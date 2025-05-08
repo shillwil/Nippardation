@@ -15,6 +15,11 @@ struct ContentView: View {
         "Push (Hypertrophy Focus)",
         "Legs (Hypertrophy Focus)"
     ]
+    @State private var generalInfo: [String] = [
+        "Exercise-Specific Warm-Up",
+        "Workbook 1",
+        "Workbook 2"
+    ]
     var body: some View {
         List {
             Section("Workouts") {
@@ -27,7 +32,13 @@ struct ContentView: View {
                 }
             }
             Section("General Info") {
-                
+                ForEach(generalInfo, id: \.self) { item in
+                    NavigationLink {
+                        // Add Destination Here
+                    } label: {
+                        Text(item)
+                    }
+                }
             }
         }
     }
