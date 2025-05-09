@@ -84,6 +84,7 @@ struct ExerciseDetailView: View {
                 Spacer()
             }
             .padding()
+            .navigationBarTitleDisplayMode(.large)
             .navigationTitle(exercise.type.name)
             .actionSheet(isPresented: $isShowingActionSheet) {
                 ActionSheet(

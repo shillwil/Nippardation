@@ -16,4 +16,5 @@ enum MuscleGroup: Hashable {
     case quads
     case hamstrings
     case calves
+    case abs
 }

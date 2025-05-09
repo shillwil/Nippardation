@@ -7,7 +7,8 @@
 
 import Foundation
 
-struct Exercise {
+struct Exercise: Identifiable {
+    var id = UUID()
     var type: ExerciseType
     var example: String
     var lastSetIntensityTechnique: String
