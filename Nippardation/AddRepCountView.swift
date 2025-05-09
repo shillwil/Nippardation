@@ -9,6 +9,7 @@ import SwiftUI
 
 struct AddRepCountView: View {
     @State private var value: Int
+    @Environment(\.dismiss) var dismiss
     
     init(repPlaceholder: Int) {
         _value = State(initialValue: repPlaceholder)
@@ -16,13 +17,25 @@ struct AddRepCountView: View {
     
     var body: some View {
         VStack {
-            HStack {
-                Spacer()
-                Text("\(value)")
-                    .font(.title3)
-                    .bold()
+            Button {
+                dismiss()
+            } label: {
+                HStack {
+                    Spacer()
+                    Image(systemName: "xmark.circle.fill")
+                        .resizable()
+                        .frame(width: 32, height: 32)
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundStyle(Color(uiColor: .systemGray))
+                }
             }
+            Text("\(value)")
+                .font(.system(size: 96, weight: .bold))
+            
             Stepper("Reps Completed", value: $value)
+            
+            Spacer()
+            
             Button {
                 // Add Save Rep Action Here
             } label: {
@@ -35,7 +48,6 @@ struct AddRepCountView: View {
                     .padding(.vertical)
 
             }
-
         }
         .padding()
     }
