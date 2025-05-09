@@ -12,43 +12,52 @@ struct ExerciseDetailView: View {
     @State private var isShowingActionSheet = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            labelText(title: "Warm-up Sets", setNumber: exercise.warmUpSets)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                labelText(title: "Warm-up Sets", setNumber: exercise.warmUpSets)
                 
-            labelText(title: "Working Sets", setNumber: exercise.workingSets)
-
-            labelText(title: "Reps", range: exercise.reps)
-
-            HStack {
-                Text("Example:")
-                    .font(.title)
-                    .bold()
+                labelText(title: "Working Sets", setNumber: exercise.workingSets)
+                
+                labelText(title: "Reps", range: exercise.reps)
+                
+                HStack {
+                    labelText(title: "Rest time between sets", range: exercise.rest)
+                    Text("min")
+                        .font(.title3)
+                        .bold()
+                }
+                
+                HStack {
+                    Text("Example:")
+                        .font(.title)
+                        .bold()
+                    Spacer()
+                }
+                .padding(.top)
+                
+                playVideoButton()
+                
+                
+                
                 Spacer()
             }
-            .padding(.top)
-            
-            playVideoButton()
-            
-            
-            
-            Spacer()
-        }
-        .padding()
-        .navigationTitle(exercise.type.name)
-        .actionSheet(isPresented: $isShowingActionSheet) {
-            ActionSheet(
-                title: Text("Watch Video"),
-                message: Text("Choose how to open this video"),
-                buttons: [
-                    .default(Text("Open in YouTube App")) {
-                        openInYouTube()
-                    },
-                    .default(Text("Open in Safari")) {
-                        openInSafari()
-                    },
-                    .cancel()
-                ]
-            )
+            .padding()
+            .navigationTitle(exercise.type.name)
+            .actionSheet(isPresented: $isShowingActionSheet) {
+                ActionSheet(
+                    title: Text("Watch Video"),
+                    message: Text("Choose how to open this video"),
+                    buttons: [
+                        .default(Text("Open in YouTube App")) {
+                            openInYouTube()
+                        },
+                        .default(Text("Open in Safari")) {
+                            openInSafari()
+                        },
+                        .cancel()
+                    ]
+                )
+            }
         }
     }
     
@@ -82,11 +91,11 @@ struct ExerciseDetailView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 60, height: 60)
                         .foregroundColor(.white)
+                        .padding(.vertical)
                     
                     Text("Tap to watch video")
                         .font(.headline)
                         .foregroundStyle(.white)
-                        .padding(.top, 8)
                 }
             }
             .frame(maxHeight: 80)
@@ -189,6 +198,7 @@ struct ExerciseDetailView: View {
         warmUpSets: 2,
         workingSets: 2,
         reps: 8...10,
+        rest: 2...3,
         trackedSets: []
     )))
 }

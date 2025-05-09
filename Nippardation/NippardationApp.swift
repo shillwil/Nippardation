@@ -18,6 +18,7 @@ struct NippardationApp: App {
                 warmUpSets: 2,
                 workingSets: 2,
                 reps: 8...10,
+                rest: 2...3,
                 trackedSets: []
             )))
         }
