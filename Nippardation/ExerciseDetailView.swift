@@ -10,6 +10,8 @@ import SwiftUI
 struct ExerciseDetailView: View {
     @Binding var exercise: Exercise
     @State private var isShowingActionSheet = false
+    @ObservedObject private var viewModel = ExerciseViewModel()
+    @State var presentRepCounter: Bool = false
     
     var body: some View {
         ScrollView {
@@ -37,7 +39,47 @@ struct ExerciseDetailView: View {
                 
                 playVideoButton()
                 
+                List {
+                    Section("Tracked Sets") {
+                        if viewModel.trackedSets.isEmpty {
+                            Text("No sets tracked yet")
+                                .foregroundColor(.gray)
+                                .padding()
+                        } else {
+                            ForEach(viewModel.trackedSets) { set in
+                                HStack {
+                                    Text("Set \(viewModel.trackedSets.firstIndex(of: set)! + 1)")
+                                        .font(.headline)
+                                    Spacer()
+                                    Text("\(set.reps) reps")
+                                        .font(.headline)
+                                }
+                                .padding(.vertical, 8)
+                                .cornerRadius(8)
+                            }
+                            .onDelete(perform: viewModel.deleteSet)
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .frame(height: 300)
+                .cornerRadius(16)
                 
+                HStack {
+                    Spacer()
+                    
+                    Button {
+                        presentRepCounter = true
+                    } label: {
+                        Text("Add Set")
+                            .foregroundStyle(.white)
+                            .frame(width: 150, height: 50)
+                            .background(Color.blue)
+                            .cornerRadius(16)
+                    }
+                    .padding()
+                }
+
                 
                 Spacer()
             }
@@ -57,6 +99,12 @@ struct ExerciseDetailView: View {
                         .cancel()
                     ]
                 )
+            }
+            .sheet(isPresented: $presentRepCounter) {
+                AddRepCountView(exercise: exercise) { newSet in
+                    viewModel.addSet(newSet)
+                }
+                .presentationDetents([.medium])
             }
         }
     }

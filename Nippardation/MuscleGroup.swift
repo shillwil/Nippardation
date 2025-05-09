@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum MuscleGroup {
+enum MuscleGroup: Hashable {
     case chest
     case back
     case shoulders

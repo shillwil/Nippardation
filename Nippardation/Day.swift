@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum Day: String {
+enum Day: String, Hashable {
     case monday
     case tuesday
     case wednesday
