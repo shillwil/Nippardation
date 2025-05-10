@@ -72,6 +72,5 @@ struct AddRepCountView: View {
         workingSets: 2,
         reps: 8...10,
         rest: 2...3,
-        trackedSets: []
     ), onSave: {_ in })
 }

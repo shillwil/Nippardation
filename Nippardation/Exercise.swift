@@ -16,5 +16,4 @@ struct Exercise: Identifiable {
     var workingSets: Int
     var reps: ClosedRange<Int>
     var rest: ClosedRange<Int>
-    var trackedSets: [TrackedSet]
 }

@@ -13,7 +13,7 @@ struct ExercisesListView: View {
         List {
             ForEach(workout.exercises) { exercise in
                 NavigationLink {
-                    ExerciseDetailView(exercise: Binding<Exercise>(get: { exercise }, set: { _ in }))
+                    ExerciseDetailView(exercise: exercise)
                 } label: {
                     Text(exercise.type.name)
                 }

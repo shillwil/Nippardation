@@ -21,7 +21,6 @@ let tuesdayWorkout = Workout(
             workingSets: 2,
             reps: 8...10,
             rest: 1...2,
-            trackedSets: []
         ),
         Exercise(
             type: ExerciseType(name: "Smith Machine Squat", muscleGroup: [.quads, .hamstrings], dayAssociation: [.tuesday]),
@@ -33,7 +32,6 @@ let tuesdayWorkout = Workout(
             workingSets: 3,
             reps: 6...8,
             rest: 3...5,
-            trackedSets: []
         ),
         Exercise(
             type: ExerciseType(name: "Barbell RDL", muscleGroup: [.back, .hamstrings], dayAssociation: [.tuesday]),
@@ -45,7 +43,6 @@ let tuesdayWorkout = Workout(
             workingSets: 3,
             reps: 6...8,
             rest: 2...3,
-            trackedSets: []
         ),
         Exercise(
             type: ExerciseType(name: "Leg Extension", muscleGroup: [.quads], dayAssociation: [.tuesday]),
@@ -57,7 +54,6 @@ let tuesdayWorkout = Workout(
             workingSets: 2,
             reps: 8...10,
             rest: 1...2,
-            trackedSets: []
         ),
         Exercise(
             type: ExerciseType(name: "Standing Calf Raise", muscleGroup: [.calves], dayAssociation: [.tuesday]),
@@ -69,7 +65,6 @@ let tuesdayWorkout = Workout(
             workingSets: 2,
             reps: 6...8,
             rest: 1...2,
-            trackedSets: []
         ),
         Exercise(
             type: ExerciseType(name: "Cable Crunch", muscleGroup: [.abs], dayAssociation: [.tuesday]),
@@ -81,7 +76,6 @@ let tuesdayWorkout = Workout(
             workingSets: 2,
             reps: 8...10,
             rest: 1...2,
-            trackedSets: []
         ),
     ]
 )
