@@ -10,7 +10,10 @@ import Combine
 
 class HomeViewModel: ObservableObject {
     @State var workouts: [Workout] = [
-        mondayWorkout,
-        tuesdayWorkout
+        upperStrength,
+        lowerStrength,
+        pullDay,
+        pushDay,
+        legDay
     ]
 }

@@ -7,12 +7,11 @@
 
 import Foundation
 
-let tuesdayWorkout = Workout(
+let lowerStrength = Workout(
     name: "Lower (Strength Focus)",
-    day: .tuesday,
     exercises: [
         Exercise(
-            type: ExerciseType(name: "Lying Leg Curl", muscleGroup: [.hamstrings], dayAssociation: [.tuesday]),
+            type: ExerciseType(name: "Lying Leg Curl", muscleGroup: [.hamstrings]),
             example: """
                     <iframe width="560" height="315" src="https://www.youtube.com/embed/sX4tGtcc62k?si=fVHTZ05sI-d-zT21" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                     """,
@@ -23,7 +22,7 @@ let tuesdayWorkout = Workout(
             rest: 1...2,
         ),
         Exercise(
-            type: ExerciseType(name: "Smith Machine Squat", muscleGroup: [.quads, .hamstrings], dayAssociation: [.tuesday]),
+            type: ExerciseType(name: "Smith Machine Squat", muscleGroup: [.quads, .hamstrings]),
             example: """
                     <iframe width="560" height="315" src="https://www.youtube.com/embed/J2D2J7RO_tA?si=sOl7cZFK4YgLeiPI" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                     """,
@@ -34,7 +33,7 @@ let tuesdayWorkout = Workout(
             rest: 3...5,
         ),
         Exercise(
-            type: ExerciseType(name: "Barbell RDL", muscleGroup: [.back, .hamstrings], dayAssociation: [.tuesday]),
+            type: ExerciseType(name: "Barbell RDL", muscleGroup: [.back, .hamstrings]),
             example: """
                     <iframe width="560" height="315" src="https://www.youtube.com/embed/3fJwfg51cv0?si=Y6L1_kLAZAYS0n9M" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                     """,
@@ -45,7 +44,7 @@ let tuesdayWorkout = Workout(
             rest: 2...3,
         ),
         Exercise(
-            type: ExerciseType(name: "Leg Extension", muscleGroup: [.quads], dayAssociation: [.tuesday]),
+            type: ExerciseType(name: "Leg Extension", muscleGroup: [.quads]),
             example: """
                     <iframe width="560" height="315" src="https://www.youtube.com/embed/uFbNtqP966A?si=toFXBY4ADpP5fRrF" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                     """,
@@ -56,7 +55,7 @@ let tuesdayWorkout = Workout(
             rest: 1...2,
         ),
         Exercise(
-            type: ExerciseType(name: "Standing Calf Raise", muscleGroup: [.calves], dayAssociation: [.tuesday]),
+            type: ExerciseType(name: "Standing Calf Raise", muscleGroup: [.calves]),
             example: """
                     <iframe width="560" height="315" src="https://www.youtube.com/embed/6lR2JdxUh7w?si=f3x1rHVJhPKS-G8g" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                     """,
@@ -67,7 +66,7 @@ let tuesdayWorkout = Workout(
             rest: 1...2,
         ),
         Exercise(
-            type: ExerciseType(name: "Cable Crunch", muscleGroup: [.abs], dayAssociation: [.tuesday]),
+            type: ExerciseType(name: "Cable Crunch", muscleGroup: [.abs]),
             example: """
                     <iframe width="560" height="315" src="https://www.youtube.com/embed/epBrpaGHMcg?si=SiKwGX13GWWPo9w8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                     """,

@@ -10,7 +10,6 @@ import Foundation
 struct Workout: Hashable, Identifiable {
     var id = UUID()
     var name: String
-    var day: Day
     var exercises: [Exercise]
     
     func hash(into hasher: inout Hasher) {
