@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23787" systemVersion="24E263" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+    <entity name="CDTrackedExercise" representedClassName="CDTrackedExercise" syncable="YES">
+        <attribute name="exerciseName" attributeType="String"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="muscleGroups" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="NSArray"/>
+        <relationship name="trackedSets" optional="YES" toMany="YES" deletionRule="Cascade" ordered="YES" destinationEntity="CDTrackedSet" inverseName="exercise" inverseEntity="CDTrackedSet"/>
+        <relationship name="workout" maxCount="1" deletionRule="Nullify" destinationEntity="CDTrackedWorkout" inverseName="trackedExercises" inverseEntity="CDTrackedWorkout"/>
+    </entity>
+    <entity name="CDTrackedSet" representedClassName="CDTrackedSet" syncable="YES">
+        <attribute name="exerciseTypeMuscleGroups" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="NSArray"/>
+        <attribute name="exerciseTypeName" attributeType="String"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="reps" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="setType" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="weight" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <relationship name="exercise" maxCount="1" deletionRule="Nullify" destinationEntity="CDTrackedExercise" inverseName="trackedSets" inverseEntity="CDTrackedExercise"/>
+    </entity>
+    <entity name="CDTrackedWorkout" representedClassName="CDTrackedWorkout" syncable="YES">
+        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="duration" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="endTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isCompleted" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="startTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="workoutTemplate" attributeType="String"/>
+        <relationship name="trackedExercises" toMany="YES" deletionRule="Cascade" ordered="YES" destinationEntity="CDTrackedExercise" inverseName="workout" inverseEntity="CDTrackedExercise"/>
+    </entity>
+</model>
