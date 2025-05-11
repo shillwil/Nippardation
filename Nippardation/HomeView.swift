@@ -17,7 +17,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Workouts") {
+                Section("Workout Templates") {
                     ForEach(viewModel.workouts, id: \.self) { workout in
                         NavigationLink {
                             ExercisesListView(workout: workout)

@@ -43,7 +43,7 @@ struct AddRepCountView: View {
             
             Button {
                 // Add Save Rep Action Here
-                let trackedSet = TrackedSet(reps: value, exerciseType: exercise.type)
+                let trackedSet = TrackedSet(reps: value, setType: .warmup, exerciseType: exercise.type)
                 onSave(trackedSet)
                 dismiss()
             } label: {

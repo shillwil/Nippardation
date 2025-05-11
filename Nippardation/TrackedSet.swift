@@ -10,6 +10,7 @@ import Foundation
 struct TrackedSet: Hashable, Equatable, Identifiable {
     let id = UUID()
     var reps: Int
+    var setType: SetType
     var exerciseType: ExerciseType
     
     func hash(into hasher: inout Hasher) {
@@ -20,4 +21,9 @@ struct TrackedSet: Hashable, Equatable, Identifiable {
     static func == (lhs: TrackedSet, rhs: TrackedSet) -> Bool {
         return lhs.reps == rhs.reps && lhs.exerciseType == rhs.exerciseType
     }
+}
+
+enum SetType {
+    case warmup
+    case working
 }
