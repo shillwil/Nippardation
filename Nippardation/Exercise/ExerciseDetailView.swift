@@ -45,6 +45,8 @@ struct ExerciseDetailView: View {
                         .bold()
                 }
                 
+                labelText(title: "Last Set Intensity Technique", text: exercise.lastSetIntensityTechnique)
+                
                 HStack {
                     Text("Example:")
                         .font(.title)
@@ -133,7 +135,7 @@ struct ExerciseDetailView: View {
     }
     
     @ViewBuilder
-    private func labelText(title: String, setNumber: Int? = nil, range: ClosedRange<Int>? = nil) -> some View {
+    private func labelText(title: String, setNumber: Int? = nil, range: ClosedRange<Int>? = nil, text: String? = nil) -> some View {
         HStack {
             Text(title)
             
@@ -143,6 +145,9 @@ struct ExerciseDetailView: View {
             }
             if let range {
                 Text("\(range.lowerBound)-\(range.upperBound)")
+            }
+            if let text {
+                Text("\(text)")
             }
         }
         .font(.title3)
