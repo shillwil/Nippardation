@@ -9,19 +9,24 @@ import SwiftUI
 
 @main
 struct NippardationApp: App {
+    private let coreDataManager = CoreDataManager.shared
+    @StateObject private var workoutManager = WorkoutManager.shared
+    
+    init() {
+        StringArrayTransformer.register()
+    }
+    
     var body: some Scene {
         WindowGroup {
-//            ExerciseDetailView(exercise: .constant(Exercise(
-//                type: ExerciseType(name: "Neutral-Grip Lat Pulldown", muscleGroup: [.back, .biceps], dayAssociation: [.wednesday]),
-//                example: "https://www.youtube.com/watch?v=lA4_1F9EAFU",
-//                lastSetIntensityTechnique: "Failure",
-//                warmUpSets: 2,
-//                workingSets: 2,
-//                reps: 8...10,
-//                rest: 2...3,
-//                trackedSets: []
-//            )))
             HomeView()
+                .onChange(of: UIApplication.shared.applicationState) { oldState, newState in
+                    if newState == .background {
+                        coreDataManager.saveContext()
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+                    coreDataManager.saveContext()
+                }
         }
     }
 }

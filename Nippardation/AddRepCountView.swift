@@ -9,12 +9,14 @@ import SwiftUI
 
 struct AddRepCountView: View {
     @State private var value: Int
+    @State private var weight: Double
     @Environment(\.dismiss) var dismiss
     var onSave: (TrackedSet) -> Void
     @State private var exercise: Exercise
     
     init(exercise: Exercise, onSave: @escaping (TrackedSet) -> Void) {
         _value = State(initialValue: exercise.workingSets)
+        _weight = State(initialValue: 0)
         _exercise = State(initialValue: exercise)
         self.onSave = onSave
         
@@ -43,7 +45,7 @@ struct AddRepCountView: View {
             
             Button {
                 // Add Save Rep Action Here
-                let trackedSet = TrackedSet(reps: value, setType: .warmup, exerciseType: exercise.type)
+                let trackedSet = TrackedSet(reps: value, weight: weight, setType: .warmup, exerciseType: exercise.type)
                 onSave(trackedSet)
                 dismiss()
             } label: {
