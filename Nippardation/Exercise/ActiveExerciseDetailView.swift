@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WebKit
 
 struct ActiveExerciseDetailView: View {
     @Environment(\.dismiss) private var dismiss

@@ -34,6 +34,7 @@ struct WorkoutSelectionView: View {
                             }
                             .contentShape(Rectangle())
                         }
+                        .tint(Color.appTheme)
                         .buttonStyle(.automatic)
                     }
                 }
@@ -47,6 +48,7 @@ struct WorkoutSelectionView: View {
                 Button("Cancel") {
                     dismiss()
                 }
+                Color.appTheme
             }
         }
     }

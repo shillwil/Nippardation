@@ -50,6 +50,7 @@ struct HomeView: View {
                                 Text("Start New Workout")
                             }
                         }
+                        .tint(Color.appTheme)
                         .buttonStyle(.borderedProminent)
                     }
                 }
@@ -61,6 +62,7 @@ struct HomeView: View {
                 }
             }
         }
+        .tint(Color.appTheme)
     }
 }
 
