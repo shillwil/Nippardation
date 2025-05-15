@@ -16,6 +16,10 @@ struct HomeView: View {
     ]
     
     @State private var startNewWorkout: Bool = false
+    @State private var showActiveWorkout: Bool = false
+    @State private var activeWorkout: TrackedWorkout?
+    @ObservedObject private var workoutManager = WorkoutManager.shared
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -57,10 +61,45 @@ struct HomeView: View {
                 .padding()
                 .sheet(isPresented: $startNewWorkout) {
                     WorkoutSelectionView { workout in
-                        
+                        self.activeWorkout = workout
+                        self.showActiveWorkout = true
                     }
                 }
+                .fullScreenCover(isPresented: $showActiveWorkout) {
+                    if let activeWorkout {
+                        NavigationStack {
+                            ActiveWorkoutView(workout: activeWorkout)
+                        }
+                    }
+                }
+                
+                if workoutManager.isWorkoutInProgress {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Button {
+                                if let workout = workoutManager.activeWorkout {
+                                    self.activeWorkout = workout
+                                    self.showActiveWorkout = true
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Resume Workout")
+                                }
+                                .padding()
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                            }
+                            .padding(.bottom, 70)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
             }
+            .navigationTitle("Home")
         }
         .tint(Color.appTheme)
     }

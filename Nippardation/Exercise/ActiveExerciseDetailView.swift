@@ -102,6 +102,12 @@ struct ActiveExerciseDetailView: View {
                             }
                             .padding(.horizontal)
                             
+                            // Add a debug Text element to check if sets are tracked
+                            Text("Sets count: \(workout.trackedExercises[exerciseIndex].trackedSets.count)")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .padding(.horizontal)
+                            
                             if workout.trackedExercises[exerciseIndex].trackedSets.isEmpty {
                                 Text("No sets tracked yet")
                                     .foregroundColor(.secondary)
@@ -225,7 +231,7 @@ struct ActiveExerciseDetailView: View {
                     AddRepCountView(exercise: exercise) { newSet in
                         addSet(newSet)
                     }
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.fraction(0.75)])
                 }
             }
             .sheet(isPresented: $isEditingSet) {
@@ -511,9 +517,6 @@ struct EditSetView: View {
                     dismiss()
                 }
             )
-//            .sheet(isPresented: $showingWeightPicker) {
-//                WeightInputView(weight: $weight, weightString: $weightString)
-//            }
         }
     }
 }

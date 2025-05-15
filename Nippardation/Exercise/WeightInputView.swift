@@ -27,103 +27,104 @@ struct WeightInputView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                // Current weight display
-                VStack(spacing: 4) {
-                    Text("WEIGHT")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Current weight display
+                    VStack(spacing: 4) {
+                        Text("WEIGHT")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        
+                        Text("\(weight, specifier: "%.1f") lbs")
+                            .font(.system(size: 48, weight: .bold))
+                            .padding()
+                    }
                     
-                    Text("\(weight, specifier: "%.1f") lbs")
-                        .font(.system(size: 48, weight: .bold))
-                        .padding()
-                }
-                
-                // Weight increment selector
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("ADJUST BY")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                    
-                    HStack {
-                        ForEach(increments, id: \.self) { increment in
-                            Button {
-                                selectedIncrement = increment
-                            } label: {
-                                Text(increment == 2.5 ? "2½" : "\(Int(increment))")
-                                    .font(.headline)
-                                    .frame(minWidth: 40)
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 12)
-                                    .background(selectedIncrement == increment ? Color.appTheme : Color(.secondarySystemBackground))
-                                    .foregroundColor(selectedIncrement == increment ? .white : .primary)
-                                    .cornerRadius(8)
+                    // Weight increment selector
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ADJUST BY")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        
+                        HStack {
+                            ForEach(increments, id: \.self) { increment in
+                                Button {
+                                    selectedIncrement = increment
+                                } label: {
+                                    Text(increment == 2.5 ? "2½" : "\(Int(increment))")
+                                        .font(.headline)
+                                        .frame(minWidth: 40)
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, 12)
+                                        .background(selectedIncrement == increment ? Color.appTheme : Color(.secondarySystemBackground))
+                                        .foregroundColor(selectedIncrement == increment ? .white : .primary)
+                                        .cornerRadius(8)
+                                }
                             }
                         }
                     }
-                }
-                .padding(.horizontal)
-                
-                // Increment/decrement buttons
-                HStack(spacing: 20) {
-                    Button {
-                        let newWeight = max(0, weight - selectedIncrement)
-                        weight = newWeight
-                        weightString = String(format: "%.1f", newWeight)
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .resizable()
-                            .frame(width: 60, height: 60)
-                            .foregroundColor(.appTheme)
-                    }
+                    .padding(.horizontal)
                     
-                    Button {
-                        let newWeight = weight + selectedIncrement
-                        weight = newWeight
-                        weightString = String(format: "%.1f", newWeight)
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .resizable()
-                            .frame(width: 60, height: 60)
-                            .foregroundColor(.appTheme)
-                    }
-                }
-                .padding(.vertical)
-                
-                // Custom weight input
-                HStack {
-                    Text("Custom Weight:")
-                        .font(.headline)
-                    
-                    TextField("Enter weight", text: $weightString)
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 100)
-                    
-                    Button("Set") {
-                        if let newWeight = Double(weightString) {
+                    // Increment/decrement buttons
+                    HStack(spacing: 20) {
+                        Button {
+                            let newWeight = max(0, weight - selectedIncrement)
                             weight = newWeight
+                            weightString = String(format: "%.1f", newWeight)
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .resizable()
+                                .frame(width: 60, height: 60)
+                                .foregroundColor(.appTheme)
+                        }
+                        
+                        Button {
+                            let newWeight = weight + selectedIncrement
+                            weight = newWeight
+                            weightString = String(format: "%.1f", newWeight)
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .resizable()
+                                .frame(width: 60, height: 60)
+                                .foregroundColor(.appTheme)
                         }
                     }
-                    .tint(Color.appTheme)
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding(.horizontal)
-                
-                // Weight preset suggestions
-                Text("COMMON WEIGHTS")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical)
+                    
+                    // Custom weight input
+                    HStack {
+                        Text("Custom Weight:")
+                            .font(.headline)
+                        
+                        TextField("Enter weight", text: $weightString)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
+                        
+                        Button("Set") {
+                            if let newWeight = Double(weightString) {
+                                weight = newWeight
+                            }
+                        }
+                        .tint(Color.appTheme)
+                        .buttonStyle(.borderedProminent)
+                    }
                     .padding(.horizontal)
-                    .padding(.top)
-                
-                // Scrollable presets by category
-                ScrollView {
+                    
+                    // Weight preset suggestions
+                    Text("COMMON WEIGHTS")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.top)
+                    
+                    // Scrollable presets by category
+                    //                ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         ForEach(weightPresets, id: \.self) { presetGroup in
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 10) {
@@ -148,49 +149,43 @@ struct WeightInputView: View {
                             }
                         }
                     }
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.appTheme, lineWidth: 1)
-                }
-                .padding(.horizontal)
-                
-                Spacer()
-                
-                // Confirmation button
-                Button {
-                    // Ensure weight is valid
-                    if let newWeight = Double(weightString) {
-                        weight = newWeight
-                    }
-                    dismiss()
-                } label: {
-                    Text("Confirm Weight")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.appTheme)
-                        .cornerRadius(12)
-                }
-                .padding()
-            }
-            .navigationTitle("Enter Weight")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                    
+                    Spacer()
+                    
+                    Button {
+                        // Ensure weight is valid
                         if let newWeight = Double(weightString) {
                             weight = newWeight
                         }
                         dismiss()
+                    } label: {
+                        Text("Confirm Weight")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.appTheme)
+                            .cornerRadius(12)
                     }
-                    .tint(Color.appTheme)
+                    .padding()
                 }
-            }
-            .onAppear {
-                // Format weight string on appear
-                weightString = String(format: "%.1f", weight)
+                .navigationTitle("Enter Weight")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            if let newWeight = Double(weightString) {
+                                weight = newWeight
+                            }
+                            dismiss()
+                        }
+                        .tint(Color.appTheme)
+                    }
+                }
+                .onAppear {
+                    // Format weight string on appear
+                    weightString = String(format: "%.1f", weight)
+                }
             }
         }
     }
