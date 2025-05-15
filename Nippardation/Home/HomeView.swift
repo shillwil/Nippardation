@@ -14,20 +14,50 @@ struct HomeView: View {
         "Workbook 1",
         "Workbook 2"
     ]
+    
+    @State private var startNewWorkout: Bool = false
     var body: some View {
         NavigationStack {
-            List {
-                Section("Workout Templates") {
-                    ForEach(viewModel.workouts, id: \.self) { workout in
-                        NavigationLink {
-                            ExercisesListView(workout: workout)
-                        } label: {
-                            Text(workout.name)
+            ZStack {
+                List {
+                    Section("Workout Templates") {
+                        ForEach(viewModel.workouts, id: \.self) { workout in
+                            NavigationLink {
+                                ExercisesListView(workout: workout)
+                            } label: {
+                                Text(workout.name)
+                            }
                         }
                     }
+                    Section("General Info") {
+                        
+                    }
                 }
-                Section("General Info") {
+                
+                VStack {
+                    Spacer()
                     
+                    HStack {
+                        Spacer()
+                        Button {
+                            startNewWorkout = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "play.circle")
+                                    .resizable()
+                                    .frame(width: 32, height: 32)
+                                    .aspectRatio(contentMode: .fit)
+                                Text("Start New Workout")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding()
+                .sheet(isPresented: $startNewWorkout) {
+                    WorkoutSelectionView { workout in
+                        
+                    }
                 }
             }
         }

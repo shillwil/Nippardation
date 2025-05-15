@@ -38,4 +38,9 @@ struct TrackedWorkout: Identifiable, Codable {
     }
 }
 
+extension TrackedWorkout: Equatable {
+    static func == (lhs: TrackedWorkout, rhs: TrackedWorkout) -> Bool {
+        lhs.id == rhs.id
+    }
+}
 

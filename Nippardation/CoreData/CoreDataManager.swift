@@ -93,6 +93,7 @@ class CoreDataManager {
                 print("Successfully saved TrackedWorkout to Core Data")
             } catch {
                 print("Failed to save TrackedWorkout: \(error)")
+                fatalError()
             }
         }
     }
