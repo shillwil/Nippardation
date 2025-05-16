@@ -52,6 +52,10 @@ class WorkoutManager: ObservableObject {
     
     func updateTrackedSet(exerciseIndex: Int, set: TrackedSet) {
         cacheManager.updateTrackedSet(exerciseIndex: exerciseIndex, set: set)
+        
+        if let workout = cacheManager.activeWorkout {
+            self.activeWorkout = workout
+        }
     }
     
     func updateSet(exerciseIndex: Int, setIndex: Int, reps: Int, weight: Double) {
