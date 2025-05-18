@@ -64,28 +64,6 @@ struct ActiveExerciseDetailView: View {
             }
             
             Spacer()
-            
-            Button {
-                withAnimation {
-                    sheetState = .expanded
-                }
-            } label: {
-                Image(systemName: "chevron.up")
-                    .foregroundColor(.secondary)
-            }
-            .padding(.horizontal)
-            
-            Button {
-                if viewModel.currentExercise.trackedSets.isEmpty {
-                    showingExerciseDetail = false
-                } else {
-                    // Save changes before closing
-                    saveAndClose()
-                }
-            } label: {
-                Text("Done")
-                    .foregroundColor(Color.appTheme)
-            }
         }
         .padding(.horizontal)
         .frame(height: 80)
@@ -108,24 +86,6 @@ struct ActiveExerciseDetailView: View {
                 }
                 
                 Spacer()
-                
-                Button {
-                    withAnimation {
-                        sheetState = .collapsed
-                    }
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                Button {
-                    saveAndClose()
-                } label: {
-                    Text("Done")
-                        .foregroundColor(Color.appTheme)
-                }
             }
             .padding()
             .background(Color(UIColor.systemBackground))
