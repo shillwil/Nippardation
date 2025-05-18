@@ -13,7 +13,6 @@ struct ActiveWorkoutView: View {
     
     // UI state properties
     @State private var showingExerciseDetail = false
-    @State private var sheetState: SheetState = .dismissed
     @State private var selectedExerciseIndex: Int?
     
     init(workout: TrackedWorkout) {
@@ -23,7 +22,6 @@ struct ActiveWorkoutView: View {
     
     var body: some View {
         List {
-            // Workout summary section
             Section {
                 VStack(spacing: 16) {
                     // Duration and start time row
@@ -89,7 +87,6 @@ struct ActiveWorkoutView: View {
                     Button {
                         selectedExerciseIndex = index
                         showingExerciseDetail = true
-                        sheetState = .expanded
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -142,16 +139,40 @@ struct ActiveWorkoutView: View {
         }
         .navigationTitle(viewModel.workout.workoutTemplate)
         .navigationBarTitleDisplayMode(.inline)
-        .bottomSheet(isPresented: $showingExerciseDetail, sheetState: $sheetState) {
-            if let index = selectedExerciseIndex {
-                ActiveExerciseDetailView(
-                    workout: $viewModel.workout,
-                    showingExerciseDetail: $showingExerciseDetail,
-                    sheetState: $sheetState,
-                    exerciseIndex: index
-                )
+        .expandablePlayer(
+            isPresented: $showingExerciseDetail,
+            expandedContent: {
+                if let index = selectedExerciseIndex {
+                    // Create a wrapper view that handles the expanded content
+                    ZStack {
+                        ActiveExerciseDetailView(
+                            workout: $viewModel.workout,
+                            showingExerciseDetail: $showingExerciseDetail,
+                            exerciseIndex: index
+                        )
+                    }
+                }
+            },
+            collapsedContent: {
+                // Mini player view for collapsed state
+                if let index = selectedExerciseIndex {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(viewModel.workout.trackedExercises[index].exerciseName)
+                                .font(.headline)
+                                .lineLimit(1)
+                            
+                            Text("\(viewModel.workout.trackedExercises[index].trackedSets.count) sets tracked")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                }
             }
-        }
+        )
         .alert("End Workout", isPresented: $viewModel.isShowingEndWorkoutAlert) {
             Button("Cancel", role: .cancel) {}
             Button("End Workout", role: .destructive) {

@@ -14,7 +14,6 @@ struct ActiveExerciseDetailView: View {
     
     @Binding var workout: TrackedWorkout
     @Binding var showingExerciseDetail: Bool
-    @Binding var sheetState: SheetState
     
     @State private var isShowingAddSet = false
     @State private var isEditingSet = false
@@ -25,10 +24,9 @@ struct ActiveExerciseDetailView: View {
     
     let exerciseIndex: Int
     
-    init(workout: Binding<TrackedWorkout>, showingExerciseDetail: Binding<Bool>, sheetState: Binding<SheetState>, exerciseIndex: Int) {
+    init(workout: Binding<TrackedWorkout>, showingExerciseDetail: Binding<Bool>, exerciseIndex: Int) {
         self._workout = workout
         self._showingExerciseDetail = showingExerciseDetail
-        self._sheetState = sheetState
         self.exerciseIndex = exerciseIndex
         
         // Create the view model with binding
@@ -40,13 +38,7 @@ struct ActiveExerciseDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Collapsed view (mini player)
-            if sheetState == .collapsed {
-                miniPlayerView
-            } else {
-                // Full view (expanded state)
-                fullPlayerView
-            }
+            fullPlayerView
         }
     }
     
@@ -381,6 +373,5 @@ struct ActiveExerciseDetailView: View {
             ])
         ),
         showingExerciseDetail: .constant(true),
-        sheetState: .constant(.collapsed),
         exerciseIndex: 0)
 }

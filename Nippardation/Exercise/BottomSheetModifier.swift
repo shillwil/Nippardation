@@ -7,49 +7,53 @@
 
 import SwiftUI
 
-enum SheetState {
-    case dismissed
-    case collapsed
-    case expanded
-}
+import SwiftUI
 
-struct BottomSheetModifier<SheetContent: View>: ViewModifier {
+struct ExpandablePlayerModifier<ExpandedContent: View, CollapsedContent: View>: ViewModifier {
     @Binding var isPresented: Bool
-    @Binding var sheetState: SheetState
-    let sheetContent: SheetContent
+    let expandedContent: ExpandedContent
+    let collapsedContent: CollapsedContent
     
-    // For tracking drag gesture
-    @GestureState private var dragOffset: CGFloat = 0
+    @State private var isExpanded: Bool = false
+    @State private var dragOffset: CGFloat = 0
     
     // Animation settings
     private let animation = Animation.spring(response: 0.3, dampingFraction: 0.7)
     
     // Height configurations
     private let collapsedHeight: CGFloat = 80
-    private let screenHeight = UIScreen.main.bounds.height - 150
+    private let maxHeight: CGFloat = UIScreen.main.bounds.height * 0.85
+    
+    init(isPresented: Binding<Bool>,
+         @ViewBuilder expandedContent: () -> ExpandedContent,
+         @ViewBuilder collapsedContent: () -> CollapsedContent) {
+        self._isPresented = isPresented
+        self.expandedContent = expandedContent()
+        self.collapsedContent = collapsedContent()
+    }
     
     func body(content: Content) -> some View {
         ZStack(alignment: .bottom) {
             // Main content
             content
-                .disabled(isPresented && sheetState == .expanded)
+                .disabled(isPresented && isExpanded)
             
-            // Bottom sheet
+            // Player overlay
             if isPresented {
                 // Semi-transparent background overlay (only in expanded state)
-//                if sheetState == .expanded {
-//                    Color.black
-//                        .opacity(0.3)
-//                        .ignoresSafeArea()
-//                        .onTapGesture {
-//                            withAnimation(animation) {
-//                                sheetState = .collapsed
-//                            }
-//                        }
-//                        .transition(.opacity)
-//                }
+                if isExpanded {
+                    Color.black
+                        .opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(animation) {
+                                isExpanded = false
+                            }
+                        }
+                        .transition(.opacity)
+                }
                 
-                // The actual sheet
+                // The actual player view
                 VStack(spacing: 0) {
                     // Drag handle
                     HStack {
@@ -63,90 +67,88 @@ struct BottomSheetModifier<SheetContent: View>: ViewModifier {
                     .padding(.bottom, 8)
                     .background(Color(UIColor.systemBackground))
                     
-                    // Sheet content
-                    sheetContent
-                        .frame(maxWidth: .infinity, maxHeight: sheetState == .expanded ? .infinity : collapsedHeight - 25)
-                        .background(Color(UIColor.systemBackground))
+                    // Player content based on state
+                    if isExpanded {
+                        expandedContent
+                            .transition(.opacity)
+                    } else {
+                        collapsedContent
+                            .frame(height: collapsedHeight - 25)
+                            .transition(.opacity)
+                    }
                 }
-                .frame(height: sheetState == .expanded ? screenHeight : collapsedHeight)
+                .frame(height: isExpanded ? maxHeight : collapsedHeight)
                 .frame(maxWidth: .infinity)
                 .background(Color(UIColor.systemBackground))
-                .cornerRadius(12, corners: [.topLeft, .topRight])
+                .cornerRadius(12)
                 .shadow(color: .primary.opacity(0.2), radius: 10, x: 0, y: -5)
-                .offset(y: dragOffset + (sheetState == .expanded ? 0 : 0))
-                .gesture(sheetDragGesture)
+                .offset(y: dragOffset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            if isExpanded {
+                                // When expanded, only allow dragging down
+                                dragOffset = max(0, value.translation.height)
+                            } else {
+                                // When collapsed, allow dragging in both directions
+                                dragOffset = value.translation.height
+                            }
+                        }
+                        .onEnded { value in
+                            let dragThreshold: CGFloat = 100
+                            
+                            if isExpanded {
+                                // If expanded and dragged down enough
+                                if value.translation.height > dragThreshold {
+                                    withAnimation(animation) {
+                                        isExpanded = false
+                                        dragOffset = 0
+                                    }
+                                } else {
+                                    // Spring back to expanded position
+                                    withAnimation(animation) {
+                                        dragOffset = 0
+                                    }
+                                }
+                            } else {
+                                // If collapsed and dragged up enough
+                                if value.translation.height < -dragThreshold {
+                                    withAnimation(animation) {
+                                        isExpanded = true
+                                        dragOffset = 0
+                                    }
+                                } else if value.translation.height > dragThreshold {
+                                    // If dragged down enough to dismiss
+                                    withAnimation(animation) {
+                                        isPresented = false
+                                        dragOffset = 0
+                                    }
+                                } else {
+                                    // Spring back to collapsed position
+                                    withAnimation(animation) {
+                                        dragOffset = 0
+                                    }
+                                }
+                            }
+                        }
+                )
                 .transition(.move(edge: .bottom))
             }
         }
         .animation(animation, value: isPresented)
-        .animation(animation, value: sheetState)
-    }
-    
-    // Drag gesture for the sheet
-    private var sheetDragGesture: some Gesture {
-        DragGesture()
-            .updating($dragOffset) { value, state, _ in
-                if sheetState == .expanded {
-                    // Only allow dragging down from expanded state
-                    state = max(0, value.translation.height)
-                } else {
-                    // Allow dragging up or down from collapsed state
-                    state = value.translation.height
-                }
-            }
-            .onEnded { value in
-                let dragThreshold: CGFloat = 120
-                
-                // Determine new state based on current state and drag
-                switch sheetState {
-                case .expanded:
-                    if value.translation.height > dragThreshold {
-                        withAnimation(animation) {
-                            sheetState = .collapsed
-                        }
-                    }
-                case .collapsed:
-                    if value.translation.height < -dragThreshold {
-                        withAnimation(animation) {
-                            sheetState = .expanded
-                        }
-                    } else if value.translation.height > dragThreshold {
-                        withAnimation(animation) {
-                            isPresented = false
-                            sheetState = .dismissed
-                        }
-                    }
-                case .dismissed:
-                    break
-                }
-            }
     }
 }
 
 extension View {
-    func bottomSheet<Content: View>(isPresented: Binding<Bool>, sheetState: Binding<SheetState>, @ViewBuilder content: @escaping () -> Content) -> some View {
-        self.modifier(BottomSheetModifier(isPresented: isPresented, sheetState: sheetState, sheetContent: content()))
+    func expandablePlayer<ExpandedContent: View, CollapsedContent: View>(
+        isPresented: Binding<Bool>,
+        @ViewBuilder expandedContent: @escaping () -> ExpandedContent,
+        @ViewBuilder collapsedContent: @escaping () -> CollapsedContent
+    ) -> some View {
+        self.modifier(ExpandablePlayerModifier(
+            isPresented: isPresented,
+            expandedContent: expandedContent,
+            collapsedContent: collapsedContent)
+        )
     }
 }
-
-// Extension for applying corner radius to specific corners
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCorner(radius: radius, corners: corners))
-    }
-}
-
-// Helper shape for rounded corners
-struct RoundedCorner: Shape {
-    var radius: CGFloat = .infinity
-    var corners: UIRectCorner = .allCorners
-    
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
-        return Path(path.cgPath)
-    }
-}
-
-//#Preview {
-//    BottomSheetModifier(isPresented: .constant(true), sheetState: .constant(.collapsed), sheetContent: EmptyView())
-//}
