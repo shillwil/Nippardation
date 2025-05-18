@@ -42,6 +42,11 @@ class ActiveExerciseViewModel: ObservableObject {
         updateStats()
     }
     
+    func updateWorkout(_ newWorkout: TrackedWorkout) {
+        self.workout = newWorkout
+        updateStats()
+    }
+    
     // Find the matching exercise from the workout templates
     private func findMatchingExercise() {
         let exerciseName = workout.trackedExercises[exerciseIndex].exerciseName

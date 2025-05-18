@@ -9,16 +9,28 @@ import SwiftUI
 import WebKit
 
 struct ActiveExerciseDetailView: View {
-    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: ActiveExerciseViewModel
+    @ObservedObject var workoutManager = WorkoutManager.shared
+    
+    @Binding var workout: TrackedWorkout
+    @Binding var showingExerciseDetail: Bool
+    @Binding var sheetState: SheetState
     
     @State private var isShowingAddSet = false
     @State private var isEditingSet = false
     @State private var selectedSetIndex: Int?
     @State private var editingReps: Int = 0
     @State private var editingWeight: Double = 0.0
+    @State private var showingCancelAlert = false
     
-    init(workout: Binding<TrackedWorkout>, exerciseIndex: Int) {
+    let exerciseIndex: Int
+    
+    init(workout: Binding<TrackedWorkout>, showingExerciseDetail: Binding<Bool>, sheetState: Binding<SheetState>, exerciseIndex: Int) {
+        self._workout = workout
+        self._showingExerciseDetail = showingExerciseDetail
+        self._sheetState = sheetState
+        self.exerciseIndex = exerciseIndex
+        
         // Create the view model with binding
         _viewModel = StateObject(wrappedValue: ActiveExerciseViewModel(
             workout: workout.wrappedValue,
@@ -27,9 +39,106 @@ struct ActiveExerciseDetailView: View {
     }
     
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            // Collapsed view (mini player)
+            if sheetState == .collapsed {
+                miniPlayerView
+            } else {
+                // Full view (expanded state)
+                fullPlayerView
+            }
+        }
+    }
+    
+    // Mini player view (collapsed state)
+    private var miniPlayerView: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(viewModel.currentExercise.exerciseName)
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                Text("\(viewModel.currentExercise.trackedSets.count) sets tracked")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Button {
+                withAnimation {
+                    sheetState = .expanded
+                }
+            } label: {
+                Image(systemName: "chevron.up")
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal)
+            
+            Button {
+                if viewModel.currentExercise.trackedSets.isEmpty {
+                    showingExerciseDetail = false
+                } else {
+                    // Save changes before closing
+                    saveAndClose()
+                }
+            } label: {
+                Text("Done")
+                    .foregroundColor(Color.appTheme)
+            }
+        }
+        .padding(.horizontal)
+        .frame(height: 80)
+    }
+    
+    // Full player view (expanded state)
+    private var fullPlayerView: some View {
+        VStack(spacing: 0) {
+            // Navigation bar
+            HStack {
+                Button {
+                    if viewModel.currentExercise.trackedSets.isEmpty {
+                        showingExerciseDetail = false
+                    } else {
+                        showingCancelAlert = true
+                    }
+                } label: {
+                    Text("Cancel")
+                        .foregroundColor(Color.appTheme)
+                }
+                
+                Spacer()
+                
+                Button {
+                    withAnimation {
+                        sheetState = .collapsed
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Button {
+                    saveAndClose()
+                } label: {
+                    Text("Done")
+                        .foregroundColor(Color.appTheme)
+                }
+            }
+            .padding()
+            .background(Color(UIColor.systemBackground))
+            
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    // Exercise title
+                    Text(viewModel.currentExercise.exerciseName)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal)
+                        .padding(.top)
+                    
                     // Exercise Information
                     if let exercise = viewModel.matchingExercise {
                         Group {
@@ -78,12 +187,6 @@ struct ActiveExerciseDetailView: View {
                                 .buttonStyle(.bordered)
                             }
                             .padding(.horizontal)
-                            
-                            // Add a debug Text element to check if sets are tracked
-                            Text("Sets count: \(viewModel.currentExercise.trackedSets.count)")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                                .padding(.horizontal)
                             
                             if viewModel.currentExercise.trackedSets.isEmpty {
                                 Text("No sets tracked yet")
@@ -186,39 +289,86 @@ struct ActiveExerciseDetailView: View {
                             }
                         }
                     }
+                    
+                    // Spacer to ensure bottom button doesn't overlap content
+                    Spacer(minLength: 100)
                 }
                 .padding(.bottom, 20)
             }
-            .navigationTitle(viewModel.currentExercise.exerciseName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+            
+            // "Finish This Movement" button at bottom
+            VStack {
+                Button {
+                    saveAndClose()
+                } label: {
+                    Text("Finish This Movement")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.appTheme)
+                        .cornerRadius(12)
+                        .shadow(radius: 2)
                 }
+                .padding()
             }
-            .sheet(isPresented: $isShowingAddSet) {
-                if let exercise = viewModel.matchingExercise {
-                    AddRepCountView(exercise: exercise) { newSet in
-                        viewModel.addSet(newSet)
-                    }
-                    .presentationDetents([.fraction(0.75)])
-                }
+            .background(
+                Rectangle()
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: -5)
+            )
+        }
+        .alert("Cancel Exercise", isPresented: $showingCancelAlert) {
+            Button("Go Back", role: .cancel) {
+                // Just dismiss the alert
             }
-            .sheet(isPresented: $isEditingSet) {
-                if let index = selectedSetIndex {
-                    EditSetView(
-                        reps: $editingReps,
-                        weight: $editingWeight,
-                        onSave: { newReps, newWeight in
-                            viewModel.updateSet(at: index, reps: newReps, weight: newWeight)
-                        }
-                    )
-                    .presentationDetents([.medium])
+            
+            Button("Cancel Anyway", role: .destructive) {
+                showingExerciseDetail = false
+            }
+        } message: {
+            Text("You have unsaved sets for this exercise. Are you sure you want to cancel?")
+        }
+        .sheet(isPresented: $isShowingAddSet) {
+            if let exercise = viewModel.matchingExercise {
+                AddRepCountView(exercise: exercise) { newSet in
+                    viewModel.addSet(newSet)
+                    // Update the binding to ensure changes propagate
+                    workout.trackedExercises[exerciseIndex] = viewModel.currentExercise
                 }
+                .presentationDetents([.fraction(0.75)])
             }
         }
+        .sheet(isPresented: $isEditingSet) {
+            if let index = selectedSetIndex {
+                EditSetView(
+                    reps: $editingReps,
+                    weight: $editingWeight,
+                    onSave: { newReps, newWeight in
+                        viewModel.updateSet(at: index, reps: newReps, weight: newWeight)
+                        // Update the binding to ensure changes propagate
+                        workout.trackedExercises[exerciseIndex] = viewModel.currentExercise
+                    }
+                )
+                .presentationDetents([.medium])
+            }
+        }
+        .onAppear {
+            // Synchronize view model with the latest workout data
+            viewModel.updateWorkout(workout)
+        }
+        .onChange(of: viewModel.workout) { newValue in
+            // Keep the binding in sync with view model changes
+            workout = newValue
+        }
+    }
+    
+    private func saveAndClose() {
+        // Save changes through the workout binding
+        workout.trackedExercises[exerciseIndex] = viewModel.currentExercise
+        // Update in workout manager
+        workoutManager.updateExercise(at: exerciseIndex, with: viewModel.currentExercise)
+        showingExerciseDetail = false
     }
     
     @ViewBuilder
@@ -241,7 +391,7 @@ struct ActiveExerciseDetailView: View {
         VStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(.blue)
+                .foregroundColor(.appTheme)
             
             Text(value)
                 .font(.title3)
@@ -270,5 +420,7 @@ struct ActiveExerciseDetailView: View {
                 )
             ])
         ),
+        showingExerciseDetail: .constant(true),
+        sheetState: .constant(.collapsed),
         exerciseIndex: 0)
 }

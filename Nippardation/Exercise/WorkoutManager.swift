@@ -66,6 +66,16 @@ class WorkoutManager: ObservableObject {
         cacheManager.removeTrackedSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
     }
     
+    func updateExercise(at index: Int, with exercise: TrackedExercise) {
+        guard var workout = activeWorkout, index < workout.trackedExercises.count else { return }
+        
+        workout.trackedExercises[index] = exercise
+        activeWorkout = workout
+        
+        // Update in cache
+        cacheManager.updateExercise(at: index, with: exercise)
+    }
+    
     func endWorkout() {
         guard let completedWorkout = cacheManager.endWorkout() else { return }
         

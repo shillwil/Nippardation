@@ -82,6 +82,14 @@ class WorkoutCacheManager {
         saveWorkoutCache()
     }
     
+    func updateExercise(at index: Int, with exercise: TrackedExercise) {
+        guard var workout = activeWorkout, index < workout.trackedExercises.count else { return }
+        
+        workout.trackedExercises[index] = exercise
+        activeWorkout = workout
+        saveWorkoutCache()
+    }
+    
     func endWorkout() -> TrackedWorkout? {
         guard var workout = activeWorkout else { return nil }
         

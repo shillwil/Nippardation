@@ -14,6 +14,7 @@ struct ActiveWorkoutView: View {
     
     @State private var showingEndWorkoutAlert = false
     @State private var showingExerciseDetail = false
+    @State private var sheetState: SheetState = .dismissed
     @State private var selectedExerciseIndex: Int?
     
     // Timer for workout duration
@@ -92,6 +93,7 @@ struct ActiveWorkoutView: View {
                     Button {
                         selectedExerciseIndex = index
                         showingExerciseDetail = true
+                        sheetState = .expanded
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -144,9 +146,14 @@ struct ActiveWorkoutView: View {
         }
         .navigationTitle(workout.workoutTemplate)
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingExerciseDetail) {
+        .bottomSheet(isPresented: $showingExerciseDetail, sheetState: $sheetState) {
             if let index = selectedExerciseIndex {
-                ActiveExerciseDetailView(workout: $workout, exerciseIndex: index)
+                ActiveExerciseDetailView(
+                    workout: $workout,
+                    showingExerciseDetail: $showingExerciseDetail,
+                    sheetState: $sheetState,
+                    exerciseIndex: index
+                )
             }
         }
         .alert("End Workout", isPresented: $showingEndWorkoutAlert) {
