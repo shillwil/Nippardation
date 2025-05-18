@@ -9,21 +9,17 @@ import SwiftUI
 
 struct ActiveWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject var workoutManager = WorkoutManager.shared
-    @State var workout: TrackedWorkout
+    @StateObject private var viewModel: ActiveWorkoutViewModel
     
-    @State private var showingEndWorkoutAlert = false
+    // UI state properties
     @State private var showingExerciseDetail = false
     @State private var sheetState: SheetState = .dismissed
     @State private var selectedExerciseIndex: Int?
     
-    // Timer for workout duration
-    @State private var elapsedTime: TimeInterval = 0
-    @State private var timer: Timer?
-    
-    // Stats
-    @State private var totalVolume: Double = 0
-    @State private var completedSets: Int = 0
+    init(workout: TrackedWorkout) {
+        // Initialize the view model with the workout
+        _viewModel = StateObject(wrappedValue: ActiveWorkoutViewModel(workout: workout))
+    }
     
     var body: some View {
         List {
@@ -37,7 +33,7 @@ struct ActiveWorkoutView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             
-                            Text(formattedElapsedTime)
+                            Text(viewModel.formattedElapsedTime)
                                 .font(.title2)
                                 .fontWeight(.semibold)
                         }
@@ -49,14 +45,14 @@ struct ActiveWorkoutView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             
-                            Text(workout.startTime?.formatted(date: .omitted, time: .shortened) ?? "")
+                            Text(viewModel.workout.startTime?.formatted(date: .omitted, time: .shortened) ?? "")
                                 .font(.title2)
                                 .fontWeight(.semibold)
                         }
                     }
                     
                     // Progress bar and stats
-                    if completedSets > 0 {
+                    if viewModel.completedSets > 0 {
                         Divider()
                         
                         HStack {
@@ -65,7 +61,7 @@ struct ActiveWorkoutView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 
-                                Text("\(completedSets)")
+                                Text("\(viewModel.completedSets)")
                                     .font(.title2)
                                     .fontWeight(.semibold)
                             }
@@ -77,7 +73,7 @@ struct ActiveWorkoutView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 
-                                Text("\(Int(totalVolume)) lbs")
+                                Text("\(Int(viewModel.totalVolume)) lbs")
                                     .font(.title2)
                                     .fontWeight(.semibold)
                             }
@@ -89,7 +85,7 @@ struct ActiveWorkoutView: View {
             
             // Exercises section
             Section("Exercises") {
-                ForEach(Array(zip(workout.trackedExercises.indices, workout.trackedExercises)), id: \.0) { index, exercise in
+                ForEach(Array(zip(viewModel.workout.trackedExercises.indices, viewModel.workout.trackedExercises)), id: \.0) { index, exercise in
                     Button {
                         selectedExerciseIndex = index
                         showingExerciseDetail = true
@@ -133,7 +129,7 @@ struct ActiveWorkoutView: View {
             // End workout button
             Section {
                 Button(role: .destructive) {
-                    showingEndWorkoutAlert = true
+                    viewModel.isShowingEndWorkoutAlert = true
                 } label: {
                     HStack {
                         Spacer()
@@ -144,83 +140,33 @@ struct ActiveWorkoutView: View {
                 }
             }
         }
-        .navigationTitle(workout.workoutTemplate)
+        .navigationTitle(viewModel.workout.workoutTemplate)
         .navigationBarTitleDisplayMode(.inline)
         .bottomSheet(isPresented: $showingExerciseDetail, sheetState: $sheetState) {
             if let index = selectedExerciseIndex {
                 ActiveExerciseDetailView(
-                    workout: $workout,
+                    workout: $viewModel.workout,
                     showingExerciseDetail: $showingExerciseDetail,
                     sheetState: $sheetState,
                     exerciseIndex: index
                 )
             }
         }
-        .alert("End Workout", isPresented: $showingEndWorkoutAlert) {
+        .alert("End Workout", isPresented: $viewModel.isShowingEndWorkoutAlert) {
             Button("Cancel", role: .cancel) {}
             Button("End Workout", role: .destructive) {
-                endWorkout()
+                viewModel.endWorkout()
+                dismiss()
             }
         } message: {
             Text("Are you sure you want to end this workout? Your progress will be saved.")
         }
         .onAppear {
-            startTimer()
-            
-            // Update elapsed time based on workout start time
-            if let startTime = workout.startTime {
-                elapsedTime = Date().timeIntervalSince(startTime)
-            }
-            
-            // Calculate initial stats
-            updateWorkoutStats()
+            viewModel.startTimer()
         }
         .onDisappear {
-            stopTimer()
+            viewModel.stopTimer()
         }
-        .onChange(of: workout) { _, _ in
-            updateWorkoutStats()
-        }
-    }
-    
-    private var formattedElapsedTime: String {
-        let hours = Int(elapsedTime) / 3600
-        let minutes = (Int(elapsedTime) % 3600) / 60
-        let seconds = Int(elapsedTime) % 60
-        
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%d:%02d", minutes, seconds)
-        }
-    }
-    
-    private func updateWorkoutStats() {
-        // Calculate total volume
-        totalVolume = workout.trackedExercises.reduce(0.0) { exerciseSum, exercise in
-            exerciseSum + exercise.trackedSets.reduce(0.0) { setSum, set in
-                setSum + (Double(set.reps) * set.weight)
-            }
-        }
-        
-        // Count completed sets
-        completedSets = workout.trackedExercises.reduce(0) { $0 + $1.trackedSets.count }
-    }
-    
-    private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            elapsedTime += 1
-        }
-    }
-    
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
-    }
-    
-    private func endWorkout() {
-        workoutManager.endWorkout()
-        dismiss()
     }
 }
 
