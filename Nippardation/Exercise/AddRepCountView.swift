@@ -54,29 +54,11 @@ struct AddRepCountView: View {
                         .foregroundStyle(Color(uiColor: .systemGray))
                 }
             }
-            .padding(.horizontal)
+            .padding()
             
             Text("Track Set")
                 .font(.title)
                 .fontWeight(.bold)
-            
-            // Set type selector
-            Picker("Set Type", selection: $setType) {
-                Text("Warm-up").tag(SetType.warmup)
-                Text("Working").tag(SetType.working)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .onChange(of: setType) { oldValue, newValue in
-                // Update weight based on set type
-                if newValue == .warmup && lastWarmupWeight > 0 {
-                    weight = lastWarmupWeight
-                    weightString = String(format: "%.1f", weight)
-                } else if newValue == .working && lastWorkingWeight > 0 {
-                    weight = lastWorkingWeight
-                    weightString = String(format: "%.1f", weight)
-                }
-            }
             
             // Reps section
             VStack(alignment: .center, spacing: 10) {
@@ -112,6 +94,24 @@ struct AddRepCountView: View {
                 .padding(.vertical, 5)
             }
             .padding()
+            
+            // Set type selector
+            Picker("Set Type", selection: $setType) {
+                Text("Warm-up").tag(SetType.warmup)
+                Text("Working").tag(SetType.working)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .onChange(of: setType) { oldValue, newValue in
+                // Update weight based on set type
+                if newValue == .warmup && lastWarmupWeight > 0 {
+                    weight = lastWarmupWeight
+                    weightString = String(format: "%.1f", weight)
+                } else if newValue == .working && lastWorkingWeight > 0 {
+                    weight = lastWorkingWeight
+                    weightString = String(format: "%.1f", weight)
+                }
+            }
             
             // Weight section
             VStack(alignment: .center, spacing: 10) {
