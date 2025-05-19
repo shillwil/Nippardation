@@ -22,11 +22,8 @@ class WorkoutManager: ObservableObject {
     @Published var workoutStats: WorkoutStats = WorkoutStats()
     
     private init() {
-        // Check for an active workout in the cache
-        if let cachedWorkout = cacheManager.resumeActiveWorkout() {
-            activeWorkout = cachedWorkout
-            isWorkoutInProgress = true
-        }
+        // Initial check for cached workout - this will be done on app start
+        checkForActiveWorkout()
         
         // Load completed workouts from Core Data
         loadCompletedWorkouts()
@@ -41,6 +38,21 @@ class WorkoutManager: ObservableObject {
         
         // Load workout statistics
         loadWorkoutStats()
+    }
+    
+    // Public method to explicitly check for cached workout
+    func checkForActiveWorkout() {
+        if let cachedWorkout = cacheManager.resumeActiveWorkout() {
+            DispatchQueue.main.async { [weak self] in
+                self?.activeWorkout = cachedWorkout
+                self?.isWorkoutInProgress = true
+                // Ensure UI gets updated
+                self?.objectWillChange.send()
+            }
+            print("Restored active workout: \(cachedWorkout.workoutTemplate)")
+        } else {
+            print("No active workout found in cache")
+        }
     }
     
     func startWorkout(template: Workout) -> TrackedWorkout {

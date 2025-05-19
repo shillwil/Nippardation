@@ -16,7 +16,7 @@ class WorkoutCacheManager {
     private let decoder = JSONDecoder()
     
     private var timer: Timer?
-    private let saveInterval: TimeInterval = 30 // Save every 30 seconds
+    private let saveInterval: TimeInterval = 10 // Save every 10 seconds (reduced from 30)
     
     @Published var activeWorkout: TrackedWorkout?
     
@@ -47,6 +47,10 @@ class WorkoutCacheManager {
         
         activeWorkout = workout
         startPeriodicSaving()
+        
+        // Save immediately too
+        saveWorkoutCache()
+        
         return workout
     }
     
@@ -104,9 +108,6 @@ class WorkoutCacheManager {
         clearCache()
         stopPeriodicSaving()
         
-        // Store in Core Data
-        CoreDataManager.shared.saveTrackedWorkout(workout)
-        
         return workout
     }
     
@@ -126,38 +127,60 @@ class WorkoutCacheManager {
         timer = nil
     }
     
-    private func saveWorkoutCache() {
+    func saveWorkoutCache() {
         guard let workout = activeWorkout else { return }
         
         do {
             let data = try encoder.encode(workout)
             UserDefaults.standard.set(data, forKey: activeWorkoutKey)
             print("Workout cached successfully")
+            
+            // Force UserDefaults to synchronize immediately to help with app termination
+            UserDefaults.standard.synchronize()
         } catch {
             print("Failed to cache workout: \(error)")
         }
     }
     
     private func loadCachedWorkout() {
-        guard let data = UserDefaults.standard.data(forKey: activeWorkoutKey) else { return }
+        guard let data = UserDefaults.standard.data(forKey: activeWorkoutKey) else {
+            print("No workout data found in UserDefaults")
+            return
+        }
         
         do {
             let workout = try decoder.decode(TrackedWorkout.self, from: data)
-            activeWorkout = workout
             
-            // If there's an active workout, restart the timer
+            // Only consider it active if it's not completed
             if workout.isCompleted == false {
+                activeWorkout = workout
+                
+                // Update the startTime if needed
+                if workout.startTime == nil {
+                    var updatedWorkout = workout
+                    updatedWorkout.startTime = Date()
+                    activeWorkout = updatedWorkout
+                    saveWorkoutCache()
+                }
+                
+                // Restart the timer
                 startPeriodicSaving()
+                
+                print("Cached workout loaded successfully: \(workout.workoutTemplate)")
+            } else {
+                print("Found completed workout in cache - should have been removed")
+                clearCache()
             }
-            
-            print("Cached workout loaded successfully")
         } catch {
             print("Failed to load cached workout: \(error)")
+            // Clear potentially corrupted data
+            clearCache()
         }
     }
     
     private func clearCache() {
         UserDefaults.standard.removeObject(forKey: activeWorkoutKey)
+        UserDefaults.standard.synchronize()
         activeWorkout = nil
     }
 }

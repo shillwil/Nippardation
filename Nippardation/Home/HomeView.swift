@@ -13,7 +13,9 @@ struct HomeView: View {
     
     @State private var startNewWorkout: Bool = false
     @State private var showActiveWorkout: Bool = false
-    @State private var activeWorkout: TrackedWorkout?
+    
+    // Add state to track if we've done initial loading
+    @State private var didCheckForActiveWorkout: Bool = false
     
     var body: some View {
         NavigationStack {
@@ -104,70 +106,70 @@ struct HomeView: View {
                     
                     HStack {
                         Spacer()
-                        Button {
-                            startNewWorkout = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "play.circle")
-                                    .resizable()
-                                    .frame(width: 32, height: 32)
-                                    .aspectRatio(contentMode: .fit)
-                                Text("Start New Workout")
+                        
+                        // Conditionally show either Resume or Start New Workout button
+                        if workoutManager.isWorkoutInProgress {
+                            Button {
+                                showActiveWorkout = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise.circle")
+                                        .resizable()
+                                        .frame(width: 32, height: 32)
+                                        .aspectRatio(contentMode: .fit)
+                                    Text("Resume Workout")
+                                }
+                                .padding()
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(16)
+                                .shadow(radius: 2)
                             }
-                            .padding()
-                            .background(Color.appTheme)
-                            .foregroundColor(.white)
-                            .cornerRadius(16)
-                            .shadow(radius: 2)
+                        } else {
+                            Button {
+                                startNewWorkout = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "play.circle")
+                                        .resizable()
+                                        .frame(width: 32, height: 32)
+                                        .aspectRatio(contentMode: .fit)
+                                    Text("Start New Workout")
+                                }
+                                .padding()
+                                .background(Color.appTheme)
+                                .foregroundColor(.white)
+                                .cornerRadius(16)
+                                .shadow(radius: 2)
+                            }
                         }
                     }
                 }
                 .padding()
                 .sheet(isPresented: $startNewWorkout) {
                     WorkoutSelectionView { workout in
-                        self.activeWorkout = workout
                         self.showActiveWorkout = true
                     }
                 }
                 .fullScreenCover(isPresented: $showActiveWorkout) {
-                    if let activeWorkout {
+                    if let activeWorkout = workoutManager.activeWorkout {
                         NavigationStack {
                             ActiveWorkoutView(workout: activeWorkout)
                         }
                     }
-                }
-                
-                if workoutManager.isWorkoutInProgress {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Button {
-                                if let workout = workoutManager.activeWorkout {
-                                    self.activeWorkout = workout
-                                    self.showActiveWorkout = true
-                                }
-                            } label: {
-                                HStack {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("Resume Workout")
-                                }
-                                .padding()
-                                .background(Color.green)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                                .shadow(radius: 2)
-                            }
-                            .padding(.bottom, 70)
-                        }
-                    }
-                    .padding(.horizontal)
                 }
             }
             .navigationTitle("Home")
             .onAppear {
                 // Refresh workout data when the view appears
                 workoutManager.loadCompletedWorkouts()
+                
+                // Check for active workout on first appear only
+                if !didCheckForActiveWorkout {
+                    // Explicitly force the WorkoutManager to check for cached workout
+                    workoutManager.checkForActiveWorkout()
+                    didCheckForActiveWorkout = true
+                }
             }
         }
         .tint(Color.appTheme)
