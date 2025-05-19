@@ -9,32 +9,93 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var viewModel = HomeViewModel()
-    @State private var generalInfo: [String] = [
-        "Exercise-Specific Warm-Up",
-        "Workbook 1",
-        "Workbook 2"
-    ]
+    @ObservedObject private var workoutManager = WorkoutManager.shared
     
     @State private var startNewWorkout: Bool = false
     @State private var showActiveWorkout: Bool = false
     @State private var activeWorkout: TrackedWorkout?
-    @ObservedObject private var workoutManager = WorkoutManager.shared
     
     var body: some View {
         NavigationStack {
             ZStack {
-                List {
-                    Section("Workout Templates") {
-                        ForEach(viewModel.workouts, id: \.self) { workout in
-                            NavigationLink {
-                                ExercisesListView(workout: workout)
-                            } label: {
-                                Text(workout.name)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Workout Stats Chart
+                        if !workoutManager.completedWorkouts.isEmpty {
+                            WorkoutStatsView()
+                                .padding(.top, 8)
+                        }
+                        
+                        // Workout Templates
+                        VStack(alignment: .leading) {
+                            Text("Workout Templates")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            
+                            ForEach(viewModel.workouts, id: \.self) { workout in
+                                NavigationLink {
+                                    ExercisesListView(workout: workout)
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(workout.name)
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                            
+                                            Text("\(workout.exercises.count) exercises")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding()
+                                    .background(Color(.secondarySystemBackground))
+                                    .cornerRadius(12)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        
+                        // Recent Workouts Section
+                        if !workoutManager.completedWorkouts.isEmpty {
+                            VStack(alignment: .leading) {
+                                Text("Recent Workouts")
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                    .padding(.top, 8)
+                                
+                                ForEach(workoutManager.completedWorkouts.prefix(3)) { workout in
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(workout.workoutTemplate)
+                                                .font(.headline)
+                                            
+                                            Text(workout.formattedDate)
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if let duration = workout.formattedDuration {
+                                            Text(duration)
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding()
+                                    .background(Color(.secondarySystemBackground))
+                                    .cornerRadius(12)
+                                }
+                                .padding(.horizontal)
                             }
                         }
-                    }
-                    Section("General Info") {
                         
+                        Spacer(minLength: 100)
                     }
                 }
                 
@@ -53,9 +114,12 @@ struct HomeView: View {
                                     .aspectRatio(contentMode: .fit)
                                 Text("Start New Workout")
                             }
+                            .padding()
+                            .background(Color.appTheme)
+                            .foregroundColor(.white)
+                            .cornerRadius(16)
+                            .shadow(radius: 2)
                         }
-                        .tint(Color.appTheme)
-                        .buttonStyle(.borderedProminent)
                     }
                 }
                 .padding()
@@ -92,6 +156,7 @@ struct HomeView: View {
                                 .background(Color.green)
                                 .foregroundColor(.white)
                                 .cornerRadius(10)
+                                .shadow(radius: 2)
                             }
                             .padding(.bottom, 70)
                         }
@@ -100,6 +165,10 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("Home")
+            .onAppear {
+                // Refresh workout data when the view appears
+                workoutManager.loadCompletedWorkouts()
+            }
         }
         .tint(Color.appTheme)
     }

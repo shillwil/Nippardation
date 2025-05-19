@@ -125,14 +125,13 @@ struct ActiveWorkoutView: View {
             
             // End workout button
             Section {
-                Button(role: .destructive) {
-                    viewModel.isShowingEndWorkoutAlert = true
-                } label: {
-                    HStack {
-                        Spacer()
-                        Text("End Workout")
-                            .fontWeight(.bold)
-                        Spacer()
+                // In ActiveWorkoutView where you handle ending the workout:
+                Button("End Workout", role: .destructive) {
+                    viewModel.endWorkout()
+                    
+                    // Short delay to ensure data is saved before dismissing
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+                        dismiss()
                     }
                 }
             }

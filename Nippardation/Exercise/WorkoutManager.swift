@@ -82,9 +82,20 @@ class WorkoutManager: ObservableObject {
         self.isWorkoutInProgress = false
         self.activeWorkout = nil
         
-        // Reload completed workouts and stats
-        loadCompletedWorkouts()
-        loadWorkoutStats()
+        // Save to CoreData first
+        CoreDataManager.shared.saveTrackedWorkout(completedWorkout)
+        
+        // Then reload the data
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.loadCompletedWorkouts()
+            self?.loadWorkoutStats()
+            
+            // Notify observers that data has changed
+            self?.objectWillChange.send()
+            
+            // Also post notification for any other observers
+            NotificationCenter.default.post(name: NSNotification.Name("WorkoutDataUpdated"), object: nil)
+        }
     }
     
     func deleteCompletedWorkout(id: UUID) {
@@ -97,7 +108,7 @@ class WorkoutManager: ObservableObject {
         return coreDataManager.fetchExerciseProgressData(exerciseName: exerciseName)
     }
     
-    private func loadCompletedWorkouts() {
+    func loadCompletedWorkouts() {
         completedWorkouts = coreDataManager.fetchTrackedWorkouts()
             .filter { $0.isCompleted }
             .sorted { $0.date > $1.date }
@@ -143,7 +154,7 @@ extension WorkoutManager {
         let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) ?? Date()
         
         let filteredWorkouts = completedWorkouts.filter {
-            $0.date >= startDate
+            $0.date >= startDate && $0.isCompleted
         }
         
         // Group by date (day)

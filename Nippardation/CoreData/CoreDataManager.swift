@@ -11,22 +11,22 @@ import Foundation
 class CoreDataManager {
     static let shared = CoreDataManager()
     
-    private let modelName = "Nippardation"
+    private let modelName = "CDModel"
     
     lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: modelName)
-        container.loadPersistentStores { description, error in
-            if let error = error {
-                fatalError("Unable to load persistent stores: \(error)")
+            let container = NSPersistentContainer(name: modelName)
+            container.loadPersistentStores { description, error in
+                if let error = error {
+                    print("Unable to load persistent stores: \(error)")
+                }
             }
-        }
-        
-        // Merge policy to handle conflicts
-        container.viewContext.automaticallyMergesChangesFromParent = true
-        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        
-        return container
-    }()
+            
+            // Merge policy to handle conflicts
+            container.viewContext.automaticallyMergesChangesFromParent = true
+            container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+            
+            return container
+        }()
     
     var viewContext: NSManagedObjectContext {
         return persistentContainer.viewContext
@@ -52,6 +52,7 @@ class CoreDataManager {
     
     // MARK: - TrackedWorkout Operations
     
+    // Check the save method in CoreDataManager
     func saveTrackedWorkout(_ trackedWorkout: TrackedWorkout) {
         let context = backgroundContext()
         
@@ -90,21 +91,27 @@ class CoreDataManager {
             // Save the context
             do {
                 try context.save()
-                print("Successfully saved TrackedWorkout to Core Data")
+                print("Successfully saved TrackedWorkout to Core Data with ID: \(trackedWorkout.id)")
+                
+                // Post notification on main thread for UI updates
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: NSNotification.Name("WorkoutDataUpdated"), object: nil)
+                }
             } catch {
                 print("Failed to save TrackedWorkout: \(error)")
-                fatalError()
             }
         }
     }
-    
+    // Make sure the fetch method works correctly
     func fetchTrackedWorkouts() -> [TrackedWorkout] {
         let request: NSFetchRequest<CDTrackedWorkout> = CDTrackedWorkout.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
         
         do {
             let cdWorkouts = try viewContext.fetch(request)
-            return cdWorkouts.map { self.convertToTrackedWorkout($0) }
+            let workouts = cdWorkouts.map { self.convertToTrackedWorkout($0) }
+            print("Fetched \(workouts.count) workouts from Core Data. Completed count: \(workouts.filter { $0.isCompleted }.count)")
+            return workouts
         } catch {
             print("Failed to fetch tracked workouts: \(error)")
             return []
