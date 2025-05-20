@@ -72,7 +72,7 @@ class WorkoutCacheManager {
         saveWorkoutCache()
     }
     
-    func updateSet(exerciseIndex: Int, setIndex: Int, reps: Int, weight: Double) {
+    func updateSet(exerciseIndex: Int, setIndex: Int, reps: Int, weight: Double, setType: SetType) {
         guard var workout = activeWorkout,
               exerciseIndex < workout.trackedExercises.count,
               setIndex < workout.trackedExercises[exerciseIndex].trackedSets.count else { return }
@@ -80,6 +80,7 @@ class WorkoutCacheManager {
         var updatedSet = workout.trackedExercises[exerciseIndex].trackedSets[setIndex]
         updatedSet.reps = reps
         updatedSet.weight = weight
+        updatedSet.setType = setType
         
         workout.trackedExercises[exerciseIndex].trackedSets[setIndex] = updatedSet
         activeWorkout = workout

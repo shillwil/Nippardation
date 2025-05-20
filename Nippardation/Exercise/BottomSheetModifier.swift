@@ -14,7 +14,7 @@ struct ExpandablePlayerModifier<ExpandedContent: View, CollapsedContent: View>: 
     let expandedContent: ExpandedContent
     let collapsedContent: CollapsedContent
     
-    @State private var isExpanded: Bool = false
+    @State private var isExpanded: Bool = true
     @State private var dragOffset: CGFloat = 0
     
     // Animation settings
