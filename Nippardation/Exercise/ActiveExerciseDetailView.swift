@@ -20,6 +20,7 @@ struct ActiveExerciseDetailView: View {
     @State private var selectedSetIndex: Int?
     @State private var editingReps: Int = 0
     @State private var editingWeight: Double = 0.0
+    @State private var editingSetType: SetType = .working
     @State private var showingCancelAlert = false
     
     let exerciseIndex: Int
@@ -176,6 +177,7 @@ struct ActiveExerciseDetailView: View {
                                                     selectedSetIndex = index
                                                     editingReps = set.reps
                                                     editingWeight = set.weight
+                                                    editingSetType = set.setType
                                                     isEditingSet = true
                                                 } label: {
                                                     Label("Edit", systemImage: "pencil")
@@ -296,8 +298,9 @@ struct ActiveExerciseDetailView: View {
                 EditSetView(
                     reps: $editingReps,
                     weight: $editingWeight,
-                    onSave: { newReps, newWeight in
-                        viewModel.updateSet(at: index, reps: newReps, weight: newWeight)
+                    setType: $editingSetType,
+                    onSave: { newReps, newWeight, newSetType in
+                        viewModel.updateSet(at: index, reps: newReps, weight: newWeight, setType: newSetType)
                         // Update the binding to ensure changes propagate
                         workout.trackedExercises[exerciseIndex] = viewModel.currentExercise
                     }

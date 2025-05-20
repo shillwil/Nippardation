@@ -172,16 +172,17 @@ class ActiveExerciseViewModel: ObservableObject {
     }
     
     // Update a set at the specified index
-    func updateSet(at index: Int, reps: Int, weight: Double) {
+    func updateSet(at index: Int, reps: Int, weight: Double, setType: SetType) {
         guard index < workout.trackedExercises[exerciseIndex].trackedSets.count else { return }
         
         var updatedSet = workout.trackedExercises[exerciseIndex].trackedSets[index]
         updatedSet.reps = reps
         updatedSet.weight = weight
+        updatedSet.setType = setType
         workout.trackedExercises[exerciseIndex].trackedSets[index] = updatedSet
         
         // Update in WorkoutManager
-        workoutManager.updateSet(exerciseIndex: exerciseIndex, setIndex: index, reps: reps, weight: weight)
+        workoutManager.updateSet(exerciseIndex: exerciseIndex, setIndex: index, reps: reps, weight: weight, setType: setType)
         
         // Recalculate stats
         updateStats()

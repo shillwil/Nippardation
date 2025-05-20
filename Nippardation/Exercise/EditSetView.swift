@@ -12,14 +12,16 @@ struct EditSetView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var reps: Int
     @Binding var weight: Double
-    var onSave: (Int, Double) -> Void
+    @Binding var setType: SetType
+    var onSave: (Int, Double, SetType) -> Void
     
     @State private var weightString: String = ""
     @State private var showingWeightPicker = false
     
-    init(reps: Binding<Int>, weight: Binding<Double>, onSave: @escaping (Int, Double) -> Void) {
+    init(reps: Binding<Int>, weight: Binding<Double>, setType: Binding<SetType>, onSave: @escaping (Int, Double, SetType) -> Void) {
         self._reps = reps
         self._weight = weight
+        self._setType = setType
         self.onSave = onSave
         self._weightString = State(initialValue: String(format: "%.1f", weight.wrappedValue))
     }
@@ -72,6 +74,13 @@ struct EditSetView: View {
                 }
                 .padding(.horizontal)
                 
+                Picker("Set Type", selection: $setType) {
+                    Text("Warm-up").tag(SetType.warmup)
+                    Text("Working").tag(SetType.working)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+
                 // Weight section
                 VStack(alignment: .leading, spacing: 8) {
                     Text("WEIGHT (LBS)")
@@ -102,7 +111,7 @@ struct EditSetView: View {
                 
                 // Save button
                 Button {
-                    onSave(reps, weight)
+                    onSave(reps, weight, setType)
                     dismiss()
                 } label: {
                     Text("Save Changes")
@@ -118,7 +127,7 @@ struct EditSetView: View {
             .navigationBarItems(
                 leading: Button("Cancel") { dismiss() },
                 trailing: Button("Save") {
-                    onSave(reps, weight)
+                    onSave(reps, weight, setType)
                     dismiss()
                 }
             )
@@ -131,7 +140,7 @@ struct EditSetView: View {
 }
 
 #Preview {
-    EditSetView(reps: .constant(8), weight: .constant(42.5)) { _, _ in
+    EditSetView(reps: .constant(8), weight: .constant(42.5), setType: .constant(.working)) { _, _,_  in
         
     }
 }

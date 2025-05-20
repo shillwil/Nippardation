@@ -70,8 +70,8 @@ class WorkoutManager: ObservableObject {
         }
     }
     
-    func updateSet(exerciseIndex: Int, setIndex: Int, reps: Int, weight: Double) {
-        cacheManager.updateSet(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: reps, weight: weight)
+    func updateSet(exerciseIndex: Int, setIndex: Int, reps: Int, weight: Double, setType: SetType) {
+        cacheManager.updateSet(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: reps, weight: weight, setType: setType)
     }
     
     func removeTrackedSet(exerciseIndex: Int, setIndex: Int) {

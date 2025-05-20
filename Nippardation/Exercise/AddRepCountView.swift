@@ -19,6 +19,9 @@ struct AddRepCountView: View {
     
     @AppStorage("lastWorkingWeight-") private var lastWorkingWeight: Double = 0.0
     @AppStorage("lastWarmupWeight-") private var lastWarmupWeight: Double = 0.0
+    @AppStorage("lastWorkingReps-") private var lastWorkingReps: Int = 0
+    @AppStorage("lastWarmupReps-") private var lastWarmupReps: Int = 0
+    @AppStorage("lastSetType-") private var lastSetType: String = "working"
     
     init(exercise: Exercise, onSave: @escaping (TrackedSet) -> Void) {
         _exercise = State(initialValue: exercise)
@@ -29,15 +32,40 @@ struct AddRepCountView: View {
         let exerciseKey = exercise.type.name.replacingOccurrences(of: " ", with: "_")
         let workingKey = "lastWorkingWeight-\(exerciseKey)"
         let warmupKey = "lastWarmupWeight-\(exerciseKey)"
+        let workingRepsKey = "lastWorkingReps-\(exerciseKey)"
+        let warmupRepsKey = "lastWarmupReps-\(exerciseKey)"
+        let setTypeKey = "lastSetType-\(exerciseKey)"
         
         let defaultWorkingWeight = UserDefaults.standard.double(forKey: workingKey)
         let defaultWarmupWeight = UserDefaults.standard.double(forKey: warmupKey)
+        let defaultWorkingReps = UserDefaults.standard.integer(forKey: workingRepsKey)
+        let defaultWarmupReps = UserDefaults.standard.integer(forKey: warmupRepsKey)
+        let savedSetType = UserDefaults.standard.string(forKey: setTypeKey) ?? "working"
         
+        let initialSetType: SetType = savedSetType == "warmup" ? .warmup : .working
+        let initialReps: Int
+        let initialWeight: Double
+        
+        if initialSetType == .warmup {
+            // Use saved warmup values or default to exercise's target reps
+            initialReps = defaultWarmupReps > 0 ? defaultWarmupReps : exercise.reps.lowerBound
+            initialWeight = defaultWarmupWeight > 0 ? defaultWarmupWeight : 45.0
+        } else {
+            // Use saved working values or default to exercise's target reps
+            initialReps = defaultWorkingReps > 0 ? defaultWorkingReps : exercise.reps.lowerBound
+            initialWeight = defaultWorkingWeight > 0 ? defaultWorkingWeight : 45.0
+        }
+        
+        _reps = State(initialValue: initialReps)
         _weight = State(initialValue: defaultWorkingWeight > 0 ? defaultWorkingWeight : 45)
+        _setType = State(initialValue: initialSetType)
         _weightString = State(initialValue: String(format: "%.1f", defaultWorkingWeight))
         
         _lastWorkingWeight = AppStorage(wrappedValue: defaultWorkingWeight, workingKey)
         _lastWarmupWeight = AppStorage(wrappedValue: defaultWarmupWeight, warmupKey)
+        _lastWorkingReps = AppStorage(wrappedValue: defaultWorkingReps, workingRepsKey)
+        _lastWarmupReps = AppStorage(wrappedValue: defaultWarmupReps, warmupRepsKey)
+        _lastSetType = AppStorage(wrappedValue: savedSetType, setTypeKey)
     }
     
     var body: some View {
@@ -120,15 +148,27 @@ struct AddRepCountView: View {
         .pickerStyle(.segmented)
         .padding(.horizontal)
         .onChange(of: setType) { oldValue, newValue in
-            // Update weight based on set type
-            if newValue == .warmup && lastWarmupWeight > 0 {
-                weight = lastWarmupWeight
-                weightString = String(format: "%.1f", weight)
-            } else if newValue == .working && lastWorkingWeight > 0 {
-                weight = lastWorkingWeight
-                weightString = String(format: "%.1f", weight)
-            }
-        }
+           // Update values based on set type
+           if newValue == .warmup {
+               // Switch to warmup values
+               if lastWarmupWeight > 0 {
+                   weight = lastWarmupWeight
+                   weightString = String(format: "%.1f", weight)
+               }
+               if lastWarmupReps > 0 {
+                   reps = lastWarmupReps
+               }
+           } else if newValue == .working {
+               // Switch to working values
+               if lastWorkingWeight > 0 {
+                   weight = lastWorkingWeight
+                   weightString = String(format: "%.1f", weight)
+               }
+               if lastWorkingReps > 0 {
+                   reps = lastWorkingReps
+               }
+           }
+       }
     }
     
     private var weightSelector: some View {
@@ -161,9 +201,14 @@ struct AddRepCountView: View {
             // Save the weight for this exercise and set type
             if setType == .working {
                 lastWorkingWeight = weight
+                lastWorkingReps = reps
             } else {
                 lastWarmupWeight = weight
+                lastWarmupReps = reps
             }
+                            
+            // Save the last used set type
+            lastSetType = setType == .warmup ? "warmup" : "working"
             
             // Create tracked set and save
             let trackedSet = TrackedSet(reps: reps, weight: weight, setType: setType, exerciseType: exercise.type)
