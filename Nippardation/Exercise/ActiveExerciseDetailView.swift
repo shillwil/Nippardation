@@ -38,45 +38,15 @@ struct ActiveExerciseDetailView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            fullPlayerView
-        }
+        workoutView
+            .environmentObject(viewModel)
     }
     
-    // Mini player view (collapsed state)
-    private var miniPlayerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.currentExercise.exerciseName)
-                    .font(.headline)
-                    .lineLimit(1)
-                
-                Text("\(viewModel.currentExercise.trackedSets.count) sets tracked")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .padding(.horizontal)
-        .frame(height: 80)
-    }
-    
-    // Full player view (expanded state)
-    private var fullPlayerView: some View {
+    private var workoutView: some View {
         VStack(spacing: 0) {
             // Navigation bar
             HStack {
-                Button {
-                    if viewModel.currentExercise.trackedSets.isEmpty {
-                        showingExerciseDetail = false
-                    } else {
-                        showingCancelAlert = true
-                    }
-                } label: {
-                    Text("Cancel")
-                        .foregroundColor(Color.appTheme)
-                }
+                cancelButton
                 
                 Spacer()
             }
@@ -94,34 +64,7 @@ struct ActiveExerciseDetailView: View {
                     
                     // Exercise Information
                     if let exercise = viewModel.matchingExercise {
-                        Group {
-                            // Target information
-                            VStack(alignment: .leading, spacing: 12) {
-                                targetInfoRow(title: "Target Sets", value: "\(exercise.warmUpSets) warm-up + \(exercise.workingSets) working")
-                                targetInfoRow(title: "Target Reps", value: "\(exercise.reps.lowerBound)-\(exercise.reps.upperBound)")
-                                targetInfoRow(title: "Rest Period", value: "\(exercise.rest.lowerBound)-\(exercise.rest.upperBound) min")
-                                targetInfoRow(title: "Intensity Technique", value: exercise.lastSetIntensityTechnique)
-                            }
-                            .padding()
-                            .background(Color(.secondarySystemBackground))
-                            .cornerRadius(12)
-                            .padding(.horizontal)
-                            
-                            // Example video
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Example")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                
-                                if let webView = viewModel.webView {
-                                    WebViewRepresentable(webView: webView)
-                                        .aspectRatio(1.8, contentMode: .fit)
-                                        .cornerRadius(12)
-                                        .frame(height: 200)
-                                        .padding(.horizontal)
-                                }
-                            }
-                        }
+                        MovementInfoView(exercise: exercise)
                         
                         // Tracked Sets Section
                         VStack(alignment: .leading, spacing: 16) {
@@ -148,98 +91,16 @@ struct ActiveExerciseDetailView: View {
                                     .frame(maxWidth: .infinity, alignment: .center)
                                     .padding()
                             } else {
-                                VStack(spacing: 10) {
-                                    ForEach(Array(zip(viewModel.currentExercise.trackedSets.indices, viewModel.currentExercise.trackedSets)), id: \.0) { index, set in
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(set.setType == .warmup ? "Warm-up Set" : "Working Set")
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.secondary)
-                                                
-                                                Text("Set \(index + 1)")
-                                                    .font(.headline)
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            VStack(alignment: .trailing, spacing: 4) {
-                                                Text("\(set.reps) reps")
-                                                    .font(.headline)
-                                                
-                                                Text("\(Int(set.weight)) lbs")
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            
-                                            // Edit and Delete buttons
-                                            Menu {
-                                                Button {
-                                                    selectedSetIndex = index
-                                                    editingReps = set.reps
-                                                    editingWeight = set.weight
-                                                    editingSetType = set.setType
-                                                    isEditingSet = true
-                                                } label: {
-                                                    Label("Edit", systemImage: "pencil")
-                                                }
-                                                
-                                                Button(role: .destructive) {
-                                                    viewModel.deleteSet(at: index)
-                                                } label: {
-                                                    Label("Delete", systemImage: "trash")
-                                                }
-                                            } label: {
-                                                Image(systemName: "ellipsis.circle")
-                                                    .font(.title3)
-                                                    .foregroundColor(.gray)
-                                            }
-                                        }
-                                        .padding()
-                                        .background(Color(.secondarySystemBackground))
-                                        .cornerRadius(12)
-                                    }
-                                }
-                                .padding(.horizontal)
+                                trackedSetsView
+                                    .padding(.horizontal)
                             }
                             
-                            // Volume Summary
                             if viewModel.totalVolume > 0 {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Summary")
-                                        .font(.headline)
-                                    
-                                    HStack {
-                                        Spacer()
-                                        
-                                        volumeStatView(
-                                            title: "Sets",
-                                            value: "\(viewModel.currentExercise.trackedSets.count)",
-                                            icon: "number.square.fill"
-                                        )
-                                        
-                                        Spacer()
-                                        
-                                        volumeStatView(
-                                            title: "Reps",
-                                            value: "\(viewModel.totalReps)",
-                                            icon: "repeat.circle.fill"
-                                        )
-                                        
-                                        Spacer()
-                                        
-                                        volumeStatView(
-                                            title: "Volume",
-                                            value: "\(Int(viewModel.totalVolume))",
-                                            icon: "chart.bar.fill"
-                                        )
-                                        
-                                        Spacer()
-                                    }
-                                }
-                                .padding()
-                                .background(Color(.secondarySystemBackground))
-                                .cornerRadius(12)
-                                .padding(.horizontal)
+                                summaryView
+                                    .padding()
+                                    .background(Color(.secondarySystemBackground))
+                                    .cornerRadius(12)
+                                    .padding(.horizontal)
                             }
                         }
                     }
@@ -250,27 +111,7 @@ struct ActiveExerciseDetailView: View {
                 .padding(.bottom, 20)
             }
             
-            // "Finish This Movement" button at bottom
-            VStack {
-                Button {
-                    saveAndClose()
-                } label: {
-                    Text("Finish This Movement")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.appTheme)
-                        .cornerRadius(12)
-                        .shadow(radius: 2)
-                }
-                .padding()
-            }
-            .background(
-                Rectangle()
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: -5)
-            )
+            saveAndCloseButtonSection
         }
         .alert("Cancel Exercise", isPresented: $showingCancelAlert) {
             Button("Go Back", role: .cancel) {
@@ -318,6 +159,29 @@ struct ActiveExerciseDetailView: View {
         }
     }
     
+    private var saveAndCloseButtonSection: some View {
+        VStack {
+            Button {
+                saveAndClose()
+            } label: {
+                Text("Finish This Movement")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.appTheme)
+                    .cornerRadius(12)
+                    .shadow(radius: 2)
+            }
+            .padding()
+        }
+        .background(
+            Rectangle()
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: -5)
+        )
+    }
+    
     private func saveAndClose() {
         // Save changes through the workout binding
         workout.trackedExercises[exerciseIndex] = viewModel.currentExercise
@@ -326,18 +190,105 @@ struct ActiveExerciseDetailView: View {
         showingExerciseDetail = false
     }
     
-    @ViewBuilder
-    private func targetInfoRow(title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+    private var cancelButton: some View {
+        Button {
+            if viewModel.currentExercise.trackedSets.isEmpty {
+                showingExerciseDetail = false
+            } else {
+                showingCancelAlert = true
+            }
+        } label: {
+            Text("Cancel")
+                .foregroundColor(Color.appTheme)
+        }
+    }
+    
+    private var summaryView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Summary")
+                .font(.headline)
             
-            Spacer()
-            
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
+            HStack {
+                Spacer()
+                
+                volumeStatView(
+                    title: "Sets",
+                    value: "\(viewModel.currentExercise.trackedSets.count)",
+                    icon: "number.square.fill"
+                )
+                
+                Spacer()
+                
+                volumeStatView(
+                    title: "Reps",
+                    value: "\(viewModel.totalReps)",
+                    icon: "repeat.circle.fill"
+                )
+                
+                Spacer()
+                
+                volumeStatView(
+                    title: "Volume",
+                    value: "\(Int(viewModel.totalVolume))",
+                    icon: "chart.bar.fill"
+                )
+                
+                Spacer()
+            }
+        }
+    }
+    
+    private var trackedSetsView: some View {
+        VStack(spacing: 10) {
+            ForEach(Array(zip(viewModel.currentExercise.trackedSets.indices, viewModel.currentExercise.trackedSets)), id: \.0) { index, set in
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(set.setType == .warmup ? "Warm-up Set" : "Working Set")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Set \(index + 1)")
+                            .font(.headline)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("\(set.reps) reps")
+                            .font(.headline)
+                        
+                        Text("\(Int(set.weight)) lbs")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Edit and Delete buttons
+                    Menu {
+                        Button {
+                            selectedSetIndex = index
+                            editingReps = set.reps
+                            editingWeight = set.weight
+                            editingSetType = set.setType
+                            isEditingSet = true
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        
+                        Button(role: .destructive) {
+                            viewModel.deleteSet(at: index)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+            }
         }
     }
     

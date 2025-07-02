@@ -136,42 +136,20 @@ struct ActiveWorkoutView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingExerciseDetail, content: {
+            if let index = selectedExerciseIndex {
+                ActiveExerciseDetailView(
+                    workout: $viewModel.workout,
+                    showingExerciseDetail: $showingExerciseDetail,
+                    exerciseIndex: index
+                )
+                .presentationDetents([.height(350), .medium, .large])
+                .interactiveDismissDisabled()
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+            }
+        })
         .navigationTitle(viewModel.workout.workoutTemplate)
         .navigationBarTitleDisplayMode(.inline)
-        .expandablePlayer(
-            isPresented: $showingExerciseDetail,
-            expandedContent: {
-                if let index = selectedExerciseIndex {
-                    // Create a wrapper view that handles the expanded content
-                    ZStack {
-                        ActiveExerciseDetailView(
-                            workout: $viewModel.workout,
-                            showingExerciseDetail: $showingExerciseDetail,
-                            exerciseIndex: index
-                        )
-                    }
-                }
-            },
-            collapsedContent: {
-                // Mini player view for collapsed state
-                if let index = selectedExerciseIndex {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(viewModel.workout.trackedExercises[index].exerciseName)
-                                .font(.headline)
-                                .lineLimit(1)
-                            
-                            Text("\(viewModel.workout.trackedExercises[index].trackedSets.count) sets tracked")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                }
-            }
-        )
         .alert("End Workout", isPresented: $viewModel.isShowingEndWorkoutAlert) {
             Button("Cancel", role: .cancel) {}
             Button("End Workout", role: .destructive) {

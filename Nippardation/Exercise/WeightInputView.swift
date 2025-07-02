@@ -11,16 +11,7 @@ struct WeightInputView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var weight: Double
     @Binding var weightString: String
-    
-    // Common weight presets based on standard plate increments
-    let weightPresets: [[Double]] = [
-        [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0], // Light weights
-        [45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0], // Moderate weights
-        [90.0, 95.0, 100.0, 115.0, 135.0, 155.0, 175.0, 185.0], // Medium weights
-        [195.0, 205.0, 225.0, 245.0, 275.0, 295.0, 315.0, 335.0], // Heavy weights
-        [365.0, 385.0, 405.0, 455.0, 495.0, 500.0, 545.0, 585.0]  // Very heavy weights
-    ]
-    
+        
     // Step increments
     let increments: [Double] = [2.5, 5.0, 10.0, 25.0, 45.0]
     @State private var selectedIncrement: Double = 5.0
@@ -113,42 +104,6 @@ struct WeightInputView: View {
                         .buttonStyle(.borderedProminent)
                     }
                     .padding(.horizontal)
-                    
-                    // Weight preset suggestions
-                    Text("COMMON WEIGHTS")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-                        .padding(.top)
-                    
-                    // Scrollable presets by category
-                    //                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        ForEach(weightPresets, id: \.self) { presetGroup in
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 10) {
-                                ForEach(presetGroup, id: \.self) { preset in
-                                    Button {
-                                        weight = preset
-                                        weightString = String(format: "%.1f", preset)
-                                    } label: {
-                                        Text("\(Int(preset))")
-                                            .font(.headline)
-                                            .frame(minWidth: 60)
-                                            .padding(.vertical, 12)
-                                            .background(abs(weight - preset) < 0.1 ? Color.appTheme : Color(.secondarySystemBackground))
-                                            .foregroundColor(abs(weight - preset) < 0.1 ? .white : .primary)
-                                            .cornerRadius(8)
-                                    }
-                                }
-                            }
-                            
-                            if presetGroup != weightPresets.last {
-                                Divider()
-                            }
-                        }
-                    }
                     
                     Spacer()
                     
