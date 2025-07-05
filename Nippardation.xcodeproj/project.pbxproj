@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A22C80FE2E1494B70094ACAA /* MovementInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A22C80FD2E1494B70094ACAA /* MovementInfoView.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A25D330B2DCD447400326210 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +28,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A22C80FD2E1494B70094ACAA /* MovementInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovementInfoView.swift; sourceTree = "<group>"; };
 		A25D32FD2DCD447300326210 /* Nippardation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nippardation.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A25D330A2DCD447400326210 /* NippardationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NippardationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A25D33142DCD447400326210 /* NippardationUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NippardationUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,6 +84,7 @@
 				A25D330D2DCD447400326210 /* NippardationTests */,
 				A25D33172DCD447400326210 /* NippardationUITests */,
 				A25D32FE2DCD447300326210 /* Products */,
+				A22C80FD2E1494B70094ACAA /* MovementInfoView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -236,6 +242,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A22C80FE2E1494B70094ACAA /* MovementInfoView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

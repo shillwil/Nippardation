@@ -10,7 +10,7 @@ import SwiftUI
 struct AddRepCountView: View {
     @State private var reps: Int
     @State private var weight: Double
-    @State private var setType: SetType = .working
+    @State private var setType: SetType = .warmup
     @Environment(\.dismiss) var dismiss
     var onSave: (TrackedSet) -> Void
     @State private var exercise: Exercise
@@ -21,7 +21,7 @@ struct AddRepCountView: View {
     @AppStorage("lastWarmupWeight-") private var lastWarmupWeight: Double = 0.0
     @AppStorage("lastWorkingReps-") private var lastWorkingReps: Int = 0
     @AppStorage("lastWarmupReps-") private var lastWarmupReps: Int = 0
-    @AppStorage("lastSetType-") private var lastSetType: String = "working"
+    @AppStorage("lastSetType-") private var lastSetType: String = "warmup"
     
     init(exercise: Exercise, onSave: @escaping (TrackedSet) -> Void) {
         _exercise = State(initialValue: exercise)
@@ -40,26 +40,16 @@ struct AddRepCountView: View {
         let defaultWarmupWeight = UserDefaults.standard.double(forKey: warmupKey)
         let defaultWorkingReps = UserDefaults.standard.integer(forKey: workingRepsKey)
         let defaultWarmupReps = UserDefaults.standard.integer(forKey: warmupRepsKey)
-        let savedSetType = UserDefaults.standard.string(forKey: setTypeKey) ?? "working"
+        let savedSetType = UserDefaults.standard.string(forKey: setTypeKey) ?? "warmup"
         
         let initialSetType: SetType = savedSetType == "warmup" ? .warmup : .working
-        let initialReps: Int
-        let initialWeight: Double
-        
-        if initialSetType == .warmup {
-            // Use saved warmup values or default to exercise's target reps
-            initialReps = defaultWarmupReps > 0 ? defaultWarmupReps : exercise.reps.lowerBound
-            initialWeight = defaultWarmupWeight > 0 ? defaultWarmupWeight : 45.0
-        } else {
-            // Use saved working values or default to exercise's target reps
-            initialReps = defaultWorkingReps > 0 ? defaultWorkingReps : exercise.reps.lowerBound
-            initialWeight = defaultWorkingWeight > 0 ? defaultWorkingWeight : 45.0
-        }
+        let initialReps: Int = defaultWarmupReps > 0 ? defaultWarmupReps : exercise.reps.lowerBound
+        let initialWeight: Double = defaultWarmupWeight > 0 ? defaultWarmupWeight : 45.0
         
         _reps = State(initialValue: initialReps)
-        _weight = State(initialValue: defaultWorkingWeight > 0 ? defaultWorkingWeight : 45)
+        _weight = State(initialValue: initialWeight)
         _setType = State(initialValue: initialSetType)
-        _weightString = State(initialValue: String(format: "%.1f", defaultWorkingWeight))
+        _weightString = State(initialValue: String(format: "%.1f", initialWeight))
         
         _lastWorkingWeight = AppStorage(wrappedValue: defaultWorkingWeight, workingKey)
         _lastWarmupWeight = AppStorage(wrappedValue: defaultWarmupWeight, warmupKey)
