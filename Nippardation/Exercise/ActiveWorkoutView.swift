@@ -71,9 +71,12 @@ struct ActiveWorkoutView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 
-                                Text("\(Int(viewModel.totalVolume)) lbs")
+                                Text(viewModel.formattedTotalVolume)
                                     .font(.title2)
                                     .fontWeight(.semibold)
+                                    .onTapGesture {
+                                        viewModel.cycleVolumeUnit()
+                                    }
                             }
                         }
                     }
