@@ -29,7 +29,11 @@ class ActiveWorkoutViewModel: ObservableObject {
         // Subscribe to workout manager updates
         workoutManager.$activeWorkout
             .compactMap { $0 }
-            .assign(to: &$workout)
+            .sink { [weak self] updatedWorkout in
+                self?.workout = updatedWorkout
+                self?.updateWorkoutStats()
+            }
+            .store(in: &cancellables)
         
         // Calculate initial stats
         updateWorkoutStats()

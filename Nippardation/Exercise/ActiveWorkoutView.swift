@@ -143,7 +143,7 @@ struct ActiveWorkoutView: View {
                     showingExerciseDetail: $showingExerciseDetail,
                     exerciseIndex: index
                 )
-                .presentationDetents([.height(350), .medium, .large])
+                .presentationDetents([.height(350), .height(180), .large])
                 .interactiveDismissDisabled()
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
             }
