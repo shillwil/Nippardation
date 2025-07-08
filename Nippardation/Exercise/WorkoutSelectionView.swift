@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct WorkoutSelectionView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel = HomeViewModel()
     @ObservedObject var workoutManager = WorkoutManager.shared
@@ -26,6 +27,7 @@ struct WorkoutSelectionView: View {
                         } label: {
                             HStack {
                                 Text(workout.name)
+                                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.appTheme)
                                 Spacer()
                                 Image(systemName: "play.circle.fill")
                                     .resizable()
