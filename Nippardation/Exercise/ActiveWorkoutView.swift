@@ -14,10 +14,12 @@ struct ActiveWorkoutView: View {
     // UI state properties
     @State private var showingExerciseDetail = false
     @State private var selectedExerciseIndex: Int?
+    @State private var selectedDetent: PresentationDetent
     
     init(workout: TrackedWorkout) {
         // Initialize the view model with the workout
         _viewModel = StateObject(wrappedValue: ActiveWorkoutViewModel(workout: workout))
+        selectedDetent = .height(350)
     }
     
     var body: some View {
@@ -71,9 +73,12 @@ struct ActiveWorkoutView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 
-                                Text("\(Int(viewModel.totalVolume)) lbs")
+                                Text(viewModel.formattedTotalVolume)
                                     .font(.title2)
                                     .fontWeight(.semibold)
+                                    .onTapGesture {
+                                        viewModel.cycleVolumeUnit()
+                                    }
                             }
                         }
                     }
@@ -143,7 +148,8 @@ struct ActiveWorkoutView: View {
                     showingExerciseDetail: $showingExerciseDetail,
                     exerciseIndex: index
                 )
-                .presentationDetents([.height(350), .height(180), .large])
+                .presentationDetents([.height(350), .height(180), .large], selection: $selectedDetent)
+                .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
             }
