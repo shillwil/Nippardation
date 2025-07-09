@@ -19,6 +19,7 @@ struct WorkoutStatsView: View {
     @State private var timeRange: TimeRange = .month
     @State private var volumeData: [VolumeDataPoint] = []
     @State private var isRefreshing: Bool = false
+    @State private var volumeUnit: VolumeUnit = .pounds
     
     enum TimeRange: String, CaseIterable, Identifiable {
         case week = "Week"
@@ -88,9 +89,15 @@ struct WorkoutStatsView: View {
                 // Stats summary
                 HStack(spacing: 20) {
                     statBox(value: getTotalVolume(), label: "Total Volume")
+                        .onTapGesture {
+                            volumeUnit = volumeUnit.next()
+                        }
                     statBox(value: "\(volumeData.count)", label: "Workouts")
                     if let avg = getAverageVolume() {
                         statBox(value: avg, label: "Avg Volume")
+                            .onTapGesture {
+                                volumeUnit = volumeUnit.next()
+                            }
                     }
                 }
                 .padding(.top, 8)
@@ -178,10 +185,14 @@ struct WorkoutStatsView: View {
     }
     
     private func formatWeight(_ weight: Double) -> String {
-        if weight >= 1000 {
-            return String(format: "%.1fK", weight / 1000)
+        let convertedWeight = volumeUnit.convert(weight, from: .pounds)
+        
+        if volumeUnit == .pyramidBlocks {
+            return volumeUnit.formatWithNewline(convertedWeight)
+        } else if convertedWeight >= 1000 {
+            return String(format: "%.1fK \(volumeUnit.rawValue)", convertedWeight / 1000)
         } else {
-            return "\(Int(weight))"
+            return volumeUnit.formatWithNewline(convertedWeight)
         }
     }
     
@@ -191,13 +202,17 @@ struct WorkoutStatsView: View {
             Text(value)
                 .font(.title3)
                 .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.4)
+                .frame(height: 44)
             
             Text(label)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .frame(minWidth: 90, maxWidth: .infinity, minHeight: 80, maxHeight: 80)
+        .padding(.horizontal, 4)
         .background(Color(.systemBackground))
         .cornerRadius(8)
     }

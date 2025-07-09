@@ -15,6 +15,7 @@ class ActiveWorkoutViewModel: ObservableObject {
     @Published var completedSets: Int = 0
     @Published var elapsedTime: TimeInterval = 0
     @Published var isShowingEndWorkoutAlert = false
+    @Published var volumeUnit: VolumeUnit = .pounds
     
     // Timer for tracking workout duration
     private var timer: Timer?
@@ -29,7 +30,11 @@ class ActiveWorkoutViewModel: ObservableObject {
         // Subscribe to workout manager updates
         workoutManager.$activeWorkout
             .compactMap { $0 }
-            .assign(to: &$workout)
+            .sink { [weak self] updatedWorkout in
+                self?.workout = updatedWorkout
+                self?.updateWorkoutStats()
+            }
+            .store(in: &cancellables)
         
         // Calculate initial stats
         updateWorkoutStats()
@@ -105,5 +110,16 @@ class ActiveWorkoutViewModel: ObservableObject {
         } else {
             return String(format: "%d:%02d", minutes, seconds)
         }
+    }
+    
+    // MARK: - Volume Management
+    
+    func cycleVolumeUnit() {
+        volumeUnit = volumeUnit.next()
+    }
+    
+    var formattedTotalVolume: String {
+        let convertedVolume = volumeUnit.convert(totalVolume, from: .pounds)
+        return volumeUnit.format(convertedVolume)
     }
 }

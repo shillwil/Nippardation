@@ -22,13 +22,16 @@ struct ActiveExerciseDetailView: View {
     @State private var editingWeight: Double = 0.0
     @State private var editingSetType: SetType = .working
     @State private var showingCancelAlert = false
+    @State private var volumeUnit: VolumeUnit = .pounds
     
     let exerciseIndex: Int
+    let isReadOnly: Bool
     
-    init(workout: Binding<TrackedWorkout>, showingExerciseDetail: Binding<Bool>, exerciseIndex: Int) {
+    init(workout: Binding<TrackedWorkout>, showingExerciseDetail: Binding<Bool>, exerciseIndex: Int, isReadOnly: Bool = false) {
         self._workout = workout
         self._showingExerciseDetail = showingExerciseDetail
         self.exerciseIndex = exerciseIndex
+        self.isReadOnly = isReadOnly
         
         // Create the view model with binding
         _viewModel = StateObject(wrappedValue: ActiveExerciseViewModel(
@@ -46,7 +49,14 @@ struct ActiveExerciseDetailView: View {
         VStack(spacing: 0) {
             // Navigation bar
             HStack {
-                cancelButton
+                if !isReadOnly {
+                    cancelButton
+                } else {
+                    Button("Close") {
+                        showingExerciseDetail = false
+                    }
+                    .foregroundColor(Color.appTheme)
+                }
                 
                 Spacer()
             }
@@ -65,24 +75,33 @@ struct ActiveExerciseDetailView: View {
                     // Exercise Information
                     if let exercise = viewModel.matchingExercise {
                         MovementInfoView(exercise: exercise)
-                        
-                        // Tracked Sets Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Text("Tracked Sets")
-                                    .font(.headline)
-                                
-                                Spacer()
-                                
-                                Button {
-                                    isShowingAddSet = true
-                                } label: {
-                                    Label("Add Set", systemImage: "plus.circle.fill")
-                                        .font(.subheadline)
+                    } else if isReadOnly {
+                        // Fallback for read-only mode when no matching exercise found
+                        Text("Exercise details not available")
+                            .foregroundColor(.secondary)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                    
+                    // Tracked Sets Section (only show if not read-only)
+                    if !isReadOnly {
+                        if viewModel.matchingExercise != nil {
+                            VStack(alignment: .leading, spacing: 16) {
+                                HStack {
+                                    Text("Tracked Sets")
+                                        .font(.headline)
+                                    
+                                    Spacer()
+                                    
+                                    Button {
+                                        isShowingAddSet = true
+                                    } label: {
+                                        Label("Add Set", systemImage: "plus.circle.fill")
+                                            .font(.subheadline)
+                                    }
+                                    .buttonStyle(.bordered)
                                 }
-                                .buttonStyle(.bordered)
-                            }
-                            .padding(.horizontal)
+                                .padding(.horizontal)
                             
                             if viewModel.currentExercise.trackedSets.isEmpty {
                                 Text("No sets tracked yet")
@@ -95,12 +114,13 @@ struct ActiveExerciseDetailView: View {
                                     .padding(.horizontal)
                             }
                             
-                            if viewModel.totalVolume > 0 {
-                                summaryView
-                                    .padding()
-                                    .background(Color(.secondarySystemBackground))
-                                    .cornerRadius(12)
-                                    .padding(.horizontal)
+                                if viewModel.totalVolume > 0 {
+                                    summaryView
+                                        .padding()
+                                        .background(Color(.secondarySystemBackground))
+                                        .cornerRadius(12)
+                                        .padding(.horizontal)
+                                }
                             }
                         }
                     }
@@ -111,7 +131,9 @@ struct ActiveExerciseDetailView: View {
                 .padding(.bottom, 20)
             }
             
-            saveAndCloseButtonSection
+            if !isReadOnly {
+                saveAndCloseButtonSection
+            }
         }
         .alert("Cancel Exercise", isPresented: $showingCancelAlert) {
             Button("Go Back", role: .cancel) {
@@ -229,9 +251,12 @@ struct ActiveExerciseDetailView: View {
                 
                 volumeStatView(
                     title: "Volume",
-                    value: "\(Int(viewModel.totalVolume))",
+                    value: formatVolume(viewModel.totalVolume),
                     icon: "chart.bar.fill"
                 )
+                .onTapGesture {
+                    volumeUnit = volumeUnit.next()
+                }
                 
                 Spacer()
             }
@@ -262,27 +287,29 @@ struct ActiveExerciseDetailView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    // Edit and Delete buttons
-                    Menu {
-                        Button {
-                            selectedSetIndex = index
-                            editingReps = set.reps
-                            editingWeight = set.weight
-                            editingSetType = set.setType
-                            isEditingSet = true
+                    // Edit and Delete buttons (only show if not read-only)
+                    if !isReadOnly {
+                        Menu {
+                            Button {
+                                selectedSetIndex = index
+                                editingReps = set.reps
+                                editingWeight = set.weight
+                                editingSetType = set.setType
+                                isEditingSet = true
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            
+                            Button(role: .destructive) {
+                                viewModel.deleteSet(at: index)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         } label: {
-                            Label("Edit", systemImage: "pencil")
+                            Image(systemName: "ellipsis.circle")
+                                .font(.title3)
+                                .foregroundColor(.gray)
                         }
-                        
-                        Button(role: .destructive) {
-                            viewModel.deleteSet(at: index)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.title3)
-                            .foregroundColor(.gray)
                     }
                 }
                 .padding()
@@ -302,12 +329,20 @@ struct ActiveExerciseDetailView: View {
             Text(value)
                 .font(.title3)
                 .fontWeight(.bold)
+                .lineLimit(2)
+                .minimumScaleFactor(0.43)
+                .scaledToFit()
             
             Text(title)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
         .frame(width: 80)
+    }
+    
+    private func formatVolume(_ volume: Double) -> String {
+        let convertedVolume = volumeUnit.convert(volume, from: .pounds)
+        return volumeUnit.format(convertedVolume)
     }
 }
 

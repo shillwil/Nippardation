@@ -12,12 +12,13 @@ struct ActiveWorkoutView: View {
     @StateObject private var viewModel: ActiveWorkoutViewModel
     
     // UI state properties
-    @State private var showingExerciseDetail = false
-    @State private var selectedExerciseIndex: Int?
+    @State private var selectedExercise: IdentifiableIndex?
+    @State private var selectedDetent: PresentationDetent
     
     init(workout: TrackedWorkout) {
         // Initialize the view model with the workout
         _viewModel = StateObject(wrappedValue: ActiveWorkoutViewModel(workout: workout))
+        selectedDetent = .large
     }
     
     var body: some View {
@@ -71,9 +72,12 @@ struct ActiveWorkoutView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 
-                                Text("\(Int(viewModel.totalVolume)) lbs")
+                                Text(viewModel.formattedTotalVolume)
                                     .font(.title2)
                                     .fontWeight(.semibold)
+                                    .onTapGesture {
+                                        viewModel.cycleVolumeUnit()
+                                    }
                             }
                         }
                     }
@@ -85,8 +89,8 @@ struct ActiveWorkoutView: View {
             Section("Exercises") {
                 ForEach(Array(zip(viewModel.workout.trackedExercises.indices, viewModel.workout.trackedExercises)), id: \.0) { index, exercise in
                     Button {
-                        selectedExerciseIndex = index
-                        showingExerciseDetail = true
+                        selectedDetent = .large
+                        selectedExercise = IdentifiableIndex(id: index)
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -136,18 +140,20 @@ struct ActiveWorkoutView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingExerciseDetail, content: {
-            if let index = selectedExerciseIndex {
-                ActiveExerciseDetailView(
-                    workout: $viewModel.workout,
-                    showingExerciseDetail: $showingExerciseDetail,
-                    exerciseIndex: index
-                )
-                .presentationDetents([.height(350), .medium, .large])
-                .interactiveDismissDisabled()
-                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-            }
-        })
+        .sheet(item: $selectedExercise) { identifiableIndex in
+            ActiveExerciseDetailView(
+                workout: $viewModel.workout,
+                showingExerciseDetail: Binding(
+                    get: { self.selectedExercise != nil },
+                    set: { _ in self.selectedExercise = nil }
+                ),
+                exerciseIndex: identifiableIndex.value
+            )
+            .presentationDetents([.height(350), .height(180), .large], selection: $selectedDetent)
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled()
+            .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+        }
         .navigationTitle(viewModel.workout.workoutTemplate)
         .navigationBarTitleDisplayMode(.inline)
         .alert("End Workout", isPresented: $viewModel.isShowingEndWorkoutAlert) {

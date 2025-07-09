@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A22C80FE2E1494B70094ACAA /* MovementInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A22C80FD2E1494B70094ACAA /* MovementInfoView.swift */; };
+		A2B895D52E1DD4B200A7ADBC /* WebViewRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B895D42E1DD4B200A7ADBC /* WebViewRepresentable.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +33,7 @@
 		A25D32FD2DCD447300326210 /* Nippardation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nippardation.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A25D330A2DCD447400326210 /* NippardationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NippardationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A25D33142DCD447400326210 /* NippardationUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NippardationUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2B895D42E1DD4B200A7ADBC /* WebViewRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WebViewRepresentable.swift; path = Nippardation/Helpers/WebViewRepresentable.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -85,6 +87,7 @@
 				A25D33172DCD447400326210 /* NippardationUITests */,
 				A25D32FE2DCD447300326210 /* Products */,
 				A22C80FD2E1494B70094ACAA /* MovementInfoView.swift */,
+				A2B895D42E1DD4B200A7ADBC /* WebViewRepresentable.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -242,6 +245,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2B895D52E1DD4B200A7ADBC /* WebViewRepresentable.swift in Sources */,
 				A22C80FE2E1494B70094ACAA /* MovementInfoView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
