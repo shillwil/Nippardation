@@ -204,7 +204,7 @@ struct WorkoutStatsView: View {
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.4)
                 .frame(height: 44)
             
             Text(label)
