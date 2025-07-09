@@ -9,15 +9,13 @@ import SwiftUI
 
 struct ExercisesListView: View {
     var workout: Workout
-    @State private var showingExerciseDetail = false
-    @State private var selectedExerciseIndex: Int?
+    @State private var selectedExercise: IdentifiableIndex?
     
     var body: some View {
         List {
             ForEach(Array(workout.exercises.enumerated()), id: \.offset) { index, exercise in
                 Button {
-                    selectedExerciseIndex = index
-                    showingExerciseDetail = true
+                    selectedExercise = IdentifiableIndex(id: index)
                 } label: {
                     HStack {
                         Text(exercise.type.name)
@@ -32,15 +30,16 @@ struct ExercisesListView: View {
         }
         .navigationBarTitleDisplayMode(.large)
         .navigationTitle(workout.name)
-        .sheet(isPresented: $showingExerciseDetail) {
-            if let index = selectedExerciseIndex {
-                ActiveExerciseDetailView(
-                    workout: .constant(createReadOnlyWorkout()),
-                    showingExerciseDetail: $showingExerciseDetail,
-                    exerciseIndex: index,
-                    isReadOnly: true
-                )
-            }
+        .sheet(item: $selectedExercise) { identifiableIndex in
+            ActiveExerciseDetailView(
+                workout: .constant(createReadOnlyWorkout()),
+                showingExerciseDetail: Binding(
+                    get: { self.selectedExercise != nil },
+                    set: { _ in self.selectedExercise = nil }
+                ),
+                exerciseIndex: identifiableIndex.value,
+                isReadOnly: true
+            )
         }
     }
     
