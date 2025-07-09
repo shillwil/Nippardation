@@ -74,9 +74,17 @@ struct ActiveExerciseDetailView: View {
                     // Exercise Information
                     if let exercise = viewModel.matchingExercise {
                         MovementInfoView(exercise: exercise)
-                        
-                        // Tracked Sets Section (only show if not read-only)
-                        if !isReadOnly {
+                    } else if isReadOnly {
+                        // Fallback for read-only mode when no matching exercise found
+                        Text("Exercise details not available")
+                            .foregroundColor(.secondary)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                    
+                    // Tracked Sets Section (only show if not read-only)
+                    if !isReadOnly {
+                        if viewModel.matchingExercise != nil {
                             VStack(alignment: .leading, spacing: 16) {
                                 HStack {
                                     Text("Tracked Sets")
