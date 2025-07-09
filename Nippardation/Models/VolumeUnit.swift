@@ -11,7 +11,6 @@ enum VolumeUnit: String, CaseIterable {
     case pounds = "lbs"
     case kilograms = "kg"
     case pyramidBlocks = "Pyramid Blocks"
-    case pyramids = "Pyramids"
     
     func convert(_ value: Double, from unit: VolumeUnit) -> Double {
         let pounds: Double
@@ -23,8 +22,6 @@ enum VolumeUnit: String, CaseIterable {
             pounds = value * 2.20462
         case .pyramidBlocks:
             pounds = value * 5000
-        case .pyramids:
-            pounds = value * 2300000
         }
         
         switch self {
@@ -34,8 +31,6 @@ enum VolumeUnit: String, CaseIterable {
             return pounds / 2.20462
         case .pyramidBlocks:
             return pounds / 5000
-        case .pyramids:
-            return pounds / 2300000
         }
     }
     
@@ -58,14 +53,6 @@ enum VolumeUnit: String, CaseIterable {
             }
             let unit = value < 1 ? "Pyramid Block" : "Pyramid Blocks"
             return "\(formattedValue) \(unit)"
-        case .pyramids:
-            let percentage = value * 100
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-            formatter.minimumFractionDigits = 0
-            formatter.maximumFractionDigits = 2
-            let formattedValue = formatter.string(from: NSNumber(value: percentage)) ?? "0"
-            return "\(formattedValue)% of a Pyramid"
         }
     }
     
@@ -88,14 +75,6 @@ enum VolumeUnit: String, CaseIterable {
             }
             let unit = value < 1 ? "Pyramid Block" : "Pyramid Blocks"
             return "\(formattedValue)\n\(unit)"
-        case .pyramids:
-            let percentage = value * 100
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-            formatter.minimumFractionDigits = 0
-            formatter.maximumFractionDigits = 2
-            let formattedValue = formatter.string(from: NSNumber(value: percentage)) ?? "0"
-            return "\(formattedValue)%\nof Pyramid"
         }
     }
     

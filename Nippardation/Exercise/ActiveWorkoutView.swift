@@ -18,7 +18,7 @@ struct ActiveWorkoutView: View {
     init(workout: TrackedWorkout) {
         // Initialize the view model with the workout
         _viewModel = StateObject(wrappedValue: ActiveWorkoutViewModel(workout: workout))
-        selectedDetent = .height(350)
+        selectedDetent = .large
     }
     
     var body: some View {
@@ -89,7 +89,7 @@ struct ActiveWorkoutView: View {
             Section("Exercises") {
                 ForEach(Array(zip(viewModel.workout.trackedExercises.indices, viewModel.workout.trackedExercises)), id: \.0) { index, exercise in
                     Button {
-                        selectedDetent = .height(350)
+                        selectedDetent = .large
                         selectedExercise = IdentifiableIndex(id: index)
                     } label: {
                         HStack {

@@ -187,7 +187,7 @@ struct WorkoutStatsView: View {
     private func formatWeight(_ weight: Double) -> String {
         let convertedWeight = volumeUnit.convert(weight, from: .pounds)
         
-        if volumeUnit == .pyramidBlocks || volumeUnit == .pyramids {
+        if volumeUnit == .pyramidBlocks {
             return volumeUnit.formatWithNewline(convertedWeight)
         } else if convertedWeight >= 1000 {
             return String(format: "%.1fK \(volumeUnit.rawValue)", convertedWeight / 1000)

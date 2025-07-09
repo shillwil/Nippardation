@@ -155,7 +155,7 @@ The app includes 5 predefined workout templates based on Jeff Nippard's programs
 ### Utility Systems
 
 #### Volume Unit System
-- Multiple unit support: pounds, kilograms, pyramid blocks, pyramids
+- Multiple unit support: pounds, kilograms, pyramid blocks
 - Tap-to-cycle functionality for unit conversion
 - Consistent conversion factors across the app
 

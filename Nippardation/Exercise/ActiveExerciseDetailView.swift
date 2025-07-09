@@ -22,6 +22,7 @@ struct ActiveExerciseDetailView: View {
     @State private var editingWeight: Double = 0.0
     @State private var editingSetType: SetType = .working
     @State private var showingCancelAlert = false
+    @State private var volumeUnit: VolumeUnit = .pounds
     
     let exerciseIndex: Int
     let isReadOnly: Bool
@@ -250,9 +251,12 @@ struct ActiveExerciseDetailView: View {
                 
                 volumeStatView(
                     title: "Volume",
-                    value: "\(Int(viewModel.totalVolume))",
+                    value: formatVolume(viewModel.totalVolume),
                     icon: "chart.bar.fill"
                 )
+                .onTapGesture {
+                    volumeUnit = volumeUnit.next()
+                }
                 
                 Spacer()
             }
@@ -325,12 +329,20 @@ struct ActiveExerciseDetailView: View {
             Text(value)
                 .font(.title3)
                 .fontWeight(.bold)
+                .lineLimit(2)
+                .minimumScaleFactor(0.43)
+                .scaledToFit()
             
             Text(title)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
         .frame(width: 80)
+    }
+    
+    private func formatVolume(_ volume: Double) -> String {
+        let convertedVolume = volumeUnit.convert(volume, from: .pounds)
+        return volumeUnit.format(convertedVolume)
     }
 }
 
