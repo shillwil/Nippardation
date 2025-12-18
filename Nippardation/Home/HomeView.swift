@@ -10,9 +10,12 @@ import SwiftUI
 struct HomeView: View {
     @ObservedObject var viewModel = HomeViewModel()
     @ObservedObject private var workoutManager = WorkoutManager.shared
+    @EnvironmentObject private var authManager: AuthManager
     
     @State private var startNewWorkout: Bool = false
     @State private var showActiveWorkout: Bool = false
+    @State private var error: Error? = nil
+    @State private var showErrorAlert: Bool = false
     
     // Add state to track if we've done initial loading
     @State private var didCheckForActiveWorkout: Bool = false
@@ -158,8 +161,29 @@ struct HomeView: View {
                         }
                     }
                 }
+
             }
             .navigationTitle("Home")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        if let user = authManager.user {
+                            Label(user.email ?? "User", systemImage: "person.circle")
+                        }
+                        
+                        Divider()
+                        
+                        Button(action: {
+                            signOut()
+                        }) {
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                    } label: {
+                        Image(systemName: "person.circle")
+                            .foregroundColor(.appTheme)
+                    }
+                }
+            }
             .onAppear {
                 // Refresh workout data when the view appears
                 workoutManager.loadCompletedWorkouts()
@@ -172,7 +196,17 @@ struct HomeView: View {
                 }
             }
         }
+        
         .tint(Color.appTheme)
+    }
+    
+    func signOut() {
+        do {
+            try authManager.signOut()
+        } catch let authError {
+            error = authError
+            showErrorAlert = true
+        }
     }
 }
 
