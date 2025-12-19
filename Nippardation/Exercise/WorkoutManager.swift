@@ -56,7 +56,8 @@ class WorkoutManager: ObservableObject {
     }
     
     func startWorkout(template: Workout) -> TrackedWorkout {
-        let workout = cacheManager.startWorkout(template: template)
+        let userID = AuthManager.shared.user?.uid
+        let workout = cacheManager.startWorkout(template: template, userID: userID)
         self.activeWorkout = workout
         self.isWorkoutInProgress = true
         return workout
@@ -97,6 +98,22 @@ class WorkoutManager: ObservableObject {
         // Save to CoreData first
         CoreDataManager.shared.saveTrackedWorkout(completedWorkout)
         
+        // Sync workout to backend asynchronously
+        Task {
+            do {
+                try await WorkoutSyncService.shared.syncCompletedWorkout(completedWorkout)
+                #if DEBUG
+                print("✅ Workout synced to backend successfully")
+                #endif
+            } catch {
+                #if DEBUG
+                print("❌ Failed to sync workout: \(error)")
+                #endif
+                // The workout is already saved locally, so we can handle sync failures gracefully
+                // Could implement a retry mechanism or queue for later sync
+            }
+        }
+        
         // Then reload the data
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.loadCompletedWorkouts()
@@ -121,9 +138,13 @@ class WorkoutManager: ObservableObject {
     }
     
     func loadCompletedWorkouts() {
-        completedWorkouts = coreDataManager.fetchTrackedWorkouts()
-            .filter { $0.isCompleted }
-            .sorted { $0.date > $1.date }
+        if let userID = AuthManager.shared.user?.uid {
+            completedWorkouts = coreDataManager.fetchTrackedWorkouts(for: userID)
+                .filter { $0.isCompleted }
+                .sorted { $0.date > $1.date }
+        } else {
+            completedWorkouts = []
+        }
     }
     
     private func loadWorkoutStats() {

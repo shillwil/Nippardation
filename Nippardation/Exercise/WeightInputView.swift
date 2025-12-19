@@ -150,7 +150,7 @@ struct WeightInputView: View {
     @Previewable @State var weight: Double = 45.0
     @Previewable @State var weightString: String = "45.0"
     
-    return WeightInputView(weight: $weight, weightString: $weightString)
+    WeightInputView(weight: $weight, weightString: $weightString)
 }
 
 #Preview {

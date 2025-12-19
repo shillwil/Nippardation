@@ -24,7 +24,7 @@ class WorkoutCacheManager {
         loadCachedWorkout()
     }
     
-    func startWorkout(template: Workout) -> TrackedWorkout {
+    func startWorkout(template: Workout, userID: String? = nil) -> TrackedWorkout {
         // Create tracked exercises from template
         let trackedExercises: [TrackedExercise] = template.exercises.map { exercise in
             let muscleGroupStrings = exercise.type.muscleGroup.map { $0.rawValue }
@@ -38,6 +38,7 @@ class WorkoutCacheManager {
         
         // Create tracked workout
         let workout = TrackedWorkout(
+            userID: userID,
             date: Date(),
             workoutTemplate: template.name,
             duration: nil,
