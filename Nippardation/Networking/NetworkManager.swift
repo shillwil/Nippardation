@@ -52,15 +52,28 @@ class NetworkManager {
                 do {
                     return try decoder.decode(T.self, from: data)
                 } catch {
+                    #if DEBUG
+                    print("❌ Decoding error: \(error)")
+                    if let jsonString = String(data: data, encoding: .utf8) {
+                        print("📦 Raw response: \(jsonString)")
+                    }
+                    #endif
                     throw NetworkError.decodingError
                 }
             case 401:
                 throw NetworkError.unauthorized
             case 400...499:
                 let errorMessage = String(data: data, encoding: .utf8) ?? "Client error"
+                #if DEBUG
+                print("❌ Client error (\(httpResponse.statusCode)): \(errorMessage)")
+                #endif
                 throw NetworkError.serverError(errorMessage)
             case 500...599:
-                throw NetworkError.serverError("Server error: \(httpResponse.statusCode)")
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Server error"
+                #if DEBUG
+                print("❌ Server error (\(httpResponse.statusCode)): \(errorMessage)")
+                #endif
+                throw NetworkError.serverError("Server error: \(httpResponse.statusCode) - \(errorMessage)")
             default:
                 throw NetworkError.unknown(NSError(domain: "HTTP Error", code: httpResponse.statusCode))
             }
