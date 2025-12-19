@@ -32,16 +32,20 @@ struct AppConfiguration {
     }
     
     var baseURL: URL {
-        guard let urlString = ProcessInfo.processInfo.environment["API_BASE_URL"],
-              !urlString.isEmpty else {
-            fatalError("API_BASE_URL not found in environment variables. Set it in Xcode Scheme > Run > Arguments > Environment Variables.")
+        // Check environment variable first (for debug builds via Xcode)
+        if let urlString = ProcessInfo.processInfo.environment["API_BASE_URL"],
+           !urlString.isEmpty,
+           let url = URL(string: urlString) {
+            return url
         }
 
-        guard let url = URL(string: urlString) else {
-            fatalError("Invalid API_BASE_URL: \(urlString)")
-        }
-
-        return url
+        // Fallback for production/TestFlight builds
+        #if DEBUG
+        fatalError("API_BASE_URL not found. Set it in Xcode Scheme > Run > Arguments > Environment Variables.")
+        #else
+        // Production URL for archived builds
+        return URL(string: "https://recess-backend-production.up.railway.app")!
+        #endif
     }
     
     var firebasePlistName: String {
