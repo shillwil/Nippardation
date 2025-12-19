@@ -1,0 +1,20 @@
+//
+//  Debug.xcconfig.template
+//  Nippardation
+//
+//  Template for Debug environment configuration
+//  Copy this file to Debug.xcconfig and fill in your values
+//
+
+// Include the production configuration as base
+#include "Production.xcconfig"
+
+// Debug-specific overrides
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG PRODUCTION
+SWIFT_OPTIMIZATION_LEVEL = -Onone
+ENABLE_TESTABILITY = YES
+DEBUG_INFORMATION_FORMAT = dwarf
+ENABLE_DEBUG_DYLIB = YES
+
+// Optional: Use staging API for debug builds
+// API_BASE_URL = YOUR_STAGING_API_URL_HERE
