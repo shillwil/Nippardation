@@ -12,13 +12,18 @@ enum AppEnvironment: String {
     case production = "Production"
 
     static var current: AppEnvironment {
-        // Read from scheme environment variables (set in Xcode scheme editor)
-        guard let env = ProcessInfo.processInfo.environment["APP_ENVIRONMENT"],
-              !env.isEmpty else {
-            // Default to staging if not set
-            return .staging
+        // Check environment variable first (for debug builds via Xcode)
+        if let env = ProcessInfo.processInfo.environment["APP_ENVIRONMENT"],
+           !env.isEmpty {
+            return env == "Production" ? .production : .staging
         }
-        return env == "Production" ? .production : .staging
+
+        // Fallback for production/TestFlight builds
+        #if DEBUG
+        return .staging
+        #else
+        return .production
+        #endif
     }
 }
 
