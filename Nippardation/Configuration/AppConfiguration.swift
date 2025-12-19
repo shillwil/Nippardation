@@ -12,13 +12,18 @@ enum AppEnvironment: String {
     case production = "Production"
 
     static var current: AppEnvironment {
-        // Read from scheme environment variables (set in Xcode scheme editor)
-        guard let env = ProcessInfo.processInfo.environment["APP_ENVIRONMENT"],
-              !env.isEmpty else {
-            // Default to staging if not set
-            return .staging
+        // Check environment variable first (for debug builds via Xcode)
+        if let env = ProcessInfo.processInfo.environment["APP_ENVIRONMENT"],
+           !env.isEmpty {
+            return env == "Production" ? .production : .staging
         }
-        return env == "Production" ? .production : .staging
+
+        // Fallback for production/TestFlight builds
+        #if DEBUG
+        return .staging
+        #else
+        return .production
+        #endif
     }
 }
 
@@ -32,16 +37,20 @@ struct AppConfiguration {
     }
     
     var baseURL: URL {
-        guard let urlString = ProcessInfo.processInfo.environment["API_BASE_URL"],
-              !urlString.isEmpty else {
-            fatalError("API_BASE_URL not found in environment variables. Set it in Xcode Scheme > Run > Arguments > Environment Variables.")
+        // Check environment variable first (for debug builds via Xcode)
+        if let urlString = ProcessInfo.processInfo.environment["API_BASE_URL"],
+           !urlString.isEmpty,
+           let url = URL(string: urlString) {
+            return url
         }
 
-        guard let url = URL(string: urlString) else {
-            fatalError("Invalid API_BASE_URL: \(urlString)")
-        }
-
-        return url
+        // Fallback for production/TestFlight builds
+        #if DEBUG
+        fatalError("API_BASE_URL not found. Set it in Xcode Scheme > Run > Arguments > Environment Variables.")
+        #else
+        // Production URL for archived builds
+        return URL(string: "https://recess-backend-production.up.railway.app")!
+        #endif
     }
     
     var firebasePlistName: String {
