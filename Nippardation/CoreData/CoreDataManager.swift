@@ -60,6 +60,7 @@ class CoreDataManager {
             // Create the workout entity
             let cdWorkout = CDTrackedWorkout(context: context)
             cdWorkout.id = trackedWorkout.id
+            cdWorkout.userID = trackedWorkout.userID
             cdWorkout.date = trackedWorkout.date
             cdWorkout.workoutTemplate = trackedWorkout.workoutTemplate
             cdWorkout.duration = trackedWorkout.duration ?? 0
@@ -114,6 +115,22 @@ class CoreDataManager {
             return workouts
         } catch {
             print("Failed to fetch tracked workouts: \(error)")
+            return []
+        }
+    }
+    
+    func fetchTrackedWorkouts(for userID: String) -> [TrackedWorkout] {
+        let request: NSFetchRequest<CDTrackedWorkout> = CDTrackedWorkout.fetchRequest()
+        request.predicate = NSPredicate(format: "userID == %@", userID)
+        request.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+        
+        do {
+            let cdWorkouts = try viewContext.fetch(request)
+            let workouts = cdWorkouts.map { self.convertToTrackedWorkout($0) }
+            print("Fetched \(workouts.count) workouts for user \(userID)")
+            return workouts
+        } catch {
+            print("Failed to fetch tracked workouts for user: \(error)")
             return []
         }
     }
@@ -275,6 +292,7 @@ class CoreDataManager {
         
         return TrackedWorkout(
             id: cdWorkout.id ?? UUID(),
+            userID: cdWorkout.userID,
             date: cdWorkout.date ?? Date(),
             workoutTemplate: cdWorkout.workoutTemplate ?? "",
             duration: cdWorkout.duration,

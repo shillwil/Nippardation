@@ -8,6 +8,7 @@
 import Foundation
 struct TrackedWorkout: Identifiable, Codable {
     var id = UUID()
+    var userID: String?  // Firebase user ID
     var date: Date
     var workoutTemplate: String  // Name of the template used
     var duration: TimeInterval?  // Duration in seconds

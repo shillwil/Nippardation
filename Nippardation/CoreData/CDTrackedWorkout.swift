@@ -4,6 +4,7 @@ import CoreData
 @objc(CDTrackedWorkout)
 public class CDTrackedWorkout: NSManagedObject {
     @NSManaged public var id: UUID?
+    @NSManaged public var userID: String?
     @NSManaged public var date: Date?
     @NSManaged public var workoutTemplate: String?
     @NSManaged public var duration: Double
