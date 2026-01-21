@@ -124,7 +124,13 @@ final class MockProgramRepository: ProgramRepositoryProtocol {
 
     func setActiveProgram(serverId: String) async throws -> Program {
         try await simulateNetworkCall()
-        // Deactivate all others
+
+        // Check existence BEFORE modifying state to avoid corrupting state on error
+        guard programs.contains(where: { $0.serverId == serverId }) else {
+            throw RepositoryError.notFound
+        }
+
+        // Deactivate all others and activate target
         for i in programs.indices {
             programs[i] = Program(
                 id: programs[i].id,
@@ -144,10 +150,9 @@ final class MockProgramRepository: ProgramRepositoryProtocol {
                 lastFetchedAt: programs[i].lastFetchedAt
             )
         }
-        guard let program = programs.first(where: { $0.serverId == serverId }) else {
-            throw RepositoryError.notFound
-        }
-        return program
+
+        // Safe to force unwrap since we already checked existence
+        return programs.first { $0.serverId == serverId }!
     }
 
     func deactivateProgram() async throws {

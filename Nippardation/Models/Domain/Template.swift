@@ -36,7 +36,8 @@ struct Template: Identifiable, Hashable {
     /// Estimated duration in minutes (rough estimate based on sets and rest)
     var estimatedDurationMinutes: Int {
         let totalSets = totalWorkingSets + totalWarmupSets
-        let averageRestSeconds = exercises.compactMap { $0.restSeconds }.reduce(0, +) / max(exercises.count, 1)
+        let restValues = exercises.compactMap { $0.restSeconds }
+        let averageRestSeconds = restValues.isEmpty ? 0 : restValues.reduce(0, +) / restValues.count
         let setDuration = 45 // Average seconds per set
         let totalSeconds = totalSets * (setDuration + (averageRestSeconds > 0 ? averageRestSeconds : 90))
         return totalSeconds / 60

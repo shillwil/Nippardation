@@ -151,14 +151,13 @@ extension NetworkMonitor {
     }
 
     /// Creates a mock monitor that's always disconnected
+    @MainActor
     static var alwaysDisconnected: NetworkMonitor {
         let monitor = NetworkMonitor()
         monitor.stopMonitoring()
-        // Force disconnected state for previews
-        Task { @MainActor in
-            monitor.isConnected = false
-            monitor.connectionType = .unknown
-        }
+        // Set disconnected state synchronously before returning
+        monitor.isConnected = false
+        monitor.connectionType = .unknown
         return monitor
     }
 }
