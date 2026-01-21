@@ -226,6 +226,7 @@ struct TemplateSummaryDTO: Codable {
 // MARK: - User Types
 
 /// User data transfer object from API
+/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
 struct UserDTO: Codable {
     let id: String
     let firebaseUid: String
@@ -244,11 +245,11 @@ struct UserDTO: Codable {
     let totalWorkouts: Int?
     let currentWorkoutStreak: Int?
     let longestWorkoutStreak: Int?
-    let lastWorkoutDate: Date?
+    let lastWorkoutDate: String?
     let notificationsEnabled: Bool?
-    let lastSyncedAt: Date?
-    let createdAt: Date?
-    let updatedAt: Date?
+    let lastSyncedAt: String?
+    let createdAt: String?
+    let updatedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -326,9 +327,10 @@ struct UpdateUserRequest: Codable {
 // MARK: - Sync Types
 
 /// Request body for sync endpoint
+/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
 struct SyncRequestDTO: Codable {
     let deviceId: String
-    let lastSyncedAt: Date?
+    let lastSyncedAt: String?
     let workouts: [WorkoutCreateDTO]
 
     enum CodingKeys: String, CodingKey {
@@ -339,9 +341,10 @@ struct SyncRequestDTO: Codable {
 }
 
 /// Response from sync endpoint
+/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
 struct SyncResponseDTO: Codable {
     let success: Bool
-    let syncedAt: Date
+    let syncedAt: String
     let conflicts: [SyncAPIConflictDTO]?
     let serverData: ServerSyncDataDTO?
     let stats: SyncStatsDTO
@@ -356,9 +359,10 @@ struct SyncResponseDTO: Codable {
 }
 
 /// Server data from sync (workouts from other devices)
+/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
 struct ServerSyncDataDTO: Codable {
     let workouts: [WorkoutSyncDTO]
-    let lastServerSync: Date
+    let lastServerSync: String
 
     enum CodingKeys: String, CodingKey {
         case workouts
@@ -367,11 +371,12 @@ struct ServerSyncDataDTO: Codable {
 }
 
 /// Workout data for sync (subset of full workout)
+/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
 struct WorkoutSyncDTO: Codable {
     let id: String
     let templateName: String?
-    let startedAt: Date
-    let completedAt: Date?
+    let startedAt: String
+    let completedAt: String?
     let durationSeconds: Int?
     let exerciseCount: Int
     let totalSets: Int

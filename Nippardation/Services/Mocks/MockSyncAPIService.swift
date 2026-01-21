@@ -49,13 +49,14 @@ final class MockSyncAPIService: SyncAPIServiceProtocol, @unchecked Sendable {
         }
 
         // Build default response
+        let now = ISO8601DateFormatter().string(from: Date())
         return SyncResponseDTO(
             success: true,
-            syncedAt: Date(),
+            syncedAt: now,
             conflicts: conflicts.isEmpty ? nil : conflicts,
             serverData: serverWorkouts.isEmpty ? nil : ServerSyncDataDTO(
                 workouts: serverWorkouts,
-                lastServerSync: Date()
+                lastServerSync: now
             ),
             stats: SyncStatsDTO(
                 uploaded: payload.workouts.count,

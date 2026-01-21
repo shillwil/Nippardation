@@ -30,6 +30,7 @@ final class MockUserAPIService: UserAPIServiceProtocol, @unchecked Sendable {
 
     init() {
         // Default mock user
+        let now = ISO8601DateFormatter().string(from: Date())
         mockUser = UserDTO(
             id: "mock-user-id",
             firebaseUid: "mock-firebase-uid",
@@ -48,11 +49,11 @@ final class MockUserAPIService: UserAPIServiceProtocol, @unchecked Sendable {
             totalWorkouts: 100,
             currentWorkoutStreak: 5,
             longestWorkoutStreak: 30,
-            lastWorkoutDate: Date(),
+            lastWorkoutDate: now,
             notificationsEnabled: true,
-            lastSyncedAt: Date(),
-            createdAt: Date(),
-            updatedAt: Date()
+            lastSyncedAt: now,
+            createdAt: now,
+            updatedAt: now
         )
     }
 
@@ -111,6 +112,7 @@ final class MockUserAPIService: UserAPIServiceProtocol, @unchecked Sendable {
         }
 
         // Apply updates
+        let now = ISO8601DateFormatter().string(from: Date())
         let updated = UserDTO(
             id: existing.id,
             firebaseUid: existing.firebaseUid,
@@ -133,7 +135,7 @@ final class MockUserAPIService: UserAPIServiceProtocol, @unchecked Sendable {
             notificationsEnabled: request.notificationsEnabled ?? existing.notificationsEnabled,
             lastSyncedAt: existing.lastSyncedAt,
             createdAt: existing.createdAt,
-            updatedAt: Date()
+            updatedAt: now
         )
 
         mockUser = updated
@@ -148,6 +150,7 @@ final class MockUserAPIService: UserAPIServiceProtocol, @unchecked Sendable {
         lastUpdateRequest = nil
         shouldThrowError = false
         // Reset to default mock user
+        let now = ISO8601DateFormatter().string(from: Date())
         mockUser = UserDTO(
             id: "mock-user-id",
             firebaseUid: "mock-firebase-uid",
@@ -166,11 +169,11 @@ final class MockUserAPIService: UserAPIServiceProtocol, @unchecked Sendable {
             totalWorkouts: 100,
             currentWorkoutStreak: 5,
             longestWorkoutStreak: 30,
-            lastWorkoutDate: Date(),
+            lastWorkoutDate: now,
             notificationsEnabled: true,
-            lastSyncedAt: Date(),
-            createdAt: Date(),
-            updatedAt: Date()
+            lastSyncedAt: now,
+            createdAt: now,
+            updatedAt: now
         )
     }
 }

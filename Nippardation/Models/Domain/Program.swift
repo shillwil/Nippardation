@@ -49,7 +49,7 @@ struct Program: Identifiable, Hashable {
 
     /// Progress percentage (0-1) based on duration
     var progress: Double {
-        guard let weeks = durationWeeks, weeks > 0 else { return 0 }
+        guard let weeks = durationWeeks, weeks > 0, daysPerWeek > 0 else { return 0 }
         let completedDays = timesCompleted * workouts.count + currentDayIndex
         let totalDays = weeks * daysPerWeek
         return min(1.0, Double(completedDays) / Double(totalDays))

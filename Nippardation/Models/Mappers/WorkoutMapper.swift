@@ -19,26 +19,29 @@ enum WorkoutMapper {
 
     /// Generates a deterministic UUID from a server ID string
     /// If the server ID is already a valid UUID, it's used directly
-    /// Otherwise, a UUID v5 (SHA-1 based) is generated from the string
+    /// Otherwise, a deterministic UUID is generated using XOR-based hashing
+    /// Note: This is NOT a standard UUID v5 (which requires SHA-1). It uses a simpler
+    /// XOR mixing algorithm that produces consistent UUIDs for the same input but
+    /// won't match standard UUID v5 implementations.
     static func uuidFromServerId(_ serverId: String) -> UUID {
         // First try parsing as UUID directly (for client-generated IDs)
         if let uuid = UUID(uuidString: serverId) {
             return uuid
         }
 
-        // Generate deterministic UUID from server ID using SHA-1 hash
+        // Generate deterministic UUID from server ID using XOR-based mixing
         let data = serverId.data(using: .utf8)!
         var hash = [UInt8](repeating: 0, count: 20)
 
-        // Simple hash combining namespace and server ID
+        // Combine namespace and server ID bytes
         let namespaceBytes = withUnsafeBytes(of: namespaceUUID.uuid) { Array($0) }
-        var combined = namespaceBytes + Array(data)
+        let combined = namespaceBytes + Array(data)
 
-        // Create a simple deterministic hash (not cryptographic, just for ID generation)
+        // Create a deterministic hash using XOR mixing (not cryptographic, just for ID generation)
         for i in 0..<min(combined.count, 16) {
             hash[i] = combined[i]
         }
-        // Mix in remaining bytes
+        // Mix in remaining bytes using XOR
         for i in 16..<combined.count {
             hash[i % 16] ^= combined[i]
         }
@@ -51,9 +54,9 @@ enum WorkoutMapper {
             hash[12], hash[13], hash[14], hash[15]
         )
 
-        // Set version (5) and variant bits per UUID spec
-        uuidBytes.6 = (uuidBytes.6 & 0x0F) | 0x50  // Version 5
-        uuidBytes.8 = (uuidBytes.8 & 0x3F) | 0x80  // Variant
+        // Set version 8 (custom/experimental) and variant bits per UUID spec
+        uuidBytes.6 = (uuidBytes.6 & 0x0F) | 0x80  // Version 8 (custom)
+        uuidBytes.8 = (uuidBytes.8 & 0x3F) | 0x80  // Variant (RFC 4122)
 
         return UUID(uuid: uuidBytes)
     }
