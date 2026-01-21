@@ -82,6 +82,11 @@ final class MockVideoCacheService: VideoCacheServiceProtocol {
             .appendingPathComponent("videos")
             .appendingPathComponent("\(exerciseServerId).mp4")
 
+        // Subtract existing size if replacing a cached video
+        if let existing = cachedVideos[exerciseServerId] {
+            totalCacheSize -= existing.size
+        }
+
         cachedVideos[exerciseServerId] = CachedVideo(
             localURL: localURL,
             remoteURL: remoteURL,

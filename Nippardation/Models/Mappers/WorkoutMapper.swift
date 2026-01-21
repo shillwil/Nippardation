@@ -11,6 +11,53 @@ import Foundation
 /// Bridges the gap between sync DTOs and existing TrackedWorkout models
 enum WorkoutMapper {
 
+    // MARK: - Server ID to UUID Mapping
+
+    /// Namespace UUID for generating deterministic UUIDs from server IDs
+    /// Using a fixed namespace ensures the same server ID always produces the same UUID
+    private static let namespaceUUID = UUID(uuidString: "6ba7b810-9dad-11d1-80b4-00c04fd430c8")!
+
+    /// Generates a deterministic UUID from a server ID string
+    /// If the server ID is already a valid UUID, it's used directly
+    /// Otherwise, a UUID v5 (SHA-1 based) is generated from the string
+    static func uuidFromServerId(_ serverId: String) -> UUID {
+        // First try parsing as UUID directly (for client-generated IDs)
+        if let uuid = UUID(uuidString: serverId) {
+            return uuid
+        }
+
+        // Generate deterministic UUID from server ID using SHA-1 hash
+        let data = serverId.data(using: .utf8)!
+        var hash = [UInt8](repeating: 0, count: 20)
+
+        // Simple hash combining namespace and server ID
+        let namespaceBytes = withUnsafeBytes(of: namespaceUUID.uuid) { Array($0) }
+        var combined = namespaceBytes + Array(data)
+
+        // Create a simple deterministic hash (not cryptographic, just for ID generation)
+        for i in 0..<min(combined.count, 16) {
+            hash[i] = combined[i]
+        }
+        // Mix in remaining bytes
+        for i in 16..<combined.count {
+            hash[i % 16] ^= combined[i]
+        }
+
+        // Build UUID from first 16 bytes of hash
+        var uuidBytes = (
+            hash[0], hash[1], hash[2], hash[3],
+            hash[4], hash[5], hash[6], hash[7],
+            hash[8], hash[9], hash[10], hash[11],
+            hash[12], hash[13], hash[14], hash[15]
+        )
+
+        // Set version (5) and variant bits per UUID spec
+        uuidBytes.6 = (uuidBytes.6 & 0x0F) | 0x50  // Version 5
+        uuidBytes.8 = (uuidBytes.8 & 0x3F) | 0x80  // Variant
+
+        return UUID(uuid: uuidBytes)
+    }
+
     // MARK: - Domain to DTO (for syncing)
 
     /// Converts a TrackedWorkout to a WorkoutCreateDTO for syncing
@@ -44,7 +91,7 @@ enum WorkoutMapper {
         let endDate = dto.completedAt.flatMap { parseDate($0) }
 
         return TrackedWorkout(
-            id: UUID(uuidString: dto.id) ?? UUID(),
+            id: uuidFromServerId(dto.id),
             userID: nil,
             date: startDate,
             workoutTemplate: dto.templateName ?? "Workout",
@@ -100,7 +147,7 @@ enum WorkoutExerciseMapper {
     /// Converts a WorkoutExerciseDTO to a TrackedExercise
     static func toDomain(_ dto: WorkoutExerciseDTO) -> TrackedExercise {
         TrackedExercise(
-            id: UUID(uuidString: dto.id) ?? UUID(),
+            id: WorkoutMapper.uuidFromServerId(dto.id),
             exerciseName: dto.exerciseName,
             muscleGroups: [],
             trackedSets: dto.sets.map { WorkoutSetMapper.toDomain($0) }

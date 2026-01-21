@@ -364,7 +364,9 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
 
         let existing = programDTOs[index]
         let currentDay = existing.currentDayIndex ?? 0
-        let nextDayIndex = (currentDay + 1) % existing.daysPerWeek
+        // Use workouts.count (matching domain model) with guard against zero
+        let workoutCount = max(existing.workouts.count, 1)
+        let nextDayIndex = (currentDay + 1) % workoutCount
         let cycleCompleted = nextDayIndex == 0
 
         let now = ISO8601DateFormatter().string(from: Date())
