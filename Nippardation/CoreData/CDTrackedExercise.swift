@@ -8,6 +8,10 @@ public class CDTrackedExercise: NSManagedObject {
     @NSManaged public var muscleGroups: [String]?
     @NSManaged public var workout: CDTrackedWorkout?
     @NSManaged public var trackedSets: NSSet?
+
+    // Sync attributes (added in v2)
+    @NSManaged public var serverId: String?
+    @NSManaged public var exerciseLibraryServerId: String?
 }
 
 // MARK: - Generated accessors for trackedSets

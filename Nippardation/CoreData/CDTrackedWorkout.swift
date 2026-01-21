@@ -12,6 +12,12 @@ public class CDTrackedWorkout: NSManagedObject {
     @NSManaged public var startTime: Date?
     @NSManaged public var endTime: Date?
     @NSManaged public var trackedExercises: NSSet?
+
+    // Sync attributes (added in v2)
+    @NSManaged public var serverId: String?
+    @NSManaged public var syncStatus: Int16  // 0=unsynced, 1=syncing, 2=synced
+    @NSManaged public var templateServerId: String?
+    @NSManaged public var lastSyncedAt: Date?
 }
 
 // MARK: - Generated accessors for trackedExercises
