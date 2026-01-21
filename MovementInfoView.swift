@@ -10,7 +10,14 @@ import SwiftUI
 struct MovementInfoView: View {
     @EnvironmentObject var viewModel: ActiveExerciseViewModel
     var exercise: Exercise
-    
+
+    /// Optional native video URL for R2-hosted MP4 videos
+    /// When provided, displays native AVPlayer instead of WebView
+    var nativeVideoUrl: URL?
+
+    /// Optional exercise server ID for video caching
+    var exerciseServerId: String?
+
     var body: some View {
         Group {
             // Target information
@@ -24,33 +31,47 @@ struct MovementInfoView: View {
             .background(Color(.secondarySystemBackground))
             .cornerRadius(12)
             .padding(.horizontal)
-            
-            // Example video
+
+            // Video section - only show if native video URL is available
+            videoSection
+        }
+    }
+
+    // MARK: - Video Section
+
+    @ViewBuilder
+    private var videoSection: some View {
+        if let videoUrl = nativeVideoUrl {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Example")
                     .font(.headline)
                     .padding(.horizontal)
-                
-                if let webView = viewModel.webView {
-                    WebViewRepresentable(webView: webView)
-                        .aspectRatio(1.8, contentMode: .fit)
-                        .cornerRadius(12)
-                        .frame(height: 200)
-                        .padding(.horizontal)
-                }
+
+                NativeVideoPlayer(
+                    exerciseServerId: exerciseServerId ?? exercise.type.name,
+                    videoUrl: videoUrl,
+                    aspectRatio: 16/9,
+                    showControls: true
+                )
+                .frame(height: 220)
+                .padding(.horizontal)
             }
         }
+        // When no native video URL is available, gracefully degrade by showing nothing
+        // This replaces the old WebView-based YouTube player
     }
-    
+
+    // MARK: - Helper Views
+
     @ViewBuilder
     private func targetInfoRow(title: String, value: String) -> some View {
         HStack {
             Text(title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            
+
             Spacer()
-            
+
             Text(value)
                 .font(.subheadline)
                 .fontWeight(.medium)
