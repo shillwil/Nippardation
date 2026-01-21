@@ -147,3 +147,54 @@ When agents need to communicate:
 ### Agent C ↔ Agent D
 - Agent C provides `VideoCacheService`
 - Agent D uses it in exercise detail views
+
+## API Service Layer (Phase 0 Extension)
+
+Phase 0 Extension added API Service Protocols that sit between:
+- Agent A (implements the protocols)
+- Agent B (consumes the protocols via dependency injection)
+
+### Protocol → Implementation Mapping
+
+| Protocol | Mock (Phase 0) | Real (Agent A) |
+|----------|----------------|----------------|
+| `ExerciseAPIServiceProtocol` | `MockExerciseAPIService` | `ExerciseAPIService` |
+| `TemplateAPIServiceProtocol` | `MockTemplateAPIService` | `TemplateAPIService` |
+| `ProgramAPIServiceProtocol` | `MockProgramAPIService` | `ProgramAPIService` |
+| `SyncAPIServiceProtocol` | `MockSyncAPIService` | `SyncAPIService` |
+| `UserAPIServiceProtocol` | `MockUserAPIService` | `UserAPIService` |
+
+### Why This Matters
+
+Without these protocols, Agent B's repositories would look like:
+```swift
+// BAD: Direct dependency on Agent A's concrete type
+class ExerciseRepository {
+    let apiService: ExerciseAPIService // ← Can't compile until Agent A done
+}
+```
+
+With protocols:
+```swift
+// GOOD: Depends only on protocol from Phase 0
+class ExerciseRepository {
+    let apiService: ExerciseAPIServiceProtocol // ← Compiles with mock
+}
+```
+
+### Agent Responsibilities
+
+**Agent A creates:**
+- `Services/API/ExerciseAPIService.swift` implementing `ExerciseAPIServiceProtocol`
+- `Services/API/TemplateAPIService.swift` implementing `TemplateAPIServiceProtocol`
+- `Services/API/ProgramAPIService.swift` implementing `ProgramAPIServiceProtocol`
+- `Services/API/SyncAPIService.swift` implementing `SyncAPIServiceProtocol`
+- `Services/API/UserAPIService.swift` implementing `UserAPIServiceProtocol`
+
+**Agent B uses:**
+- `ExerciseAPIServiceProtocol` in `ExerciseRepository`
+- `TemplateAPIServiceProtocol` in `TemplateRepository`
+- `ProgramAPIServiceProtocol` in `ProgramRepository`
+- `SyncAPIServiceProtocol` in `SyncService`
+
+Both compile independently. Both can merge in any order.

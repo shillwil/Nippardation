@@ -39,6 +39,23 @@ final class DependencyContainer: ObservableObject {
     /// Network monitor for tracking connectivity
     @Published private(set) var networkMonitor: NetworkMonitor
 
+    // MARK: - API Services
+
+    /// Exercise API service for API-level operations
+    @Published private(set) var exerciseAPIService: any ExerciseAPIServiceProtocol
+
+    /// Template API service for API-level operations
+    @Published private(set) var templateAPIService: any TemplateAPIServiceProtocol
+
+    /// Program API service for API-level operations
+    @Published private(set) var programAPIService: any ProgramAPIServiceProtocol
+
+    /// Sync API service for API-level operations
+    @Published private(set) var syncAPIService: any SyncAPIServiceProtocol
+
+    /// User API service for API-level operations
+    @Published private(set) var userAPIService: any UserAPIServiceProtocol
+
     // MARK: - Initialization
 
     private init() {
@@ -51,6 +68,13 @@ final class DependencyContainer: ObservableObject {
         self.syncService = MockSyncService()
         self.videoCacheService = MockVideoCacheService()
         self.networkMonitor = NetworkMonitor()
+
+        // Initialize API services with mocks
+        self.exerciseAPIService = MockExerciseAPIService()
+        self.templateAPIService = MockTemplateAPIService()
+        self.programAPIService = MockProgramAPIService()
+        self.syncAPIService = MockSyncAPIService()
+        self.userAPIService = MockUserAPIService()
     }
 
     // MARK: - Registration
@@ -104,6 +128,45 @@ final class DependencyContainer: ObservableObject {
         self.workoutRepository = MockWorkoutRepository()
         self.syncService = MockSyncService()
         self.videoCacheService = MockVideoCacheService()
+
+        // Reset API services to mocks
+        self.exerciseAPIService = MockExerciseAPIService()
+        self.templateAPIService = MockTemplateAPIService()
+        self.programAPIService = MockProgramAPIService()
+        self.syncAPIService = MockSyncAPIService()
+        self.userAPIService = MockUserAPIService()
+    }
+
+    // MARK: - API Service Setters (Used by Agent A)
+
+    /// Replace exercise API service with real implementation
+    /// Called by Agent A after completion
+    func setExerciseAPIService(_ service: any ExerciseAPIServiceProtocol) {
+        self.exerciseAPIService = service
+    }
+
+    /// Replace template API service with real implementation
+    /// Called by Agent A after completion
+    func setTemplateAPIService(_ service: any TemplateAPIServiceProtocol) {
+        self.templateAPIService = service
+    }
+
+    /// Replace program API service with real implementation
+    /// Called by Agent A after completion
+    func setProgramAPIService(_ service: any ProgramAPIServiceProtocol) {
+        self.programAPIService = service
+    }
+
+    /// Replace sync API service with real implementation
+    /// Called by Agent A after completion
+    func setSyncAPIService(_ service: any SyncAPIServiceProtocol) {
+        self.syncAPIService = service
+    }
+
+    /// Replace user API service with real implementation
+    /// Called by Agent A after completion
+    func setUserAPIService(_ service: any UserAPIServiceProtocol) {
+        self.userAPIService = service
     }
 
     /// Resets all services to their default state
