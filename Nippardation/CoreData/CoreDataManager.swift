@@ -13,6 +13,7 @@ class CoreDataManager {
 
     private let modelName = "CDModel"
     private var _persistentContainer: NSPersistentContainer?
+    private let containerLock = NSLock()
 
     /// Initializer for production use
     init() {}
@@ -25,6 +26,9 @@ class CoreDataManager {
     }
 
     var persistentContainer: NSPersistentContainer {
+        containerLock.lock()
+        defer { containerLock.unlock() }
+
         if let container = _persistentContainer {
             return container
         }

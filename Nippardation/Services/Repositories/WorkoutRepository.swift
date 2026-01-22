@@ -35,9 +35,12 @@ final class WorkoutRepository: WorkoutRepositoryProtocol {
         endDate: Date?,
         forceRefresh: Bool
     ) async throws -> PaginatedResult<TrackedWorkout> {
+        // Validate page parameter to prevent negative fetch offsets
+        let validPage = max(1, page)
+
         // Workouts are local-first, so we always use Core Data
         let cdWorkouts = coreDataManager.fetchWorkouts(
-            page: page,
+            page: validPage,
             limit: defaultPageSize,
             startDate: startDate,
             endDate: endDate
@@ -51,7 +54,7 @@ final class WorkoutRepository: WorkoutRepositoryProtocol {
 
         return PaginatedResult(
             items: workouts,
-            page: page,
+            page: validPage,
             totalPages: max(1, totalPages),
             totalItems: totalCount
         )

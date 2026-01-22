@@ -210,16 +210,19 @@ final class SyncService: SyncServiceProtocol {
             }
         }
 
-        // Handle conflicts
+        // Handle conflicts - deduplicate to avoid accumulation across retries
         if let responseConflicts = response.conflicts, !responseConflicts.isEmpty {
             for conflict in responseConflicts {
-                conflicts.append(SyncConflict(
-                    id: conflict.clientId,
-                    type: .workout,
-                    localVersion: conflict.clientId,
-                    remoteVersion: conflict.serverId as Any,
-                    detectedAt: Date()
-                ))
+                // Only add if this conflict ID doesn't already exist
+                if !conflicts.contains(where: { $0.id == conflict.clientId }) {
+                    conflicts.append(SyncConflict(
+                        id: conflict.clientId,
+                        type: .workout,
+                        localVersion: conflict.clientId,
+                        remoteVersion: conflict.serverId as Any,
+                        detectedAt: Date()
+                    ))
+                }
             }
         }
     }
