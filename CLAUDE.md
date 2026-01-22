@@ -208,6 +208,56 @@ The project uses Swift Testing framework (not XCTest). Tests are minimal and loc
 
 Use `#expect` syntax for assertions in new tests.
 
+## Workflow Requirements
+
+### Testing Requirements
+
+**ALWAYS run and update tests after making any code changes:**
+1. Run the relevant test suite after completing changes
+2. Update existing tests if the changes affect their behavior
+3. Add new tests for new functionality
+4. Ensure all tests pass before offering to commit or push
+5. If tests fail, fix the issues before proceeding
+
+```bash
+# Run all tests
+xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5'
+
+# Run specific test file
+xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5' -only-testing:NippardationTests/TestClassName
+```
+
+### Change Summary Requirements
+
+**ALWAYS provide a comprehensive summary after completing changes that includes:**
+1. **What was changed**: List all files modified, added, or deleted
+2. **Why it was changed**: Explain the problem being solved or feature being added
+3. **Broader purpose**: Describe how this change fits into the larger system or goals
+4. **Impact**: Note any side effects, breaking changes, or areas that may need attention
+
+Example format:
+```
+## Summary
+
+**Changes Made:**
+- Modified `ExerciseAPIService.swift`: Added network error wrapping
+- Created `BaseAPIService.swift`: Extracted shared helper methods
+
+**Why:**
+Network errors were not being consistently wrapped in RepositoryError types,
+causing inconsistent error handling for callers.
+
+**Broader Purpose:**
+This improves the API layer's reliability and maintainability by ensuring
+all network operations return consistent error types and reducing code
+duplication across service classes.
+
+**Impact:**
+- All API services now inherit from BaseAPIService
+- No breaking changes to public APIs
+- Tests continue to pass without modification
+```
+
 ## Commit and PR Guidelines
 
 **NEVER include any of the following in commit messages or PR descriptions:**
