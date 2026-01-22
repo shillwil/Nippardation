@@ -60,7 +60,6 @@ class ActiveExerciseViewModel: ObservableObject {
     var nativeVideoUrl: URL? {
         // Currently returns nil as exercise templates use YouTube embeds
         // When ExerciseLibraryItem data is integrated, this will return the R2 URL
-        // Example: URL(string: "https://pub-bd9be4594e0b4c538a1e72055ea5b6fc.r2.dev/exercises/bench-press.mp4")
         return nil
     }
 

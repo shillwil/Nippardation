@@ -17,6 +17,9 @@ struct NippardationApp: App {
     init() {
         StringArrayTransformer.register()
         configureFirebase()
+
+        // Configure dependency container with real implementations
+        DependencyContainer.shared.configureForProduction()
     }
     
     private func configureFirebase() {
