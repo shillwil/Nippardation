@@ -43,13 +43,16 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
         page: Int,
         forceRefresh: Bool
     ) async throws -> PaginatedResult<ExerciseLibraryItem> {
+        // Validate page parameter
+        let validPage = max(1, page)
+
         // Check cache first if not forcing refresh
         if !forceRefresh {
             let cached = getCachedExercises(filter: filter)
             if !cached.isEmpty && isCacheFresh() {
                 // Return paginated cache results
                 let pageSize = defaultPageSize
-                let startIndex = (page - 1) * pageSize
+                let startIndex = (validPage - 1) * pageSize
                 let endIndex = min(startIndex + pageSize, cached.count)
 
                 if startIndex < cached.count {
@@ -58,7 +61,7 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
 
                     return PaginatedResult(
                         items: pageItems,
-                        page: page,
+                        page: validPage,
                         totalPages: totalPages,
                         totalItems: cached.count
                     )
@@ -71,7 +74,7 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
             let apiFilters = filter.map { convertToAPIFilters($0) }
 
             // Calculate cursor from page (API uses cursor-based pagination)
-            let cursor = page > 1 ? String((page - 1) * defaultPageSize) : nil
+            let cursor = validPage > 1 ? String((validPage - 1) * defaultPageSize) : nil
 
             // Fetch from API
             let (dtos, pagination) = try await apiService.fetchExercises(
@@ -87,12 +90,12 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
             try? await coreDataManager.cacheExercises(exercises)
 
             // Calculate total pages (estimate if hasMore)
-            let totalItems = pagination.hasMore ? (page * defaultPageSize + 1) : (page * defaultPageSize)
-            let totalPages = pagination.hasMore ? (page + 1) : page
+            let totalItems = pagination.hasMore ? (validPage * defaultPageSize + 1) : (validPage * defaultPageSize)
+            let totalPages = pagination.hasMore ? (validPage + 1) : validPage
 
             return PaginatedResult(
                 items: exercises,
-                page: page,
+                page: validPage,
                 totalPages: totalPages,
                 totalItems: totalItems
             )
@@ -101,7 +104,7 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
             let cached = getCachedExercises(filter: filter)
             if !cached.isEmpty {
                 let pageSize = defaultPageSize
-                let startIndex = (page - 1) * pageSize
+                let startIndex = (validPage - 1) * pageSize
                 let endIndex = min(startIndex + pageSize, cached.count)
 
                 if startIndex < cached.count {
@@ -110,7 +113,7 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
 
                     return PaginatedResult(
                         items: pageItems,
-                        page: page,
+                        page: validPage,
                         totalPages: totalPages,
                         totalItems: cached.count
                     )

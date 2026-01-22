@@ -77,10 +77,8 @@ final class WorkoutRepository: WorkoutRepositoryProtocol {
     }
 
     func updateWorkout(_ workout: TrackedWorkout) async throws -> TrackedWorkout {
-        // Delete existing and re-save (simple update strategy)
-        coreDataManager.deleteTrackedWorkout(id: workout.id)
-        coreDataManager.saveTrackedWorkout(workout)
-
+        // Use atomic update to prevent data loss - delete and save happen in single transaction
+        try await coreDataManager.updateTrackedWorkout(workout)
         return workout
     }
 

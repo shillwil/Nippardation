@@ -270,25 +270,16 @@ final class ProgramRepository: ProgramRepositoryProtocol {
     }
 
     func updateProgramProgress(_ program: Program) async throws -> Program {
-        // Update via API through advance or regular update
-        let request = UpdateProgramRequest(
-            name: nil,
-            description: nil,
-            daysPerWeek: nil,
-            durationWeeks: nil
-        )
-
-        let dto = try await apiService.updateProgram(id: program.serverId, request)
-        let updatedProgram = ProgramMapper.toDomain(dto)
-
-        // Update local cache
-        try? await coreDataManager.updateProgramProgress(
+        // Progress updates are local-only since UpdateProgramRequest doesn't support progress fields.
+        // Progress will sync to server via advanceProgram() API calls when user advances through workouts.
+        try await coreDataManager.updateProgramProgress(
             serverId: program.serverId,
             currentDayIndex: program.currentDayIndex,
             timesCompleted: program.timesCompleted
         )
 
-        return updatedProgram
+        // Return the program with updated progress values
+        return program
     }
 
     func advanceToNextWorkout(serverId: String) async throws -> Program {
