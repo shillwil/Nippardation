@@ -10,23 +10,42 @@ import Foundation
 
 class CoreDataManager {
     static let shared = CoreDataManager()
-    
+
     private let modelName = "CDModel"
-    
-    lazy var persistentContainer: NSPersistentContainer = {
-            let container = NSPersistentContainer(name: modelName)
-            container.loadPersistentStores { description, error in
-                if let error = error {
-                    print("Unable to load persistent stores: \(error)")
-                }
-            }
-            
-            // Merge policy to handle conflicts
-            container.viewContext.automaticallyMergesChangesFromParent = true
-            container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-            
+    private var _persistentContainer: NSPersistentContainer?
+    private let containerLock = NSLock()
+
+    /// Initializer for production use
+    init() {}
+
+    /// Initializer for testing with a custom container
+    init(container: NSPersistentContainer) {
+        _persistentContainer = container
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+    }
+
+    var persistentContainer: NSPersistentContainer {
+        containerLock.lock()
+        defer { containerLock.unlock() }
+
+        if let container = _persistentContainer {
             return container
-        }()
+        }
+        let container = NSPersistentContainer(name: modelName)
+        container.loadPersistentStores { description, error in
+            if let error = error {
+                print("Unable to load persistent stores: \(error)")
+            }
+        }
+
+        // Merge policy to handle conflicts
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        _persistentContainer = container
+        return container
+    }
     
     var viewContext: NSManagedObjectContext {
         return persistentContainer.viewContext
@@ -167,7 +186,62 @@ class CoreDataManager {
             print("Failed to delete workout: \(error)")
         }
     }
-    
+
+    /// Atomically updates a tracked workout by deleting the old one and saving the new one in a single transaction.
+    /// This prevents data loss if the save fails - the operation is all-or-nothing.
+    func updateTrackedWorkout(_ workout: TrackedWorkout) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let context = persistentContainer.newBackgroundContext()
+            context.perform {
+                do {
+                    // First, delete the existing workout with this ID
+                    let deleteRequest: NSFetchRequest<CDTrackedWorkout> = CDTrackedWorkout.fetchRequest()
+                    deleteRequest.predicate = NSPredicate(format: "id == %@", workout.id as CVarArg)
+                    let existingWorkouts = try context.fetch(deleteRequest)
+                    for existing in existingWorkouts {
+                        context.delete(existing)
+                    }
+
+                    // Then create the new workout in the same context
+                    let cdWorkout = CDTrackedWorkout(context: context)
+                    cdWorkout.id = workout.id
+                    cdWorkout.userID = workout.userID
+                    cdWorkout.date = workout.date
+                    cdWorkout.workoutTemplate = workout.workoutTemplate
+                    cdWorkout.duration = workout.duration ?? 0
+                    cdWorkout.isCompleted = workout.isCompleted
+                    cdWorkout.startTime = workout.startTime
+                    cdWorkout.endTime = workout.endTime
+
+                    for exercise in workout.trackedExercises {
+                        let cdExercise = CDTrackedExercise(context: context)
+                        cdExercise.id = exercise.id
+                        cdExercise.exerciseName = exercise.exerciseName
+                        cdExercise.muscleGroups = exercise.muscleGroups.map { $0 }
+                        cdExercise.workout = cdWorkout
+
+                        for set in exercise.trackedSets {
+                            let cdSet = CDTrackedSet(context: context)
+                            cdSet.id = set.id
+                            cdSet.reps = Int16(set.reps)
+                            cdSet.weight = set.weight
+                            cdSet.setType = set.setType == .warmup ? 0 : 1
+                            cdSet.exerciseTypeName = set.exerciseType.name
+                            cdSet.exerciseTypeMuscleGroups = set.exerciseType.muscleGroup.map { $0.rawValue }
+                            cdSet.exercise = cdExercise
+                        }
+                    }
+
+                    // Save atomically - both delete and insert happen together
+                    try context.save()
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     // MARK: - Workout Statistics
     
     func fetchWorkoutStats() -> [String: Any] {

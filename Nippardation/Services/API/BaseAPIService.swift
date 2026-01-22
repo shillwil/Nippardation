@@ -1,0 +1,113 @@
+//
+//  BaseAPIService.swift
+//  Nippardation
+//
+//  Base class for API services providing common networking functionality
+//
+
+import Foundation
+
+class BaseAPIService: @unchecked Sendable {
+
+    let session: URLSession
+    let authProvider: AuthTokenProviding
+    let decoder = JSONDecoder.apiDecoder
+    let encoder = JSONEncoder.apiEncoder
+
+    init(session: URLSession = .shared, authProvider: AuthTokenProviding = DefaultAuthTokenProvider.shared) {
+        self.session = session
+        self.authProvider = authProvider
+    }
+
+    // MARK: - Shared Helpers
+
+    func addAuthHeader(to request: inout URLRequest) async throws {
+        guard let token = try await authProvider.getIDToken() else {
+            throw RepositoryError.unauthorized
+        }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    }
+
+    func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as URLError {
+            switch error.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                throw RepositoryError.networkUnavailable
+            case .timedOut:
+                throw RepositoryError.timeout
+            default:
+                throw RepositoryError.unknown(error)
+            }
+        }
+
+        try validateResponse(response, data: data)
+
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            #if DEBUG
+            print("Decoding error: \(error)")
+            if let json = String(data: data, encoding: .utf8) {
+                print("Response: \(json)")
+            }
+            #endif
+            throw RepositoryError.unknown(error)
+        }
+    }
+
+    func performRequestWithoutDecoding(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as URLError {
+            switch error.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                throw RepositoryError.networkUnavailable
+            case .timedOut:
+                throw RepositoryError.timeout
+            default:
+                throw RepositoryError.unknown(error)
+            }
+        }
+
+        return (data, response)
+    }
+
+    func validateResponse(_ response: URLResponse, data: Data? = nil) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw RepositoryError.unknown(nil)
+        }
+
+        switch httpResponse.statusCode {
+        case 200...299:
+            return
+        case 401:
+            throw RepositoryError.unauthorized
+        case 404:
+            throw RepositoryError.notFound
+        case 422:
+            let message = data.flatMap { String(data: $0, encoding: .utf8) } ?? "Validation failed"
+            throw RepositoryError.validationError(message)
+        case 429:
+            let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After")
+                .flatMap { Double($0) }
+            throw RepositoryError.rateLimited(retryAfter: retryAfter)
+        case 400...499:
+            let message = data.flatMap { String(data: $0, encoding: .utf8) }
+            throw RepositoryError.serverError(statusCode: httpResponse.statusCode, message: message)
+        case 500...599:
+            let message = data.flatMap { String(data: $0, encoding: .utf8) }
+            throw RepositoryError.serverError(statusCode: httpResponse.statusCode, message: message)
+        default:
+            throw RepositoryError.unknown(nil)
+        }
+    }
+}
