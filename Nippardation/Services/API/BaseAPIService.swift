@@ -10,17 +10,19 @@ import Foundation
 class BaseAPIService: @unchecked Sendable {
 
     let session: URLSession
+    let authProvider: AuthTokenProviding
     let decoder = JSONDecoder.apiDecoder
     let encoder = JSONEncoder.apiEncoder
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = .shared, authProvider: AuthTokenProviding = DefaultAuthTokenProvider.shared) {
         self.session = session
+        self.authProvider = authProvider
     }
 
     // MARK: - Shared Helpers
 
     func addAuthHeader(to request: inout URLRequest) async throws {
-        guard let token = try await AuthManager.shared.getIDToken() else {
+        guard let token = try await authProvider.getIDToken() else {
             throw RepositoryError.unauthorized
         }
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

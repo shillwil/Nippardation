@@ -9,8 +9,8 @@ import Foundation
 
 final class ExerciseAPIService: BaseAPIService, ExerciseAPIServiceProtocol, @unchecked Sendable {
 
-    override init(session: URLSession = .shared) {
-        super.init(session: session)
+    override init(session: URLSession = .shared, authProvider: AuthTokenProviding = DefaultAuthTokenProvider.shared) {
+        super.init(session: session, authProvider: authProvider)
     }
 
     // MARK: - ExerciseAPIServiceProtocol

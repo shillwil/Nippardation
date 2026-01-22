@@ -14,14 +14,13 @@ struct ExerciseAPIServiceTests {
 
     // Note: These tests use MockURLProtocol to intercept network requests.
     // Tests are serialized because MockURLProtocol.requestHandler is shared state.
-    // AuthManager integration requires a logged-in user, so some tests
-    // verify error handling for unauthorized states.
+    // MockAuthTokenProvider is used to provide a valid token so requests reach the network layer.
 
     // MARK: - Setup
 
-    private func createService() -> ExerciseAPIService {
+    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> ExerciseAPIService {
         MockURLProtocol.reset()
-        return ExerciseAPIService(session: MockURLProtocol.mockSession())
+        return ExerciseAPIService(session: MockURLProtocol.mockSession(), authProvider: authProvider)
     }
 
     // MARK: - fetchExercises Tests
@@ -176,10 +175,6 @@ struct ExerciseAPIServiceTests {
     }
 
     // MARK: - Error Handling Tests
-    //
-    // Note: Tests for network-level errors (timeout, connection lost) cannot be
-    // tested without mocking AuthManager, since the auth check happens before
-    // the network request. The following tests verify HTTP status code handling.
 
     @Test func handlesUnauthorizedError() async throws {
         let service = createService()
@@ -204,19 +199,15 @@ struct ExerciseAPIServiceTests {
         let service = createService()
 
         MockURLProtocol.requestHandler = { request in
-            // Verify auth header would be set (if token was available)
-            // Since no token, service throws before reaching here
-            // This test documents the expected behavior
-            return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
+            // Verify auth header is set with the mock token
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer mock-test-token")
+            return MockURLProtocol.errorResponse(for: request.url!, statusCode: 200)
         }
 
         do {
             _ = try await service.fetchExercise(id: "ex_001")
-        } catch let error as RepositoryError {
-            // Unauthorized is expected - validates auth is required
-            if case .unauthorized = error {
-                // Expected
-            }
+        } catch {
+            // May fail due to decoding, but we verified the header
         }
     }
 
@@ -224,15 +215,31 @@ struct ExerciseAPIServiceTests {
         let service = createService()
 
         MockURLProtocol.requestHandler = { request in
-            // If we reach here, verify Content-Type header
+            // Verify Content-Type header
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
-            return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
+            return MockURLProtocol.errorResponse(for: request.url!, statusCode: 200)
         }
 
         do {
             try await service.recordUsage(exerciseId: "ex_001")
         } catch {
-            // Expected
+            // May fail, but we verified the header
+        }
+    }
+
+    @Test func throwsUnauthorizedWhenNoToken() async throws {
+        let noTokenProvider = MockAuthTokenProvider(token: nil)
+        let service = createService(authProvider: noTokenProvider)
+
+        do {
+            _ = try await service.fetchExercises(filters: nil, cursor: nil, limit: 20)
+            Issue.record("Expected unauthorized error")
+        } catch let error as RepositoryError {
+            if case .unauthorized = error {
+                // Expected - no token means unauthorized
+            } else {
+                Issue.record("Expected unauthorized, got \(error)")
+            }
         }
     }
 }

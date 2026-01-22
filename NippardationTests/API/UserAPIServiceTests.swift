@@ -13,12 +13,13 @@ import Foundation
 struct UserAPIServiceTests {
 
     // Note: Tests are serialized because MockURLProtocol.requestHandler is shared state.
+    // MockAuthTokenProvider is used to provide a valid token so requests reach the network layer.
 
     // MARK: - Setup
 
-    private func createService() -> UserAPIService {
+    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> UserAPIService {
         MockURLProtocol.reset()
-        return UserAPIService(session: MockURLProtocol.mockSession())
+        return UserAPIService(session: MockURLProtocol.mockSession(), authProvider: authProvider)
     }
 
     // MARK: - login Tests

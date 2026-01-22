@@ -15,8 +15,8 @@ private struct UserResponse: Codable {
 
 final class UserAPIService: BaseAPIService, UserAPIServiceProtocol, @unchecked Sendable {
 
-    override init(session: URLSession = .shared) {
-        super.init(session: session)
+    override init(session: URLSession = .shared, authProvider: AuthTokenProviding = DefaultAuthTokenProvider.shared) {
+        super.init(session: session, authProvider: authProvider)
     }
 
     // MARK: - UserAPIServiceProtocol
