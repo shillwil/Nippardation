@@ -14,8 +14,21 @@ class CoreDataTestHelper {
 
     /// Creates a CoreDataManager configured for testing with in-memory store
     static func createInMemoryManager() -> CoreDataManager {
-        let manager = TestCoreDataManager()
-        return manager
+        let container = NSPersistentContainer(name: "CDModel")
+
+        // Use in-memory store
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        description.shouldAddStoreAsynchronously = false
+        container.persistentStoreDescriptions = [description]
+
+        container.loadPersistentStores { description, error in
+            if let error = error {
+                fatalError("Failed to load in-memory store: \(error)")
+            }
+        }
+
+        return CoreDataManager(container: container)
     }
 
     /// Creates a sample ExerciseLibraryItem for testing
@@ -163,31 +176,3 @@ class CoreDataTestHelper {
     }
 }
 
-/// Subclass of CoreDataManager that uses an in-memory store for testing
-class TestCoreDataManager: CoreDataManager {
-
-    override init() {
-        super.init()
-    }
-
-    override lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: "CDModel")
-
-        // Use in-memory store
-        let description = NSPersistentStoreDescription()
-        description.type = NSInMemoryStoreType
-        description.shouldAddStoreAsynchronously = false
-        container.persistentStoreDescriptions = [description]
-
-        container.loadPersistentStores { description, error in
-            if let error = error {
-                fatalError("Failed to load in-memory store: \(error)")
-            }
-        }
-
-        container.viewContext.automaticallyMergesChangesFromParent = true
-        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-
-        return container
-    }()
-}

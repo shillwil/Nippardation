@@ -10,23 +10,38 @@ import Foundation
 
 class CoreDataManager {
     static let shared = CoreDataManager()
-    
+
     private let modelName = "CDModel"
-    
-    lazy var persistentContainer: NSPersistentContainer = {
-            let container = NSPersistentContainer(name: modelName)
-            container.loadPersistentStores { description, error in
-                if let error = error {
-                    print("Unable to load persistent stores: \(error)")
-                }
-            }
-            
-            // Merge policy to handle conflicts
-            container.viewContext.automaticallyMergesChangesFromParent = true
-            container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-            
+    private var _persistentContainer: NSPersistentContainer?
+
+    /// Initializer for production use
+    init() {}
+
+    /// Initializer for testing with a custom container
+    init(container: NSPersistentContainer) {
+        _persistentContainer = container
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+    }
+
+    var persistentContainer: NSPersistentContainer {
+        if let container = _persistentContainer {
             return container
-        }()
+        }
+        let container = NSPersistentContainer(name: modelName)
+        container.loadPersistentStores { description, error in
+            if let error = error {
+                print("Unable to load persistent stores: \(error)")
+            }
+        }
+
+        // Merge policy to handle conflicts
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        _persistentContainer = container
+        return container
+    }
     
     var viewContext: NSManagedObjectContext {
         return persistentContainer.viewContext

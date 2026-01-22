@@ -30,12 +30,16 @@ actor MockExerciseAPIService: ExerciseAPIServiceProtocol {
             filtered = filtered.filter { $0.name.lowercased().contains(searchQuery.lowercased()) }
         }
 
+        // Filter by muscle groups
+        if let muscleGroups = filters?.muscleGroups, !muscleGroups.isEmpty {
+            filtered = filtered.filter { exercise in
+                !muscleGroups.isDisjoint(with: Set(exercise.primaryMuscles))
+            }
+        }
+
         let pagination = PaginationInfo(
-            currentPage: 1,
-            totalPages: 1,
-            totalItems: filtered.count,
-            hasMore: false,
-            nextCursor: nil
+            nextCursor: nil,
+            hasMore: false
         )
 
         return (filtered, pagination)
@@ -54,11 +58,26 @@ actor MockExerciseAPIService: ExerciseAPIServiceProtocol {
         if shouldFail { throw failureError }
 
         return filterOptions ?? ExerciseFilterOptionsDTO(
-            muscleGroups: ["chest", "back"],
-            equipment: ["barbell", "dumbbell"],
-            difficulties: ["beginner", "intermediate"],
-            movementPatterns: ["push", "pull"],
-            exerciseTypes: ["compound", "isolation"]
+            muscleGroups: [
+                FilterOptionDTO(value: "chest", label: "Chest", count: 10),
+                FilterOptionDTO(value: "back", label: "Back", count: 10)
+            ],
+            difficulties: [
+                FilterOptionDTO(value: "beginner", label: "Beginner", count: 10),
+                FilterOptionDTO(value: "intermediate", label: "Intermediate", count: 10)
+            ],
+            equipment: [
+                FilterOptionDTO(value: "barbell", label: "Barbell", count: 10),
+                FilterOptionDTO(value: "dumbbell", label: "Dumbbell", count: 10)
+            ],
+            movementPatterns: [
+                FilterOptionDTO(value: "push", label: "Push", count: 10),
+                FilterOptionDTO(value: "pull", label: "Pull", count: 10)
+            ],
+            exerciseTypes: [
+                FilterOptionDTO(value: "compound", label: "Compound", count: 10),
+                FilterOptionDTO(value: "isolation", label: "Isolation", count: 10)
+            ]
         )
     }
 
@@ -89,11 +108,8 @@ actor MockTemplateAPIService: TemplateAPIServiceProtocol {
         if shouldFail { throw failureError }
 
         let pagination = PaginationInfo(
-            currentPage: 1,
-            totalPages: 1,
-            totalItems: templates.count,
-            hasMore: false,
-            nextCursor: nil
+            nextCursor: nil,
+            hasMore: false
         )
         return (templates, pagination)
     }
@@ -207,11 +223,8 @@ actor MockProgramAPIService: ProgramAPIServiceProtocol {
         if shouldFail { throw failureError }
 
         let pagination = PaginationInfo(
-            currentPage: 1,
-            totalPages: 1,
-            totalItems: programs.count,
-            hasMore: false,
-            nextCursor: nil
+            nextCursor: nil,
+            hasMore: false
         )
         return (programs, pagination)
     }
@@ -357,9 +370,9 @@ actor MockSyncAPIService: SyncAPIServiceProtocol {
         return response ?? SyncResponseDTO(
             success: true,
             syncedAt: ISO8601DateFormatter().string(from: Date()),
-            workouts: nil,
             conflicts: nil,
-            errors: nil
+            serverData: nil,
+            stats: SyncStatsDTO(uploaded: 0, downloaded: 0, conflicts: 0)
         )
     }
 

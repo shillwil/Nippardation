@@ -172,11 +172,13 @@ extension CoreDataManager {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let context = persistentContainer.newBackgroundContext()
             context.perform {
-                let request: NSFetchRequest<NSFetchRequestResult> = CDTemplate.fetchRequest()
-                let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
+                let request: NSFetchRequest<CDTemplate> = CDTemplate.fetchRequest()
 
                 do {
-                    try context.execute(deleteRequest)
+                    let templates = try context.fetch(request)
+                    for template in templates {
+                        context.delete(template)
+                    }
                     try context.save()
                     continuation.resume()
                 } catch {
