@@ -64,9 +64,18 @@ struct NativeVideoPlayer: View {
         .task {
             await viewModel.loadVideo(exerciseServerId: exerciseServerId, videoUrl: videoUrl)
         }
-        .onChange(of: exerciseServerId) { _, newId in
+        .onChange(of: exerciseServerId) { oldId, newId in
+            // Only reload if the ID actually changed
+            guard oldId != newId else { return }
             Task {
                 await viewModel.loadVideo(exerciseServerId: newId, videoUrl: videoUrl)
+            }
+        }
+        .onChange(of: videoUrl) { oldUrl, newUrl in
+            // Reload if video URL changes (even with same exercise ID)
+            guard oldUrl != newUrl else { return }
+            Task {
+                await viewModel.loadVideo(exerciseServerId: exerciseServerId, videoUrl: newUrl)
             }
         }
         .onDisappear {

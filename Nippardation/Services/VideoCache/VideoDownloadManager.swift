@@ -23,6 +23,7 @@ actor VideoDownloadManager {
     // MARK: - State
 
     private var activeDownloads: [String: ActiveDownload] = [:]
+    private var activeSessions: [String: URLSession] = [:] // Track sessions for cancellation
     private var progressHandler: ((VideoDownloadProgress) -> Void)?
     private var prefetchTask: Task<Void, Never>?
 
@@ -85,7 +86,13 @@ actor VideoDownloadManager {
                 delegateQueue: nil
             )
 
-            defer { session.finishTasksAndInvalidate() }
+            // Track session for potential cancellation
+            activeSessions[exerciseServerId] = session
+
+            defer {
+                activeSessions.removeValue(forKey: exerciseServerId)
+                session.finishTasksAndInvalidate()
+            }
 
             // Report downloading state
             reportProgress(exerciseServerId: exerciseServerId, state: .downloading, bytesDownloaded: 0, totalBytes: 0)
@@ -131,14 +138,23 @@ actor VideoDownloadManager {
         prefetchTask?.cancel()
         prefetchTask = nil
 
-        for exerciseServerId in activeDownloads.keys {
+        // Cancel all active URLSessions
+        for (exerciseServerId, session) in activeSessions {
+            session.invalidateAndCancel()
             reportProgress(exerciseServerId: exerciseServerId, state: .cancelled, bytesDownloaded: 0, totalBytes: 0)
         }
+        activeSessions.removeAll()
         activeDownloads.removeAll()
     }
 
     /// Cancel download for specific exercise
     func cancel(exerciseServerId: String) {
+        // Cancel the URLSession if it exists
+        if let session = activeSessions[exerciseServerId] {
+            session.invalidateAndCancel()
+            activeSessions.removeValue(forKey: exerciseServerId)
+        }
+
         if activeDownloads[exerciseServerId] != nil {
             reportProgress(exerciseServerId: exerciseServerId, state: .cancelled, bytesDownloaded: 0, totalBytes: 0)
             activeDownloads.removeValue(forKey: exerciseServerId)

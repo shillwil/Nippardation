@@ -30,6 +30,7 @@ final class VideoPlayerViewModel: ObservableObject {
     private var playerItem: AVPlayerItem?
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
+    private var playerItemCancellables = Set<AnyCancellable>() // Separate set for player item subscriptions
 
     // MARK: - Dependencies
 
@@ -64,18 +65,22 @@ final class VideoPlayerViewModel: ObservableObject {
     ///   - exerciseServerId: The server ID of the exercise
     ///   - videoUrl: The remote URL of the video (optional if already cached)
     func loadVideo(exerciseServerId: String, videoUrl: URL?) async {
-        // Don't reload same video
-        if currentExerciseServerId == exerciseServerId && playerItem != nil {
+        // Don't reload same video if already loaded successfully
+        if currentExerciseServerId == exerciseServerId && playerItem != nil && error == nil {
             return
         }
 
         // Cancel any previous load
         loadTask?.cancel()
+        loadTask = nil
 
+        // Reset state for new video
         currentExerciseServerId = exerciseServerId
         isLoading = true
         error = nil
         downloadProgress = 0
+        currentTime = 0
+        duration = 0
 
         // Check if already cached
         if let localURL = videoCacheService.getCachedVideoURL(for: exerciseServerId) {
@@ -159,13 +164,20 @@ final class VideoPlayerViewModel: ObservableObject {
     /// Stop and clean up the player
     func stop() {
         loadTask?.cancel()
+        loadTask = nil
         player.pause()
         player.replaceCurrentItem(with: nil)
         playerItem = nil
+        playerItemCancellables.removeAll() // Clean up player item subscriptions
+        if let observer = timeObserver {
+            player.removeTimeObserver(observer)
+            timeObserver = nil
+        }
         currentExerciseServerId = nil
         isPlaying = false
         currentTime = 0
         duration = 0
+        error = nil
     }
 
     // MARK: - Private Methods
@@ -196,7 +208,9 @@ final class VideoPlayerViewModel: ObservableObject {
     }
 
     private func setupPlayerItem(with url: URL) {
-        // Clean up previous item
+        // Clean up previous item's subscriptions to prevent memory leaks
+        playerItemCancellables.removeAll()
+
         if let observer = timeObserver {
             player.removeTimeObserver(observer)
             timeObserver = nil
@@ -207,7 +221,7 @@ final class VideoPlayerViewModel: ObservableObject {
         playerItem = item
         player.replaceCurrentItem(with: item)
 
-        // Observe duration
+        // Observe duration - stored in player item specific set
         item.publisher(for: \.duration)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] duration in
@@ -215,7 +229,7 @@ final class VideoPlayerViewModel: ObservableObject {
                     self?.duration = duration.seconds
                 }
             }
-            .store(in: &cancellables)
+            .store(in: &playerItemCancellables)
 
         // Observe status for errors
         item.publisher(for: \.status)
@@ -225,7 +239,7 @@ final class VideoPlayerViewModel: ObservableObject {
                     self?.error = "Failed to play video"
                 }
             }
-            .store(in: &cancellables)
+            .store(in: &playerItemCancellables)
 
         // Add time observer
         timeObserver = player.addPeriodicTimeObserver(
@@ -243,7 +257,7 @@ final class VideoPlayerViewModel: ObservableObject {
                     self?.restart()
                 }
             }
-            .store(in: &cancellables)
+            .store(in: &playerItemCancellables)
 
         // Auto-play
         play()
