@@ -229,7 +229,7 @@ xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destinatio
 
 ### Change Summary Requirements
 
-**ALWAYS provide a comprehensive summary after completing changes that includes:**
+**ALWAYS provide a comprehensive summary BEFORE pushing to remote.** The summary should be presented to the user for review before executing `git push`. Include:
 1. **What was changed**: List all files modified, added, or deleted
 2. **Why it was changed**: Explain the problem being solved or feature being added
 3. **Broader purpose**: Describe how this change fits into the larger system or goals
@@ -257,6 +257,13 @@ duplication across service classes.
 - No breaking changes to public APIs
 - Tests continue to pass without modification
 ```
+
+**Workflow order:**
+1. Make code changes
+2. Run tests
+3. Stage and commit changes
+4. **Present summary to user**
+5. Push to remote (only after summary is provided)
 
 ## Commit and PR Guidelines
 
