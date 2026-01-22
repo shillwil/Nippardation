@@ -229,14 +229,23 @@ final class SyncService: SyncServiceProtocol {
         let pendingTemplates = templateRepository.getPendingTemplates()
 
         for template in pendingTemplates {
-            if template.serverId.isEmpty {
-                // New template - create on server
-                _ = try? await templateRepository.createTemplate(template)
-            } else {
-                // Existing template - update on server
-                _ = try? await templateRepository.updateTemplate(template)
+            do {
+                let syncedServerId: String
+                if template.serverId.isEmpty {
+                    // New template - create on server and get assigned serverId
+                    let createdTemplate = try await templateRepository.createTemplate(template)
+                    syncedServerId = createdTemplate.serverId
+                } else {
+                    // Existing template - update on server
+                    let updatedTemplate = try await templateRepository.updateTemplate(template)
+                    syncedServerId = updatedTemplate.serverId
+                }
+                // Only mark as synced if the operation succeeded, using the correct serverId
+                try await templateRepository.markTemplateSynced(serverId: syncedServerId)
+            } catch {
+                // Log error but continue with other templates
+                print("Failed to sync template \(template.id): \(error)")
             }
-            try? await templateRepository.markTemplateSynced(serverId: template.serverId)
         }
 
         // Refresh from server
@@ -248,14 +257,23 @@ final class SyncService: SyncServiceProtocol {
         let pendingPrograms = programRepository.getPendingPrograms()
 
         for program in pendingPrograms {
-            if program.serverId.isEmpty {
-                // New program - create on server
-                _ = try? await programRepository.createProgram(program)
-            } else {
-                // Existing program - update on server
-                _ = try? await programRepository.updateProgram(program)
+            do {
+                let syncedServerId: String
+                if program.serverId.isEmpty {
+                    // New program - create on server and get assigned serverId
+                    let createdProgram = try await programRepository.createProgram(program)
+                    syncedServerId = createdProgram.serverId
+                } else {
+                    // Existing program - update on server
+                    let updatedProgram = try await programRepository.updateProgram(program)
+                    syncedServerId = updatedProgram.serverId
+                }
+                // Only mark as synced if the operation succeeded, using the correct serverId
+                try await programRepository.markProgramSynced(serverId: syncedServerId)
+            } catch {
+                // Log error but continue with other programs
+                print("Failed to sync program \(program.id): \(error)")
             }
-            try? await programRepository.markProgramSynced(serverId: program.serverId)
         }
 
         // Refresh from server

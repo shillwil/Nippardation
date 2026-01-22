@@ -257,10 +257,13 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
 
     /// Check if cache is still fresh
     private func isCacheFresh() -> Bool {
-        // Check the most recently fetched exercise
+        // Find the most recent lastFetchedAt timestamp across all cached exercises
         let cached = coreDataManager.fetchCachedExercises()
-        guard let mostRecent = cached.first,
-              let lastFetched = mostRecent.lastFetchedAt else {
+        guard !cached.isEmpty else { return false }
+
+        // Get the maximum (most recent) lastFetchedAt timestamp
+        let mostRecentFetch = cached.compactMap { $0.lastFetchedAt }.max()
+        guard let lastFetched = mostRecentFetch else {
             return false
         }
 
