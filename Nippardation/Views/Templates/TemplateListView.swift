@@ -15,50 +15,53 @@ struct TemplateListView: View {
     @State private var showDeleteConfirmation = false
 
     var body: some View {
-        Group {
-            if viewModel.isLoading && viewModel.templates.isEmpty {
-                loadingView
-            } else if viewModel.templates.isEmpty {
-                emptyView
-            } else {
-                templateList
-            }
-        }
-        .navigationTitle("My Templates")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showCreateTemplate = true
-                } label: {
-                    Image(systemName: "plus")
+        content
+            .navigationTitle("My Templates")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showCreateTemplate = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
-        }
-        .sheet(isPresented: $showCreateTemplate) {
-            NavigationStack {
-                TemplateEditorView()
-            }
-        }
-        .alert("Delete Template", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {
-                templateToDelete = nil
-            }
-            Button("Delete", role: .destructive) {
-                if let template = templateToDelete {
-                    viewModel.deleteTemplate(template)
+            .sheet(isPresented: $showCreateTemplate) {
+                NavigationStack {
+                    TemplateEditorView()
                 }
-                templateToDelete = nil
             }
-        } message: {
-            Text("Are you sure you want to delete this template? This cannot be undone.")
-        }
-        .refreshable {
-            await viewModel.refreshAsync()
-        }
-        .onAppear {
-            if viewModel.templates.isEmpty {
-                viewModel.loadTemplates()
+            .alert("Delete Template", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    templateToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    if let template = templateToDelete {
+                        viewModel.deleteTemplate(template)
+                    }
+                    templateToDelete = nil
+                }
+            } message: {
+                Text("Are you sure you want to delete this template? This cannot be undone.")
             }
+            .refreshable {
+                await viewModel.refreshAsync()
+            }
+            .onAppear {
+                if viewModel.templates.isEmpty {
+                    viewModel.loadTemplates()
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if viewModel.isLoading && viewModel.templates.isEmpty {
+            loadingView
+        } else if viewModel.templates.isEmpty {
+            emptyView
+        } else {
+            templateList
         }
     }
 

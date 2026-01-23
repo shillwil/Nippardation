@@ -15,50 +15,53 @@ struct ProgramListView: View {
     @State private var showDeleteConfirmation = false
 
     var body: some View {
-        Group {
-            if viewModel.isLoading && viewModel.programs.isEmpty {
-                loadingView
-            } else if viewModel.programs.isEmpty {
-                emptyView
-            } else {
-                programList
-            }
-        }
-        .navigationTitle("My Programs")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showCreateProgram = true
-                } label: {
-                    Image(systemName: "plus")
+        content
+            .navigationTitle("My Programs")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showCreateProgram = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
-        }
-        .sheet(isPresented: $showCreateProgram) {
-            NavigationStack {
-                ProgramEditorView()
-            }
-        }
-        .alert("Delete Program", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {
-                programToDelete = nil
-            }
-            Button("Delete", role: .destructive) {
-                if let program = programToDelete {
-                    viewModel.deleteProgram(program)
+            .sheet(isPresented: $showCreateProgram) {
+                NavigationStack {
+                    ProgramEditorView()
                 }
-                programToDelete = nil
             }
-        } message: {
-            Text("Are you sure you want to delete this program? This cannot be undone.")
-        }
-        .refreshable {
-            await viewModel.refreshAsync()
-        }
-        .onAppear {
-            if viewModel.programs.isEmpty {
-                viewModel.loadPrograms()
+            .alert("Delete Program", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    programToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    if let program = programToDelete {
+                        viewModel.deleteProgram(program)
+                    }
+                    programToDelete = nil
+                }
+            } message: {
+                Text("Are you sure you want to delete this program? This cannot be undone.")
             }
+            .refreshable {
+                await viewModel.refreshAsync()
+            }
+            .onAppear {
+                if viewModel.programs.isEmpty {
+                    viewModel.loadPrograms()
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if viewModel.isLoading && viewModel.programs.isEmpty {
+            loadingView
+        } else if viewModel.programs.isEmpty {
+            emptyView
+        } else {
+            programList
         }
     }
 
