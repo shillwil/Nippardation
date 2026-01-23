@@ -58,16 +58,6 @@ final class ProgramEditorViewModel: ObservableObject {
         workouts.allSatisfy { $0.templateServerId != nil }
     }
 
-    var hasUnsavedChanges: Bool {
-        guard let existing = existingProgram else {
-            return !name.isEmpty || !description.isEmpty || !workouts.isEmpty
-        }
-        return name != existing.name ||
-            description != (existing.description ?? "") ||
-            daysPerWeek != existing.daysPerWeek ||
-            durationWeeks != existing.durationWeeks
-    }
-
     // MARK: - Initialization
 
     init(

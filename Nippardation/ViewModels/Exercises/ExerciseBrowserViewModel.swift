@@ -25,6 +25,7 @@ final class ExerciseBrowserViewModel: ObservableObject {
     // MARK: - Selection State (for picker mode)
 
     @Published var selectedExercises: Set<String> = []
+    private var selectedExerciseItems: [String: ExerciseLibraryItem] = [:]
     let isPickerMode: Bool
     let maxSelections: Int?
 
@@ -202,11 +203,13 @@ final class ExerciseBrowserViewModel: ObservableObject {
     func toggleSelection(_ exercise: ExerciseLibraryItem) {
         if selectedExercises.contains(exercise.serverId) {
             selectedExercises.remove(exercise.serverId)
+            selectedExerciseItems.removeValue(forKey: exercise.serverId)
         } else {
             if let max = maxSelections, selectedExercises.count >= max {
                 return // Don't allow more selections
             }
             selectedExercises.insert(exercise.serverId)
+            selectedExerciseItems[exercise.serverId] = exercise
         }
     }
 
@@ -217,9 +220,9 @@ final class ExerciseBrowserViewModel: ObservableObject {
         selectedExercises.contains(exercise.serverId)
     }
 
-    /// Returns the list of selected exercise items
+    /// Returns the list of selected exercise items (preserves selections even when filtered)
     var selectedExercisesList: [ExerciseLibraryItem] {
-        exercises.filter { selectedExercises.contains($0.serverId) }
+        Array(selectedExerciseItems.values)
     }
 
     /// Clears the current error message

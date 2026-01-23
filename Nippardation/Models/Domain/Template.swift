@@ -23,6 +23,11 @@ struct Template: Identifiable, Hashable {
 
     // MARK: - Computed Properties
 
+    /// Number of exercises in the template
+    var exerciseCount: Int {
+        exercises.count
+    }
+
     /// Total number of working sets in the template
     var totalWorkingSets: Int {
         exercises.reduce(0) { $0 + $1.workingSets }

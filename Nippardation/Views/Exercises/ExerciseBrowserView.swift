@@ -9,22 +9,38 @@ import SwiftUI
 
 struct ExerciseBrowserView: View {
 
-    @StateObject private var viewModel: ExerciseBrowserViewModel
+    @ObservedObject private var viewModel: ExerciseBrowserViewModel
     @State private var showFilters = false
+    private let ownsViewModel: Bool
 
     let onSelect: ((ExerciseLibraryItem) -> Void)?
     let onConfirmSelection: (([ExerciseLibraryItem]) -> Void)?
 
+    /// Creates a browser view that owns its own ViewModel
     init(
         isPickerMode: Bool = false,
         maxSelections: Int? = nil,
         onSelect: ((ExerciseLibraryItem) -> Void)? = nil,
         onConfirmSelection: (([ExerciseLibraryItem]) -> Void)? = nil
     ) {
-        self._viewModel = StateObject(wrappedValue: ExerciseBrowserViewModel(
+        let vm = ExerciseBrowserViewModel(
             isPickerMode: isPickerMode,
             maxSelections: maxSelections
-        ))
+        )
+        self.viewModel = vm
+        self.ownsViewModel = true
+        self.onSelect = onSelect
+        self.onConfirmSelection = onConfirmSelection
+    }
+
+    /// Creates a browser view using an externally-managed ViewModel
+    init(
+        viewModel: ExerciseBrowserViewModel,
+        onSelect: ((ExerciseLibraryItem) -> Void)? = nil,
+        onConfirmSelection: (([ExerciseLibraryItem]) -> Void)? = nil
+    ) {
+        self.viewModel = viewModel
+        self.ownsViewModel = false
         self.onSelect = onSelect
         self.onConfirmSelection = onConfirmSelection
     }

@@ -163,21 +163,3 @@ enum MockData {
         Template.empty(name: "New Template")
     }
 }
-
-// MARK: - Template Extensions for Views
-
-extension Template {
-    /// Number of exercises in the template
-    var exerciseCount: Int {
-        exercises.count
-    }
-}
-
-// MARK: - ProgramWorkout Extensions for Views
-
-extension ProgramWorkout {
-    /// Formatted display label for use in views
-    var displayLabel: String {
-        displayName
-    }
-}
