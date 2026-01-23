@@ -106,6 +106,12 @@ final class ExerciseBrowserViewModel: ObservableObject {
                         } else {
                             self.exercises.append(contentsOf: result.items)
                         }
+                        // Populate selectedExerciseItems for any preselected exercises now loaded
+                        for exercise in result.items where self.selectedExercises.contains(exercise.serverId) {
+                            if self.selectedExerciseItems[exercise.serverId] == nil {
+                                self.selectedExerciseItems[exercise.serverId] = exercise
+                            }
+                        }
                         // Only update currentPage on success
                         self.currentPage = result.page
                         self.hasMore = result.hasNextPage
@@ -120,6 +126,12 @@ final class ExerciseBrowserViewModel: ObservableObject {
                             let cached = self.exerciseRepository.getCachedExercises(filter: self.filter)
                             if !cached.isEmpty {
                                 self.exercises = cached
+                                // Populate selectedExerciseItems for any preselected exercises
+                                for exercise in cached where self.selectedExercises.contains(exercise.serverId) {
+                                    if self.selectedExerciseItems[exercise.serverId] == nil {
+                                        self.selectedExerciseItems[exercise.serverId] = exercise
+                                    }
+                                }
                             }
                         }
                         // Don't update currentPage on error - allows retry of same page

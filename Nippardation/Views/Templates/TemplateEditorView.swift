@@ -209,7 +209,7 @@ private struct ExercisePickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ExerciseBrowserView(viewModel: browserViewModel)
+            ExerciseBrowserContent(viewModel: browserViewModel)
                 .navigationTitle("Select Exercises")
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {

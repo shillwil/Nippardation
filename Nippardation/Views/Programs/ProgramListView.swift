@@ -52,6 +52,16 @@ struct ProgramListView: View {
                     viewModel.loadPrograms()
                 }
             }
+            .alert("Error", isPresented: .init(
+                get: { viewModel.error != nil },
+                set: { if !$0 { viewModel.clearError() } }
+            )) {
+                Button("OK") {
+                    viewModel.clearError()
+                }
+            } message: {
+                Text(viewModel.error ?? "An unknown error occurred")
+            }
     }
 
     @ViewBuilder

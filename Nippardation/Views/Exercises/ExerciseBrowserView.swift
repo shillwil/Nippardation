@@ -7,52 +7,48 @@
 
 import SwiftUI
 
+/// Wrapper view that owns its own ViewModel (for standalone use)
 struct ExerciseBrowserView: View {
-
-    @ObservedObject private var viewModel: ExerciseBrowserViewModel
-    @State private var showFilters = false
-    private let ownsViewModel: Bool
+    @StateObject private var viewModel: ExerciseBrowserViewModel
 
     let onSelect: ((ExerciseLibraryItem) -> Void)?
-    let onConfirmSelection: (([ExerciseLibraryItem]) -> Void)?
 
-    /// Creates a browser view that owns its own ViewModel
     init(
         isPickerMode: Bool = false,
         maxSelections: Int? = nil,
-        onSelect: ((ExerciseLibraryItem) -> Void)? = nil,
-        onConfirmSelection: (([ExerciseLibraryItem]) -> Void)? = nil
+        onSelect: ((ExerciseLibraryItem) -> Void)? = nil
     ) {
-        let vm = ExerciseBrowserViewModel(
+        self._viewModel = StateObject(wrappedValue: ExerciseBrowserViewModel(
             isPickerMode: isPickerMode,
             maxSelections: maxSelections
-        )
-        self.viewModel = vm
-        self.ownsViewModel = true
+        ))
         self.onSelect = onSelect
-        self.onConfirmSelection = onConfirmSelection
     }
 
-    /// Creates a browser view using an externally-managed ViewModel
+    var body: some View {
+        ExerciseBrowserContent(viewModel: viewModel, onSelect: onSelect)
+    }
+}
+
+/// Content view that uses an externally-managed ViewModel
+struct ExerciseBrowserContent: View {
+
+    @ObservedObject var viewModel: ExerciseBrowserViewModel
+    @State private var showFilters = false
+
+    let onSelect: ((ExerciseLibraryItem) -> Void)?
+
     init(
         viewModel: ExerciseBrowserViewModel,
-        onSelect: ((ExerciseLibraryItem) -> Void)? = nil,
-        onConfirmSelection: (([ExerciseLibraryItem]) -> Void)? = nil
+        onSelect: ((ExerciseLibraryItem) -> Void)? = nil
     ) {
         self.viewModel = viewModel
-        self.ownsViewModel = false
         self.onSelect = onSelect
-        self.onConfirmSelection = onConfirmSelection
     }
 
     /// Returns the currently selected exercises (for use with toolbar buttons)
     var selectedExercises: [ExerciseLibraryItem] {
         viewModel.selectedExercisesList
-    }
-
-    /// Confirms the current selection and calls the onConfirmSelection callback
-    func confirmSelection() {
-        onConfirmSelection?(viewModel.selectedExercisesList)
     }
 
     /// Returns whether any exercises are selected
@@ -107,6 +103,16 @@ struct ExerciseBrowserView: View {
                 viewModel.loadExercises()
                 viewModel.loadFilterOptions()
             }
+        }
+        .alert("Error", isPresented: .init(
+            get: { viewModel.error != nil },
+            set: { if !$0 { viewModel.clearError() } }
+        )) {
+            Button("OK") {
+                viewModel.clearError()
+            }
+        } message: {
+            Text(viewModel.error ?? "An unknown error occurred")
         }
     }
 
