@@ -114,6 +114,9 @@ final class DependencyContainer: ObservableObject {
     /// Configures the container with production services
     /// Called during app initialization
     func configureForProduction() {
+        // Register real video cache service
+        self.videoCacheService = VideoCacheService()
+
         // TODO: Replace with real implementations when available
         // self.exerciseRepository = ExerciseRepository()
         // self.templateRepository = TemplateRepository()
