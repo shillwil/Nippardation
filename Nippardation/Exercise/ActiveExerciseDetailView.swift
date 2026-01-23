@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import WebKit
 
 struct ActiveExerciseDetailView: View {
     @StateObject private var viewModel: ActiveExerciseViewModel
@@ -74,7 +73,11 @@ struct ActiveExerciseDetailView: View {
                     
                     // Exercise Information
                     if let exercise = viewModel.matchingExercise {
-                        MovementInfoView(exercise: exercise)
+                        MovementInfoView(
+                            exercise: exercise,
+                            nativeVideoUrl: viewModel.nativeVideoUrl,
+                            exerciseServerId: viewModel.exerciseServerId
+                        )
                     } else if isReadOnly {
                         // Fallback for read-only mode when no matching exercise found
                         Text("Exercise details not available")

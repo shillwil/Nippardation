@@ -17,6 +17,9 @@ public class CDTrackedSet: NSManagedObject {
     @NSManaged public var exerciseTypeName: String?
     @NSManaged public var exerciseTypeMuscleGroups: [String]?
     @NSManaged public var exercise: CDTrackedExercise?
+
+    // Sync attributes (added in v2)
+    @NSManaged public var serverId: String?
 }
 
 extension CDTrackedSet {
