@@ -73,14 +73,19 @@ final class ProgramListViewModel: ObservableObject {
     }
 
     /// Loads public programs with pagination
-    /// - Parameter refresh: If true, reloads from the beginning
-    func loadPublicPrograms(refresh: Bool = false) {
+    /// - Parameters:
+    ///   - refresh: If true, reloads from the beginning
+    ///   - loadingNextPage: If true, loads the next page (currentPage + 1)
+    func loadPublicPrograms(refresh: Bool = false, loadingNextPage: Bool = false) {
         if refresh {
             currentPage = 1
             programs = []
         }
 
         guard !isLoading else { return }
+
+        // Determine which page to fetch - only increment when loading next page
+        let pageToFetch = loadingNextPage ? currentPage + 1 : currentPage
 
         Task {
             await taskManager.run(id: "loadPublicPrograms") { [weak self] in
@@ -90,7 +95,7 @@ final class ProgramListViewModel: ObservableObject {
 
                 do {
                     let result = try await self.programRepository.fetchPublicPrograms(
-                        page: self.currentPage,
+                        page: pageToFetch,
                         category: nil
                     )
 
@@ -100,6 +105,7 @@ final class ProgramListViewModel: ObservableObject {
                         } else {
                             self.programs.append(contentsOf: result.items)
                         }
+                        // Only update currentPage on success
                         self.currentPage = result.page
                         self.hasMore = result.hasNextPage
                         self.error = nil
@@ -107,6 +113,7 @@ final class ProgramListViewModel: ObservableObject {
                     }
                 } catch {
                     await MainActor.run {
+                        // Don't update currentPage on error - allows retry of same page
                         self.error = error.localizedDescription
                         self.isLoading = false
                     }
@@ -118,8 +125,8 @@ final class ProgramListViewModel: ObservableObject {
     /// Loads more public programs if available
     func loadMore() {
         guard hasMore && !isLoading else { return }
-        currentPage += 1
-        loadPublicPrograms()
+        // Don't increment page here - it's updated on success in loadPublicPrograms
+        loadPublicPrograms(loadingNextPage: true)
     }
 
     /// Deletes a program
@@ -200,6 +207,47 @@ final class ProgramListViewModel: ObservableObject {
     /// Clears the current error message
     func clearError() {
         error = nil
+    }
+
+    /// Refreshes programs (async version for pull-to-refresh)
+    func refreshAsync() async {
+        await withCheckedContinuation { continuation in
+            Task {
+                await taskManager.run(id: "loadPrograms") { [weak self] in
+                    guard let self = self else {
+                        continuation.resume()
+                        return
+                    }
+
+                    await MainActor.run {
+                        self.currentPage = 1
+                        self.isLoading = true
+                    }
+
+                    do {
+                        let fetchedPrograms = try await self.programRepository.fetchPrograms(forceRefresh: true)
+
+                        await MainActor.run {
+                            self.programs = fetchedPrograms
+                            self.hasMore = false
+                            self.error = nil
+                            self.isLoading = false
+                        }
+                    } catch {
+                        await MainActor.run {
+                            let cached = self.programRepository.getCachedPrograms()
+                            if !cached.isEmpty {
+                                self.programs = cached
+                            }
+                            self.error = error.localizedDescription
+                            self.isLoading = false
+                        }
+                    }
+
+                    continuation.resume()
+                }
+            }
+        }
     }
 
     // MARK: - Private Helpers

@@ -43,7 +43,6 @@ final class TemplateEditorViewModel: ObservableObject {
     // MARK: - Dependencies
 
     private let templateRepository: any TemplateRepositoryProtocol
-    private let exerciseRepository: any ExerciseRepositoryProtocol
     private let taskManager = TaskManager()
 
     // MARK: - State
@@ -69,11 +68,9 @@ final class TemplateEditorViewModel: ObservableObject {
 
     init(
         existingTemplate: Template? = nil,
-        templateRepository: (any TemplateRepositoryProtocol)? = nil,
-        exerciseRepository: (any ExerciseRepositoryProtocol)? = nil
+        templateRepository: (any TemplateRepositoryProtocol)? = nil
     ) {
         self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
-        self.exerciseRepository = exerciseRepository ?? DependencyContainer.shared.exerciseRepository
 
         if let template = existingTemplate {
             self.existingTemplate = template

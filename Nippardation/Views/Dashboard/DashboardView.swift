@@ -30,12 +30,17 @@ struct DashboardView: View {
             }
             .navigationTitle("Dashboard")
             .refreshable {
-                viewModel.loadDashboard()
+                await viewModel.refreshAsync()
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: ProgramListView()) {
-                        Image(systemName: "list.bullet")
+                    HStack(spacing: 16) {
+                        NavigationLink(destination: TemplateListView()) {
+                            Image(systemName: "doc.text")
+                        }
+                        NavigationLink(destination: ProgramListView()) {
+                            Image(systemName: "list.bullet")
+                        }
                     }
                 }
             }

@@ -66,14 +66,19 @@ final class ExerciseBrowserViewModel: ObservableObject {
     // MARK: - Public Methods
 
     /// Loads exercises from the repository
-    /// - Parameter refresh: If true, reloads from the beginning
-    func loadExercises(refresh: Bool = false) {
+    /// - Parameters:
+    ///   - refresh: If true, reloads from the beginning
+    ///   - loadingNextPage: If true, loads the next page (currentPage + 1)
+    func loadExercises(refresh: Bool = false, loadingNextPage: Bool = false) {
         if refresh {
             currentPage = 1
             exercises = []
         }
 
         guard !isLoading else { return }
+
+        // Determine which page to fetch - only increment when loading next page
+        let pageToFetch = loadingNextPage ? currentPage + 1 : currentPage
 
         Task {
             await taskManager.run(id: "loadExercises") { [weak self] in
@@ -90,7 +95,7 @@ final class ExerciseBrowserViewModel: ObservableObject {
                 do {
                     let result = try await self.exerciseRepository.fetchExercises(
                         filter: self.filter.isEmpty ? nil : self.filter,
-                        page: self.currentPage,
+                        page: pageToFetch,
                         forceRefresh: refresh
                     )
 
@@ -100,6 +105,7 @@ final class ExerciseBrowserViewModel: ObservableObject {
                         } else {
                             self.exercises.append(contentsOf: result.items)
                         }
+                        // Only update currentPage on success
                         self.currentPage = result.page
                         self.hasMore = result.hasNextPage
                         self.error = nil
@@ -115,6 +121,7 @@ final class ExerciseBrowserViewModel: ObservableObject {
                                 self.exercises = cached
                             }
                         }
+                        // Don't update currentPage on error - allows retry of same page
                         self.error = error.localizedDescription
                         self.isLoading = false
                         self.isLoadingMore = false
@@ -170,8 +177,8 @@ final class ExerciseBrowserViewModel: ObservableObject {
     /// Loads more exercises if available
     func loadMore() {
         guard hasMore && !isLoading && !isLoadingMore else { return }
-        currentPage += 1
-        loadExercises()
+        // Don't increment page here - it's updated on success in loadExercises
+        loadExercises(loadingNextPage: true)
     }
 
     /// Applies new filters and reloads

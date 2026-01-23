@@ -53,7 +53,7 @@ struct ProgramListView: View {
             Text("Are you sure you want to delete this program? This cannot be undone.")
         }
         .refreshable {
-            viewModel.loadPrograms(refresh: true)
+            await viewModel.refreshAsync()
         }
         .onAppear {
             if viewModel.programs.isEmpty {

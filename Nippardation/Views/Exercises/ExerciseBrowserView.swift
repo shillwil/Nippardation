@@ -13,17 +13,35 @@ struct ExerciseBrowserView: View {
     @State private var showFilters = false
 
     let onSelect: ((ExerciseLibraryItem) -> Void)?
+    let onConfirmSelection: (([ExerciseLibraryItem]) -> Void)?
 
     init(
         isPickerMode: Bool = false,
         maxSelections: Int? = nil,
-        onSelect: ((ExerciseLibraryItem) -> Void)? = nil
+        onSelect: ((ExerciseLibraryItem) -> Void)? = nil,
+        onConfirmSelection: (([ExerciseLibraryItem]) -> Void)? = nil
     ) {
         self._viewModel = StateObject(wrappedValue: ExerciseBrowserViewModel(
             isPickerMode: isPickerMode,
             maxSelections: maxSelections
         ))
         self.onSelect = onSelect
+        self.onConfirmSelection = onConfirmSelection
+    }
+
+    /// Returns the currently selected exercises (for use with toolbar buttons)
+    var selectedExercises: [ExerciseLibraryItem] {
+        viewModel.selectedExercisesList
+    }
+
+    /// Confirms the current selection and calls the onConfirmSelection callback
+    func confirmSelection() {
+        onConfirmSelection?(viewModel.selectedExercisesList)
+    }
+
+    /// Returns whether any exercises are selected
+    var hasSelection: Bool {
+        !viewModel.selectedExercises.isEmpty
     }
 
     var body: some View {

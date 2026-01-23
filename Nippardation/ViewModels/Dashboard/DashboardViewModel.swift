@@ -142,9 +142,64 @@ final class DashboardViewModel: ObservableObject {
         return allTemplates.first { $0.serverId == workout.templateServerId }
     }
 
-    /// Refreshes the dashboard data
-    func refresh() {
-        loadDashboard()
+    /// Refreshes the dashboard data (async version for pull-to-refresh)
+    func refreshAsync() async {
+        await withCheckedContinuation { continuation in
+            Task {
+                await taskManager.run(id: "loadDashboard") { [weak self] in
+                    guard let self = self else {
+                        continuation.resume()
+                        return
+                    }
+
+                    await MainActor.run { self.isLoading = true }
+
+                    do {
+                        let activeProgram = try await self.programRepository.getActiveProgram()
+
+                        var templatesBuilder: [Template] = []
+                        var nextTemplateFound: Template?
+
+                        if let program = activeProgram {
+                            for workout in program.workouts {
+                                if let template = try? await self.templateRepository.fetchTemplate(
+                                    serverId: workout.templateServerId,
+                                    forceRefresh: true
+                                ) {
+                                    templatesBuilder.append(template)
+                                    if workout.dayNumber == program.currentDayIndex {
+                                        nextTemplateFound = template
+                                    }
+                                }
+                            }
+                        }
+
+                        let finalTemplates = templatesBuilder
+                        let finalNextTemplate = nextTemplateFound
+
+                        await MainActor.run {
+                            self.activeProgram = activeProgram
+                            self.nextWorkout = activeProgram?.currentWorkout
+                            self.nextTemplate = finalNextTemplate
+                            self.allTemplates = finalTemplates
+                            self.error = nil
+                            self.isLoading = false
+                        }
+                    } catch {
+                        let cached = await self.programRepository.getCachedPrograms().first { $0.isActive }
+
+                        await MainActor.run {
+                            self.activeProgram = cached
+                            self.nextWorkout = cached?.currentWorkout
+                            self.error = error.localizedDescription
+                            self.isLoading = false
+                        }
+                    }
+
+                    continuation.resume()
+                }
+            }
+        }
     }
 
     /// Clears the current error message
