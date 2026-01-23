@@ -132,7 +132,7 @@ struct ProgramEditorView: View {
             }
 
             TextField("Day Label (e.g., Push Day)", text: Binding(
-                get: { viewModel.workouts[index].dayLabel },
+                get: { workout.dayLabel },
                 set: { viewModel.setLabel($0, for: index) }
             ))
             .font(.subheadline)

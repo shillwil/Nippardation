@@ -24,6 +24,10 @@ final class ProgramListViewModel: ObservableObject {
     private let programRepository: any ProgramRepositoryProtocol
     private let taskManager = TaskManager()
 
+    // MARK: - Private State
+
+    private var isLoadingPublicPrograms = false
+
     // MARK: - Initialization
 
     init(programRepository: (any ProgramRepositoryProtocol)? = nil) {
@@ -32,7 +36,7 @@ final class ProgramListViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Loads programs from the repository
+    /// Loads user's programs from the repository
     /// - Parameter refresh: If true, reloads from the beginning
     func loadPrograms(refresh: Bool = false) {
         if refresh {
@@ -41,6 +45,8 @@ final class ProgramListViewModel: ObservableObject {
         }
 
         guard !isLoading else { return }
+
+        isLoadingPublicPrograms = false
 
         Task {
             await taskManager.run(id: "loadPrograms") { [weak self] in
@@ -84,6 +90,8 @@ final class ProgramListViewModel: ObservableObject {
 
         guard !isLoading else { return }
 
+        isLoadingPublicPrograms = true
+
         // Determine which page to fetch - only increment when loading next page
         let pageToFetch = loadingNextPage ? currentPage + 1 : currentPage
 
@@ -122,9 +130,9 @@ final class ProgramListViewModel: ObservableObject {
         }
     }
 
-    /// Loads more public programs if available
+    /// Loads more programs if available (only applicable for public programs)
     func loadMore() {
-        guard hasMore && !isLoading else { return }
+        guard hasMore && !isLoading && isLoadingPublicPrograms else { return }
         // Don't increment page here - it's updated on success in loadPublicPrograms
         loadPublicPrograms(loadingNextPage: true)
     }
