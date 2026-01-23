@@ -60,21 +60,25 @@ enum MockData {
     // MARK: - Exercises
 
     /// Sample exercises for previews
+    @MainActor
     static var exercises: [ExerciseLibraryItem] {
         MockExerciseRepository.sampleExercises
     }
 
     /// Bench press exercise
+    @MainActor
     static var benchPress: ExerciseLibraryItem {
         exercises.first { $0.name.contains("Bench Press") } ?? exercises[0]
     }
 
     /// Squat exercise
+    @MainActor
     static var squat: ExerciseLibraryItem {
         exercises.first { $0.name.contains("Squat") } ?? exercises[0]
     }
 
     /// Deadlift exercise
+    @MainActor
     static var deadlift: ExerciseLibraryItem {
         exercises.first { $0.name.contains("Deadlift") } ?? exercises[0]
     }
@@ -104,6 +108,7 @@ enum MockData {
     // MARK: - Filter Options
 
     /// Sample filter options for exercise browser
+    @MainActor
     static var filterOptions: ExerciseFilterOptionsDTO {
         ExerciseFilterOptionsDTO(
             muscleGroups: MuscleGroup.allCases.map { muscle in

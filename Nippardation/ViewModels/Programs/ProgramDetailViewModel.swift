@@ -44,6 +44,9 @@ final class ProgramDetailViewModel: ObservableObject {
 
     /// Loads the program and its associated templates
     func loadProgram() {
+        // Capture serverId before async context
+        let serverId = programServerId
+
         Task {
             await taskManager.run(id: "loadProgram") { [weak self] in
                 guard let self = self else { return }
@@ -52,30 +55,33 @@ final class ProgramDetailViewModel: ObservableObject {
 
                 do {
                     let program = try await self.programRepository.fetchProgram(
-                        serverId: self.programServerId,
+                        serverId: serverId,
                         forceRefresh: false
                     )
 
                     // Load templates for each workout
-                    var loadedTemplates: [Template] = []
+                    var templatesBuilder: [Template] = []
                     for workout in program.workouts {
                         if let template = try? await self.templateRepository.fetchTemplate(
                             serverId: workout.templateServerId,
                             forceRefresh: false
                         ) {
-                            loadedTemplates.append(template)
+                            templatesBuilder.append(template)
                         }
                     }
 
+                    // Convert to let for Swift 6 concurrency safety
+                    let finalTemplates = templatesBuilder
+
                     await MainActor.run {
                         self.program = program
-                        self.templates = loadedTemplates
+                        self.templates = finalTemplates
                         self.error = nil
                         self.isLoading = false
                     }
                 } catch {
-                    // Try loading from cache
-                    let cached = self.programRepository.getCachedProgram(serverId: self.programServerId)
+                    // Try loading from cache - need await since programRepository is @MainActor isolated
+                    let cached = await self.programRepository.getCachedProgram(serverId: serverId)
 
                     await MainActor.run {
                         if let cached = cached {
@@ -116,19 +122,33 @@ final class ProgramDetailViewModel: ObservableObject {
 
     /// Resets the program progress to the beginning
     func resetProgram() {
-        guard var program = program else { return }
+        guard let currentProgram = program else { return }
+
+        // Capture program values before async context to create reset version
+        let resetProgram = Program(
+            id: currentProgram.id,
+            serverId: currentProgram.serverId,
+            name: currentProgram.name,
+            description: currentProgram.description,
+            daysPerWeek: currentProgram.daysPerWeek,
+            durationWeeks: currentProgram.durationWeeks,
+            workouts: currentProgram.workouts,
+            isActive: currentProgram.isActive,
+            currentDayIndex: 0,
+            timesCompleted: 0,
+            isPublic: currentProgram.isPublic,
+            isAiGenerated: currentProgram.isAiGenerated,
+            createdAt: currentProgram.createdAt,
+            updatedAt: Date(),
+            lastFetchedAt: currentProgram.lastFetchedAt
+        )
 
         Task {
             await taskManager.run(id: "reset") { [weak self] in
                 guard let self = self else { return }
 
                 do {
-                    // Reset by creating a modified copy
-                    program.currentDayIndex = 0
-                    program.timesCompleted = 0
-                    program.updatedAt = Date()
-
-                    let updated = try await self.programRepository.updateProgramProgress(program)
+                    let updated = try await self.programRepository.updateProgramProgress(resetProgram)
 
                     await MainActor.run {
                         self.program = updated

@@ -183,6 +183,12 @@ final class TemplateEditorViewModel: ObservableObject {
     func save() {
         guard isValid else { return }
 
+        // Capture @MainActor properties before entering async context
+        let capturedName = name
+        let capturedDescription = description
+        let capturedExercises = exercises
+        let capturedExisting = existingTemplate
+
         Task {
             await taskManager.run(id: "save") { [weak self] in
                 guard let self = self else { return }
@@ -190,7 +196,7 @@ final class TemplateEditorViewModel: ObservableObject {
                 await MainActor.run { self.isSaving = true }
 
                 do {
-                    let templateExercises = self.exercises.map { exercise in
+                    let templateExercises = capturedExercises.map { exercise in
                         TemplateExercise(
                             id: UUID(),
                             serverId: "",
@@ -207,13 +213,13 @@ final class TemplateEditorViewModel: ObservableObject {
 
                     let template: Template
 
-                    if let existing = self.existingTemplate {
+                    if let existing = capturedExisting {
                         // Update existing
                         let updatedTemplate = Template(
                             id: existing.id,
                             serverId: existing.serverId,
-                            name: self.name,
-                            description: self.description.isEmpty ? nil : self.description,
+                            name: capturedName,
+                            description: capturedDescription.isEmpty ? nil : capturedDescription,
                             exercises: templateExercises,
                             isPublic: existing.isPublic,
                             isAiGenerated: existing.isAiGenerated,
@@ -227,8 +233,8 @@ final class TemplateEditorViewModel: ObservableObject {
                         let newTemplate = Template(
                             id: UUID(),
                             serverId: "",
-                            name: self.name,
-                            description: self.description.isEmpty ? nil : self.description,
+                            name: capturedName,
+                            description: capturedDescription.isEmpty ? nil : capturedDescription,
                             exercises: templateExercises,
                             isPublic: false,
                             isAiGenerated: false,

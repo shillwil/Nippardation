@@ -137,9 +137,11 @@ final class ProgramEditorViewModel: ObservableObject {
                         self.isLoadingTemplates = false
                     }
                 } catch {
+                    // Need await since templateRepository is @MainActor isolated
+                    let cachedTemplates = await self.templateRepository.getCachedTemplates()
                     await MainActor.run {
                         // Fall back to cached templates
-                        self.availableTemplates = self.templateRepository.getCachedTemplates()
+                        self.availableTemplates = cachedTemplates
                         self.isLoadingTemplates = false
                     }
                 }
@@ -195,6 +197,16 @@ final class ProgramEditorViewModel: ObservableObject {
     func save() {
         guard isValid else { return }
 
+        // Capture @MainActor properties before entering async context
+        let capturedName = name
+        let capturedDescription = description
+        let capturedDaysPerWeek = daysPerWeek
+        let capturedIsIndefinite = isIndefinite
+        let capturedDurationWeeks = durationWeeks
+        let capturedWorkouts = workouts
+        let capturedAvailableTemplates = availableTemplates
+        let capturedExisting = existingProgram
+
         Task {
             await taskManager.run(id: "save") { [weak self] in
                 guard let self = self else { return }
@@ -202,9 +214,9 @@ final class ProgramEditorViewModel: ObservableObject {
                 await MainActor.run { self.isSaving = true }
 
                 do {
-                    let programWorkouts = self.workouts.compactMap { workout -> ProgramWorkout? in
+                    let programWorkouts = capturedWorkouts.compactMap { workout -> ProgramWorkout? in
                         guard let templateServerId = workout.templateServerId else { return nil }
-                        let template = self.availableTemplates.first { $0.serverId == templateServerId }
+                        let template = capturedAvailableTemplates.first { $0.serverId == templateServerId }
                         return ProgramWorkout(
                             id: UUID(),
                             serverId: "",
@@ -217,15 +229,15 @@ final class ProgramEditorViewModel: ObservableObject {
 
                     let program: Program
 
-                    if let existing = self.existingProgram {
+                    if let existing = capturedExisting {
                         // Update existing
                         let updatedProgram = Program(
                             id: existing.id,
                             serverId: existing.serverId,
-                            name: self.name,
-                            description: self.description.isEmpty ? nil : self.description,
-                            daysPerWeek: self.daysPerWeek,
-                            durationWeeks: self.isIndefinite ? nil : self.durationWeeks,
+                            name: capturedName,
+                            description: capturedDescription.isEmpty ? nil : capturedDescription,
+                            daysPerWeek: capturedDaysPerWeek,
+                            durationWeeks: capturedIsIndefinite ? nil : capturedDurationWeeks,
                             workouts: programWorkouts,
                             isActive: existing.isActive,
                             currentDayIndex: existing.currentDayIndex,
@@ -242,10 +254,10 @@ final class ProgramEditorViewModel: ObservableObject {
                         let newProgram = Program(
                             id: UUID(),
                             serverId: "",
-                            name: self.name,
-                            description: self.description.isEmpty ? nil : self.description,
-                            daysPerWeek: self.daysPerWeek,
-                            durationWeeks: self.isIndefinite ? nil : self.durationWeeks,
+                            name: capturedName,
+                            description: capturedDescription.isEmpty ? nil : capturedDescription,
+                            daysPerWeek: capturedDaysPerWeek,
+                            durationWeeks: capturedIsIndefinite ? nil : capturedDurationWeeks,
                             workouts: programWorkouts,
                             isActive: false,
                             currentDayIndex: 0,

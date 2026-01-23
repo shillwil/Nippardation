@@ -50,8 +50,8 @@ final class DashboardViewModel: ObservableObject {
                     // Load active program
                     let activeProgram = try await self.programRepository.getActiveProgram()
 
-                    var templates: [Template] = []
-                    var nextTemplate: Template?
+                    var templatesBuilder: [Template] = []
+                    var nextTemplateFound: Template?
 
                     if let program = activeProgram {
                         // Load templates for the program
@@ -60,27 +60,31 @@ final class DashboardViewModel: ObservableObject {
                                 serverId: workout.templateServerId,
                                 forceRefresh: false
                             ) {
-                                templates.append(template)
+                                templatesBuilder.append(template)
 
                                 // Find current workout's template
                                 if workout.dayNumber == program.currentDayIndex {
-                                    nextTemplate = template
+                                    nextTemplateFound = template
                                 }
                             }
                         }
                     }
 
+                    // Convert to let for Swift 6 concurrency safety
+                    let finalTemplates = templatesBuilder
+                    let finalNextTemplate = nextTemplateFound
+
                     await MainActor.run {
                         self.activeProgram = activeProgram
                         self.nextWorkout = activeProgram?.currentWorkout
-                        self.nextTemplate = nextTemplate
-                        self.allTemplates = templates
+                        self.nextTemplate = finalNextTemplate
+                        self.allTemplates = finalTemplates
                         self.error = nil
                         self.isLoading = false
                     }
                 } catch {
-                    // Try to load from cache
-                    let cached = self.programRepository.getCachedPrograms().first { $0.isActive }
+                    // Try to load from cache - need await since programRepository is @MainActor isolated
+                    let cached = await self.programRepository.getCachedPrograms().first { $0.isActive }
 
                     await MainActor.run {
                         self.activeProgram = cached
