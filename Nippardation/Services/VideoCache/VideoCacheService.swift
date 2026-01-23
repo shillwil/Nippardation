@@ -316,10 +316,10 @@ final class VideoCacheService: VideoCacheServiceProtocol {
 
     private func fileSizeAt(_ url: URL) -> Int64? {
         guard let attrs = try? fileManager.attributesOfItem(atPath: url.path),
-              let size = attrs[.size] as? Int64 else {
+              let size = attrs[.size] as? NSNumber else {
             return nil
         }
-        return size
+        return size.int64Value
     }
 
     private func evictToSize(_ targetBytes: Int64) async throws {

@@ -114,7 +114,7 @@ actor VideoDownloadManager {
             try await moveToFinalLocation(from: tempURL, to: localURL)
 
             // Get file size for final progress report
-            let fileSize = try FileManager.default.attributesOfItem(atPath: localURL.path)[.size] as? Int64 ?? 0
+            let fileSize = (try FileManager.default.attributesOfItem(atPath: localURL.path)[.size] as? NSNumber)?.int64Value ?? 0
 
             // Report completion
             reportProgress(exerciseServerId: exerciseServerId, state: .completed, bytesDownloaded: fileSize, totalBytes: fileSize)
