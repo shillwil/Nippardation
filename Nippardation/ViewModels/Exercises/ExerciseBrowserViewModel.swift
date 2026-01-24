@@ -15,7 +15,6 @@ final class ExerciseBrowserViewModel: ObservableObject {
 
     @Published var exercises: [ExerciseLibraryItem] = []
     @Published var filter = ExerciseFilter()
-    @Published var filterOptions: ExerciseFilterOptionsDTO = .empty
     @Published var isLoading = false
     @Published var isLoadingMore = false
     @Published var error: String?
@@ -53,8 +52,9 @@ final class ExerciseBrowserViewModel: ObservableObject {
         self.selectedExercises = preselectedExerciseIds
         self.exerciseRepository = exerciseRepository ?? DependencyContainer.shared.exerciseRepository
 
-        // Debounce search
+        // Debounce search - dropFirst to avoid initial empty value triggering a load
         $searchText
+            .dropFirst()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .removeDuplicates()
             .sink { [weak self] query in
@@ -142,49 +142,6 @@ final class ExerciseBrowserViewModel: ObservableObject {
                 }
             }
         }
-    }
-
-    /// Loads filter options from the repository
-    func loadFilterOptions() {
-        // For now, build filter options from enums
-        // In future, this could fetch from API
-        filterOptions = ExerciseFilterOptionsDTO(
-            muscleGroups: MuscleGroup.allCases.map { muscle in
-                FilterOptionDTO(
-                    value: muscle.rawValue,
-                    label: muscle.rawValue.capitalized,
-                    count: 0
-                )
-            },
-            difficulties: Difficulty.allCases.map { difficulty in
-                FilterOptionDTO(
-                    value: difficulty.rawValue,
-                    label: difficulty.displayName,
-                    count: 0
-                )
-            },
-            equipment: Equipment.allCases.map { equipment in
-                FilterOptionDTO(
-                    value: equipment.rawValue,
-                    label: equipment.displayName,
-                    count: 0
-                )
-            },
-            movementPatterns: MovementPattern.allCases.map { pattern in
-                FilterOptionDTO(
-                    value: pattern.rawValue,
-                    label: pattern.displayName,
-                    count: 0
-                )
-            },
-            exerciseTypes: ExerciseCategory.allCases.map { category in
-                FilterOptionDTO(
-                    value: category.rawValue,
-                    label: category.displayName,
-                    count: 0
-                )
-            }
-        )
     }
 
     /// Loads more exercises if available

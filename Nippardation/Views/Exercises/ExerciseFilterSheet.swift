@@ -12,16 +12,13 @@ struct ExerciseFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var filter: ExerciseFilter
-    let filterOptions: ExerciseFilterOptionsDTO
     let onApply: (ExerciseFilter) -> Void
 
     init(
         filter: ExerciseFilter,
-        filterOptions: ExerciseFilterOptionsDTO,
         onApply: @escaping (ExerciseFilter) -> Void
     ) {
         self._filter = State(initialValue: filter)
-        self.filterOptions = filterOptions
         self.onApply = onApply
     }
 
@@ -155,7 +152,6 @@ struct ExerciseFilterSheet: View {
 #Preview {
     ExerciseFilterSheet(
         filter: ExerciseFilter(),
-        filterOptions: MockData.filterOptions,
         onApply: { _ in }
     )
 }

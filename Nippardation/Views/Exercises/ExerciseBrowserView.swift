@@ -92,7 +92,6 @@ struct ExerciseBrowserContent: View {
         .sheet(isPresented: $showFilters) {
             ExerciseFilterSheet(
                 filter: viewModel.filter,
-                filterOptions: viewModel.filterOptions,
                 onApply: { newFilter in
                     viewModel.applyFilters(newFilter)
                 }
@@ -101,7 +100,6 @@ struct ExerciseBrowserContent: View {
         .onAppear {
             if viewModel.exercises.isEmpty {
                 viewModel.loadExercises()
-                viewModel.loadFilterOptions()
             }
         }
         .alert("Error", isPresented: .init(
