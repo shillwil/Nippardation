@@ -62,8 +62,8 @@ final class DashboardViewModel: ObservableObject {
                             ) {
                                 templatesBuilder.append(template)
 
-                                // Find current workout's template
-                                if workout.dayNumber == program.currentDayIndex {
+                                // Find current workout's template by matching templateServerId
+                                if workout.templateServerId == program.currentWorkout?.templateServerId {
                                     nextTemplateFound = template
                                 }
                             }
@@ -167,7 +167,7 @@ final class DashboardViewModel: ObservableObject {
                                     forceRefresh: true
                                 ) {
                                     templatesBuilder.append(template)
-                                    if workout.dayNumber == program.currentDayIndex {
+                                    if workout.templateServerId == program.currentWorkout?.templateServerId {
                                         nextTemplateFound = template
                                     }
                                 }

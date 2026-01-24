@@ -39,7 +39,7 @@ struct DashboardView: View {
                             Image(systemName: "doc.text")
                         }
                         NavigationLink(destination: ProgramListView()) {
-                            Image(systemName: "list.bullet")
+                            Image(systemName: "list.bullet.clipboard")
                         }
                     }
                 }

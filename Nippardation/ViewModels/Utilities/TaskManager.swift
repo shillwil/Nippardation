@@ -65,13 +65,6 @@ actor TaskManager {
         tasks.removeAll()
     }
 
-    /// Checks if a task with the given ID is currently running
-    /// - Parameter id: The task ID to check
-    /// - Returns: true if the task exists and hasn't completed
-    func isRunning(id: String) -> Bool {
-        guard let task = tasks[id] else { return false }
-        return !task.isCancelled
-    }
 }
 
 // MARK: - MainActor Convenience Extension

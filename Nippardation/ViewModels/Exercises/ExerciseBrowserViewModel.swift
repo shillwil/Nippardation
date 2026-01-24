@@ -155,6 +155,8 @@ final class ExerciseBrowserViewModel: ObservableObject {
     /// - Parameter newFilter: The new filter to apply
     func applyFilters(_ newFilter: ExerciseFilter) {
         filter = newFilter
+        // Sync searchText with filter to keep UI in sync
+        searchText = newFilter.searchText ?? ""
         loadExercises(refresh: true)
     }
 
