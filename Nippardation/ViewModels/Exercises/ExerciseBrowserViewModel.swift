@@ -76,22 +76,22 @@ final class ExerciseBrowserViewModel: ObservableObject {
             exercises = []
         }
 
-        guard !isLoading else { return }
+        guard !isLoading && !isLoadingMore else { return }
 
         // Determine which page to fetch - only increment when loading next page
         let pageToFetch = loadingNextPage ? currentPage + 1 : currentPage
 
+        // Set loading state synchronously to prevent race conditions
+        // Use isLoading for initial load or refresh, isLoadingMore for pagination
+        if refresh || exercises.isEmpty {
+            isLoading = true
+        } else {
+            isLoadingMore = true
+        }
+
         Task {
             await taskManager.run(id: "loadExercises") { [weak self] in
                 guard let self = self else { return }
-
-                await MainActor.run {
-                    if refresh {
-                        self.isLoading = true
-                    } else {
-                        self.isLoadingMore = true
-                    }
-                }
 
                 do {
                     let result = try await self.exerciseRepository.fetchExercises(
