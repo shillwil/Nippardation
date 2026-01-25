@@ -51,29 +51,7 @@ final class ProgramListViewModel: ObservableObject {
         Task {
             await taskManager.run(id: "loadPrograms") { [weak self] in
                 guard let self = self else { return }
-
-                await MainActor.run { self.isLoading = true }
-
-                do {
-                    let fetchedPrograms = try await self.programRepository.fetchPrograms(forceRefresh: refresh)
-
-                    await MainActor.run {
-                        self.programs = fetchedPrograms
-                        self.hasMore = false // fetchPrograms returns all user's programs
-                        self.error = nil
-                        self.isLoading = false
-                    }
-                } catch {
-                    await MainActor.run {
-                        // Try loading from cache on failure
-                        let cached = self.programRepository.getCachedPrograms()
-                        if !cached.isEmpty {
-                            self.programs = cached
-                        }
-                        self.error = error.localizedDescription
-                        self.isLoading = false
-                    }
-                }
+                await self.performLoadPrograms(forceRefresh: refresh)
             }
         }
     }
@@ -148,7 +126,7 @@ final class ProgramListViewModel: ObservableObject {
                     try await self.programRepository.deleteProgram(serverId: program.serverId)
 
                     await MainActor.run {
-                        self.programs.removeAll { $0.id == program.id }
+                        self.programs.removeAll { $0.serverId == program.serverId }
                     }
                 } catch {
                     await MainActor.run {
@@ -227,31 +205,8 @@ final class ProgramListViewModel: ObservableObject {
                         return
                     }
 
-                    await MainActor.run {
-                        self.currentPage = 1
-                        self.isLoading = true
-                    }
-
-                    do {
-                        let fetchedPrograms = try await self.programRepository.fetchPrograms(forceRefresh: true)
-
-                        await MainActor.run {
-                            self.programs = fetchedPrograms
-                            self.hasMore = false
-                            self.error = nil
-                            self.isLoading = false
-                        }
-                    } catch {
-                        await MainActor.run {
-                            let cached = self.programRepository.getCachedPrograms()
-                            if !cached.isEmpty {
-                                self.programs = cached
-                            }
-                            self.error = error.localizedDescription
-                            self.isLoading = false
-                        }
-                    }
-
+                    await MainActor.run { self.currentPage = 1 }
+                    await self.performLoadPrograms(forceRefresh: true)
                     continuation.resume()
                 }
             }
@@ -259,6 +214,33 @@ final class ProgramListViewModel: ObservableObject {
     }
 
     // MARK: - Private Helpers
+
+    /// Core loading logic shared between loadPrograms and refreshAsync
+    /// - Parameter forceRefresh: Whether to force refresh from network
+    private func performLoadPrograms(forceRefresh: Bool) async {
+        await MainActor.run { self.isLoading = true }
+
+        do {
+            let fetchedPrograms = try await programRepository.fetchPrograms(forceRefresh: forceRefresh)
+
+            await MainActor.run {
+                self.programs = fetchedPrograms
+                self.hasMore = false // fetchPrograms returns all user's programs
+                self.error = nil
+                self.isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                // Try loading from cache on failure
+                let cached = self.programRepository.getCachedPrograms()
+                if !cached.isEmpty {
+                    self.programs = cached
+                }
+                self.error = error.localizedDescription
+                self.isLoading = false
+            }
+        }
+    }
 
     private func deactivatedCopy(of program: Program) -> Program {
         Program(

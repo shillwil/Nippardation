@@ -38,28 +38,7 @@ final class TemplateListViewModel: ObservableObject {
         Task {
             await taskManager.run(id: "loadTemplates") { [weak self] in
                 guard let self = self else { return }
-
-                await MainActor.run { self.isLoading = true }
-
-                do {
-                    let fetchedTemplates = try await self.templateRepository.fetchTemplates(forceRefresh: refresh)
-
-                    await MainActor.run {
-                        self.templates = fetchedTemplates
-                        self.error = nil
-                        self.isLoading = false
-                    }
-                } catch {
-                    await MainActor.run {
-                        // Try loading from cache on failure
-                        let cached = self.templateRepository.getCachedTemplates()
-                        if !cached.isEmpty {
-                            self.templates = cached
-                        }
-                        self.error = error.localizedDescription
-                        self.isLoading = false
-                    }
-                }
+                await self.performLoad(forceRefresh: refresh)
             }
         }
     }
@@ -73,30 +52,37 @@ final class TemplateListViewModel: ObservableObject {
                         continuation.resume()
                         return
                     }
-
-                    await MainActor.run { self.isLoading = true }
-
-                    do {
-                        let fetchedTemplates = try await self.templateRepository.fetchTemplates(forceRefresh: true)
-
-                        await MainActor.run {
-                            self.templates = fetchedTemplates
-                            self.error = nil
-                            self.isLoading = false
-                        }
-                    } catch {
-                        await MainActor.run {
-                            let cached = self.templateRepository.getCachedTemplates()
-                            if !cached.isEmpty {
-                                self.templates = cached
-                            }
-                            self.error = error.localizedDescription
-                            self.isLoading = false
-                        }
-                    }
-
+                    await self.performLoad(forceRefresh: true)
                     continuation.resume()
                 }
+            }
+        }
+    }
+
+    // MARK: - Private Methods
+
+    /// Core loading logic shared between loadTemplates and refreshAsync
+    /// - Parameter forceRefresh: Whether to force refresh from network
+    private func performLoad(forceRefresh: Bool) async {
+        await MainActor.run { self.isLoading = true }
+
+        do {
+            let fetchedTemplates = try await templateRepository.fetchTemplates(forceRefresh: forceRefresh)
+
+            await MainActor.run {
+                self.templates = fetchedTemplates
+                self.error = nil
+                self.isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                // Try loading from cache on failure
+                let cached = self.templateRepository.getCachedTemplates()
+                if !cached.isEmpty {
+                    self.templates = cached
+                }
+                self.error = error.localizedDescription
+                self.isLoading = false
             }
         }
     }
@@ -112,7 +98,7 @@ final class TemplateListViewModel: ObservableObject {
                     try await self.templateRepository.deleteTemplate(serverId: template.serverId)
 
                     await MainActor.run {
-                        self.templates.removeAll { $0.id == template.id }
+                        self.templates.removeAll { $0.serverId == template.serverId }
                     }
                 } catch {
                     await MainActor.run {

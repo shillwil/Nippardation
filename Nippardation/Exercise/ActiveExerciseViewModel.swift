@@ -26,13 +26,19 @@ class ActiveExerciseViewModel: ObservableObject {
 
     init(workout: TrackedWorkout, exerciseIndex: Int) {
         self.workout = workout
-        self.exerciseIndex = exerciseIndex
+        // Clamp exerciseIndex to valid range to prevent array out of bounds crashes
+        self.exerciseIndex = min(max(0, exerciseIndex), max(0, workout.trackedExercises.count - 1))
 
         // Find matching exercise template
         findMatchingExercise()
 
         // Calculate initial stats
         updateStats()
+    }
+
+    /// Indicates whether the exercise index is valid for the current workout
+    var isValidExercise: Bool {
+        exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count
     }
 
     func updateWorkout(_ newWorkout: TrackedWorkout) {
@@ -42,6 +48,8 @@ class ActiveExerciseViewModel: ObservableObject {
 
     // Find the matching exercise from the workout templates
     private func findMatchingExercise() {
+        guard isValidExercise else { return }
+
         let exerciseName = workout.trackedExercises[exerciseIndex].exerciseName
         let allWorkouts = [upperStrength, lowerStrength, pullDay, pushDay, legDay]
 
@@ -74,6 +82,8 @@ class ActiveExerciseViewModel: ObservableObject {
 
     // Add a set to the current exercise
     func addSet(_ set: TrackedSet) {
+        guard isValidExercise else { return }
+
         workout.trackedExercises[exerciseIndex].trackedSets.append(set)
 
         // Update in WorkoutManager
@@ -85,7 +95,9 @@ class ActiveExerciseViewModel: ObservableObject {
 
     // Update a set at the specified index
     func updateSet(at index: Int, reps: Int, weight: Double, setType: SetType) {
-        guard index < workout.trackedExercises[exerciseIndex].trackedSets.count else { return }
+        guard isValidExercise,
+              index >= 0,
+              index < workout.trackedExercises[exerciseIndex].trackedSets.count else { return }
 
         var updatedSet = workout.trackedExercises[exerciseIndex].trackedSets[index]
         updatedSet.reps = reps
@@ -102,7 +114,9 @@ class ActiveExerciseViewModel: ObservableObject {
 
     // Delete a set at the specified index
     func deleteSet(at index: Int) {
-        guard index < workout.trackedExercises[exerciseIndex].trackedSets.count else { return }
+        guard isValidExercise,
+              index >= 0,
+              index < workout.trackedExercises[exerciseIndex].trackedSets.count else { return }
 
         workout.trackedExercises[exerciseIndex].trackedSets.remove(at: index)
 
@@ -117,6 +131,12 @@ class ActiveExerciseViewModel: ObservableObject {
 
     // Update workout statistics
     private func updateStats() {
+        guard isValidExercise else {
+            totalVolume = 0
+            totalReps = 0
+            return
+        }
+
         let sets = workout.trackedExercises[exerciseIndex].trackedSets
 
         // Calculate total volume
@@ -129,7 +149,9 @@ class ActiveExerciseViewModel: ObservableObject {
     }
 
     // Get current tracked exercise
+    // Note: exerciseIndex is clamped in init, so this should always be valid
     var currentExercise: TrackedExercise {
+        precondition(isValidExercise, "Exercise index \(exerciseIndex) is out of bounds for workout with \(workout.trackedExercises.count) exercises")
         return workout.trackedExercises[exerciseIndex]
     }
 }

@@ -43,56 +43,7 @@ final class DashboardViewModel: ObservableObject {
         Task {
             await taskManager.run(id: "loadDashboard") { [weak self] in
                 guard let self = self else { return }
-
-                await MainActor.run { self.isLoading = true }
-
-                do {
-                    // Load active program
-                    let activeProgram = try await self.programRepository.getActiveProgram()
-
-                    var templatesBuilder: [Template] = []
-                    var nextTemplateFound: Template?
-
-                    if let program = activeProgram {
-                        // Load templates for the program
-                        for workout in program.workouts {
-                            if let template = try? await self.templateRepository.fetchTemplate(
-                                serverId: workout.templateServerId,
-                                forceRefresh: false
-                            ) {
-                                templatesBuilder.append(template)
-
-                                // Find current workout's template by matching templateServerId
-                                if workout.templateServerId == program.currentWorkout?.templateServerId {
-                                    nextTemplateFound = template
-                                }
-                            }
-                        }
-                    }
-
-                    // Convert to let for Swift 6 concurrency safety
-                    let finalTemplates = templatesBuilder
-                    let finalNextTemplate = nextTemplateFound
-
-                    await MainActor.run {
-                        self.activeProgram = activeProgram
-                        self.nextWorkout = activeProgram?.currentWorkout
-                        self.nextTemplate = finalNextTemplate
-                        self.allTemplates = finalTemplates
-                        self.error = nil
-                        self.isLoading = false
-                    }
-                } catch {
-                    // Try to load from cache - need await since programRepository is @MainActor isolated
-                    let cached = await self.programRepository.getCachedPrograms().first { $0.isActive }
-
-                    await MainActor.run {
-                        self.activeProgram = cached
-                        self.nextWorkout = cached?.currentWorkout
-                        self.error = error.localizedDescription
-                        self.isLoading = false
-                    }
-                }
+                await self.performLoad(forceRefresh: false)
             }
         }
     }
@@ -151,53 +102,68 @@ final class DashboardViewModel: ObservableObject {
                         continuation.resume()
                         return
                     }
-
-                    await MainActor.run { self.isLoading = true }
-
-                    do {
-                        let activeProgram = try await self.programRepository.getActiveProgram()
-
-                        var templatesBuilder: [Template] = []
-                        var nextTemplateFound: Template?
-
-                        if let program = activeProgram {
-                            for workout in program.workouts {
-                                if let template = try? await self.templateRepository.fetchTemplate(
-                                    serverId: workout.templateServerId,
-                                    forceRefresh: true
-                                ) {
-                                    templatesBuilder.append(template)
-                                    if workout.templateServerId == program.currentWorkout?.templateServerId {
-                                        nextTemplateFound = template
-                                    }
-                                }
-                            }
-                        }
-
-                        let finalTemplates = templatesBuilder
-                        let finalNextTemplate = nextTemplateFound
-
-                        await MainActor.run {
-                            self.activeProgram = activeProgram
-                            self.nextWorkout = activeProgram?.currentWorkout
-                            self.nextTemplate = finalNextTemplate
-                            self.allTemplates = finalTemplates
-                            self.error = nil
-                            self.isLoading = false
-                        }
-                    } catch {
-                        let cached = await self.programRepository.getCachedPrograms().first { $0.isActive }
-
-                        await MainActor.run {
-                            self.activeProgram = cached
-                            self.nextWorkout = cached?.currentWorkout
-                            self.error = error.localizedDescription
-                            self.isLoading = false
-                        }
-                    }
-
+                    await self.performLoad(forceRefresh: true)
                     continuation.resume()
                 }
+            }
+        }
+    }
+
+    // MARK: - Private Methods
+
+    /// Core loading logic shared between loadDashboard and refreshAsync
+    /// - Parameter forceRefresh: Whether to force refresh from network
+    private func performLoad(forceRefresh: Bool) async {
+        await MainActor.run { self.isLoading = true }
+
+        do {
+            // Load active program
+            let activeProgram = try await programRepository.getActiveProgram()
+
+            var templatesBuilder: [Template] = []
+            var nextTemplateFound: Template?
+
+            if let program = activeProgram {
+                // Load templates for the program
+                for workout in program.workouts {
+                    if let template = try? await templateRepository.fetchTemplate(
+                        serverId: workout.templateServerId,
+                        forceRefresh: forceRefresh
+                    ) {
+                        templatesBuilder.append(template)
+
+                        // Find current workout's template by matching templateServerId
+                        if workout.templateServerId == program.currentWorkout?.templateServerId {
+                            nextTemplateFound = template
+                        }
+                    }
+                }
+            }
+
+            // Convert to let for Swift 6 concurrency safety
+            let finalTemplates = templatesBuilder
+            let finalNextTemplate = nextTemplateFound
+
+            await MainActor.run {
+                self.activeProgram = activeProgram
+                self.nextWorkout = activeProgram?.currentWorkout
+                self.nextTemplate = finalNextTemplate
+                self.allTemplates = finalTemplates
+                self.error = nil
+                self.isLoading = false
+            }
+        } catch {
+            // Try to load from cache - need await since programRepository is @MainActor isolated
+            let cached = await programRepository.getCachedPrograms().first { $0.isActive }
+
+            await MainActor.run {
+                self.activeProgram = cached
+                self.nextWorkout = cached?.currentWorkout
+                // Reset template state to stay consistent with program
+                self.nextTemplate = nil
+                self.allTemplates = []
+                self.error = error.localizedDescription
+                self.isLoading = false
             }
         }
     }
