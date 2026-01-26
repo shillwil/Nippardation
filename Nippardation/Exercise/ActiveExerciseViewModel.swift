@@ -148,10 +148,10 @@ class ActiveExerciseViewModel: ObservableObject {
         totalReps = sets.reduce(0) { $0 + $1.reps }
     }
 
-    // Get current tracked exercise
-    // Note: exerciseIndex is clamped in init, so this should always be valid
-    var currentExercise: TrackedExercise {
-        precondition(isValidExercise, "Exercise index \(exerciseIndex) is out of bounds for workout with \(workout.trackedExercises.count) exercises")
+    /// Returns the current tracked exercise, or nil if the workout has no exercises.
+    /// Callers should check `isValidExercise` or handle the nil case gracefully.
+    var currentExercise: TrackedExercise? {
+        guard isValidExercise else { return nil }
         return workout.trackedExercises[exerciseIndex]
     }
 }

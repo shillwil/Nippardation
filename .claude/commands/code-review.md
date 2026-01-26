@@ -231,6 +231,8 @@ xcodebuild build -scheme Nippardation -destination 'platform=iOS Simulator,name=
 - [ ] User-facing error messages are clear and actionable
 - [ ] Errors logged appropriately for debugging
 - [ ] Recovery actions provided where possible
+- [ ] Errors in ViewModels are displayed to users (via alerts, toasts, etc.)
+- [ ] Async operation failures don't leave UI in broken state
 
 **Edge cases**
 - [ ] Empty data sets handled
@@ -238,6 +240,106 @@ xcodebuild build -scheme Nippardation -destination 'platform=iOS Simulator,name=
 - [ ] Rapid user interactions handled
 - [ ] Interrupted operations handled
 - [ ] Background/foreground transitions handled
+
+---
+
+## 9.5. Crash Prevention (CRITICAL)
+
+**This section catches crashes that would take down the app in production. Review CAREFULLY.**
+
+**Forbidden crash-inducing patterns**
+```bash
+# Search for preconditions and assertions (should be removed or have fallbacks)
+grep -rn "precondition\(" --include="*.swift" .
+grep -rn "preconditionFailure\(" --include="*.swift" .
+grep -rn "fatalError\(" --include="*.swift" .
+grep -rn "assert\(" --include="*.swift" .
+grep -rn "assertionFailure\(" --include="*.swift" .
+```
+
+**Precondition and assertion checklist**
+- [ ] NO `precondition()` calls in production code (crashes in release builds)
+- [ ] NO `preconditionFailure()` calls in production code
+- [ ] `fatalError()` only used in truly unrecoverable situations (Core Data model init, required init)
+- [ ] `assert()` only used for debug-time invariant checking (safe in release)
+- [ ] `assertionFailure()` only used for debug-time impossible states
+
+**Force unwrap safety**
+```bash
+# Find force unwraps (! operator)
+grep -rn "!\." --include="*.swift" .
+grep -rn "!\[" --include="*.swift" .
+grep -rn "as!" --include="*.swift" .
+```
+
+- [ ] NO force unwraps (`!`) without documented safety guarantee
+- [ ] NO force casts (`as!`) without proven type safety
+- [ ] All force unwraps on constants (URLs, UUIDs) are verified at compile-time
+- [ ] Optional binding (`if let`, `guard let`) used instead of force unwrap
+
+**Array bounds safety**
+```bash
+# Find array subscript access patterns
+grep -rn "\[index\]" --include="*.swift" .
+grep -rn "\[i\]" --include="*.swift" .
+```
+
+- [ ] All array access has bounds checking (or uses safe methods like `.first`, `.last`)
+- [ ] `indices.contains(index)` or `guard index >= 0 && index < array.count` before access
+- [ ] ForEach with indices uses enumerated() pattern safely
+- [ ] SwiftUI Bindings to arrays check bounds before access (especially when array can shrink)
+- [ ] No array access after potential modification without re-validation
+
+**Empty collection edge cases**
+- [ ] `.first!` never used (use `.first` with optional handling)
+- [ ] `.last!` never used (use `.last` with optional handling)
+- [ ] Empty arrays handled gracefully (show empty state, not crash)
+- [ ] Division by `count` checks for zero first
+- [ ] `randomElement()!` not used (returns optional)
+
+**Optional chaining patterns**
+- [ ] Computed properties return optionals when data may not exist
+- [ ] Callers handle nil cases from optional-returning methods
+- [ ] No assumption that optional will "always" have a value
+
+**SwiftUI-specific crash vectors**
+- [ ] Binding getters/setters have bounds checks for array indices
+- [ ] State mutations don't happen during view body evaluation
+- [ ] Sheet/NavigationLink destinations don't assume data exists
+- [ ] ForEach with dynamic data uses stable identifiers
+
+**Concurrency safety**
+- [ ] No race conditions between array modifications and reads
+- [ ] MainActor isolation for UI state mutations
+- [ ] Task cancellation doesn't leave state in inconsistent condition
+
+**Example fixes for common issues:**
+
+```swift
+// BAD: Will crash if array is empty
+var currentItem: Item {
+    precondition(!items.isEmpty, "Items should not be empty")
+    return items[currentIndex]
+}
+
+// GOOD: Returns optional, callers handle nil
+var currentItem: Item? {
+    guard currentIndex >= 0 && currentIndex < items.count else { return nil }
+    return items[currentIndex]
+}
+
+// BAD: Binding can crash if array shrinks
+Binding(
+    get: { viewModel.items[index] },
+    set: { viewModel.items[index] = $0 }
+)
+
+// GOOD: Safe binding with bounds check
+Binding(
+    get: { index < viewModel.items.count ? viewModel.items[index] : defaultValue },
+    set: { if index < viewModel.items.count { viewModel.items[index] = $0 } }
+)
+```
 
 ---
 
