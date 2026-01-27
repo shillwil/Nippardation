@@ -130,7 +130,10 @@ struct ProgramDetailView: View {
                 .font(.headline)
 
             ForEach(program.workouts.sorted(by: { $0.dayNumber < $1.dayNumber })) { workout in
-                workoutRow(workout, isNext: workout.dayNumber == program.currentDayIndex && program.isActive)
+                // Compare by serverId to correctly identify the current workout
+                // program.currentWorkout uses currentDayIndex as an array index, not a dayNumber match
+                let isCurrentWorkout = program.currentWorkout?.serverId == workout.serverId
+                workoutRow(workout, isNext: isCurrentWorkout && program.isActive)
             }
         }
     }

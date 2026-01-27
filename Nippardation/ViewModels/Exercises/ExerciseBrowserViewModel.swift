@@ -74,6 +74,11 @@ final class ExerciseBrowserViewModel: ObservableObject {
         if refresh {
             currentPage = 1
             exercises = []
+            // Cancel any in-progress request for refresh (e.g., new search query)
+            // This ensures fresh search results match the current search text
+            Task { await taskManager.cancel(id: "loadExercises") }
+            isLoading = false
+            isLoadingMore = false
         }
 
         guard !isLoading && !isLoadingMore else { return }
