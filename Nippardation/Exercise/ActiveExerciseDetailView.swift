@@ -65,11 +65,20 @@ struct ActiveExerciseDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     // Exercise title
-                    Text(viewModel.currentExercise.exerciseName)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal)
-                        .padding(.top)
+                    if let currentExercise = viewModel.currentExercise {
+                        Text(currentExercise.exerciseName)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal)
+                            .padding(.top)
+                    } else {
+                        Text("No exercise available")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                            .padding(.top)
+                    }
                     
                     // Exercise Information
                     if let exercise = viewModel.matchingExercise {
@@ -106,15 +115,17 @@ struct ActiveExerciseDetailView: View {
                                 }
                                 .padding(.horizontal)
                             
-                            if viewModel.currentExercise.trackedSets.isEmpty {
-                                Text("No sets tracked yet")
-                                    .foregroundColor(.secondary)
-                                    .italic()
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding()
-                            } else {
-                                trackedSetsView
-                                    .padding(.horizontal)
+                            if let currentExercise = viewModel.currentExercise {
+                                if currentExercise.trackedSets.isEmpty {
+                                    Text("No sets tracked yet")
+                                        .foregroundColor(.secondary)
+                                        .italic()
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding()
+                                } else {
+                                    trackedSetsView
+                                        .padding(.horizontal)
+                                }
                             }
                             
                                 if viewModel.totalVolume > 0 {
@@ -153,8 +164,11 @@ struct ActiveExerciseDetailView: View {
             if let exercise = viewModel.matchingExercise {
                 AddRepCountView(exercise: exercise) { newSet in
                     viewModel.addSet(newSet)
-                    // Update the binding to ensure changes propagate
-                    workout.trackedExercises[exerciseIndex] = viewModel.currentExercise
+                    // Update the binding to ensure changes propagate (with bounds check)
+                    if let currentExercise = viewModel.currentExercise,
+                       exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
+                        workout.trackedExercises[exerciseIndex] = currentExercise
+                    }
                 }
                 .presentationDetents([.fraction(0.75)])
             }
@@ -167,8 +181,11 @@ struct ActiveExerciseDetailView: View {
                     setType: $editingSetType,
                     onSave: { newReps, newWeight, newSetType in
                         viewModel.updateSet(at: index, reps: newReps, weight: newWeight, setType: newSetType)
-                        // Update the binding to ensure changes propagate
-                        workout.trackedExercises[exerciseIndex] = viewModel.currentExercise
+                        // Update the binding to ensure changes propagate (with bounds check)
+                        if let currentExercise = viewModel.currentExercise,
+                           exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
+                            workout.trackedExercises[exerciseIndex] = currentExercise
+                        }
                     }
                 )
                 .presentationDetents([.medium])
@@ -208,19 +225,22 @@ struct ActiveExerciseDetailView: View {
     }
     
     private func saveAndClose() {
-        // Save changes through the workout binding
-        workout.trackedExercises[exerciseIndex] = viewModel.currentExercise
-        // Update in workout manager
-        workoutManager.updateExercise(at: exerciseIndex, with: viewModel.currentExercise)
+        // Save changes through the workout binding (with bounds check)
+        if let currentExercise = viewModel.currentExercise,
+           exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
+            workout.trackedExercises[exerciseIndex] = currentExercise
+            // Update in workout manager
+            workoutManager.updateExercise(at: exerciseIndex, with: currentExercise)
+        }
         showingExerciseDetail = false
     }
     
     private var cancelButton: some View {
         Button {
-            if viewModel.currentExercise.trackedSets.isEmpty {
-                showingExerciseDetail = false
-            } else {
+            if let currentExercise = viewModel.currentExercise, !currentExercise.trackedSets.isEmpty {
                 showingCancelAlert = true
+            } else {
+                showingExerciseDetail = false
             }
         } label: {
             Text("Cancel")
@@ -232,13 +252,13 @@ struct ActiveExerciseDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Summary")
                 .font(.headline)
-            
+
             HStack {
                 Spacer()
-                
+
                 volumeStatView(
                     title: "Sets",
-                    value: "\(viewModel.currentExercise.trackedSets.count)",
+                    value: "\(viewModel.currentExercise?.trackedSets.count ?? 0)",
                     icon: "number.square.fill"
                 )
                 
@@ -267,8 +287,9 @@ struct ActiveExerciseDetailView: View {
     }
     
     private var trackedSetsView: some View {
-        VStack(spacing: 10) {
-            ForEach(Array(zip(viewModel.currentExercise.trackedSets.indices, viewModel.currentExercise.trackedSets)), id: \.0) { index, set in
+        let trackedSets = viewModel.currentExercise?.trackedSets ?? []
+        return VStack(spacing: 10) {
+            ForEach(Array(zip(trackedSets.indices, trackedSets)), id: \.0) { index, set in
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(set.setType == .warmup ? "Warm-up Set" : "Working Set")

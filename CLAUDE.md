@@ -274,3 +274,333 @@ duplication across service classes.
 - Any footer or signature attributing the code to Claude or AI
 
 Keep commit messages clean and focused on describing the changes made.
+
+# PR Size Requirements - MANDATORY
+
+## Critical Directive: 1000 Line Maximum Per PR
+
+**This is not a guideline. This is a HARD REQUIREMENT.**
+
+Before implementing ANY feature, you MUST create a detailed implementation plan that chunks the work into PRs of 1000 lines or less. NO EXCEPTIONS.
+
+---
+
+## Why This Matters
+
+Large PRs are toxic to code quality:
+- Impossible to review comprehensively
+- Higher bug escape rate
+- Longer review cycles leading to stale code
+- Higher chance of merge conflicts
+- Slower iteration on feedback
+- Difficult to revert if issues found
+- AI reviewers cannot effectively analyze >1000 lines in one pass
+
+A 7000-line PR will go through 8+ review cycles finding incremental issues. Seven 1000-line PRs will each complete in 1 cycle. The math is obvious.
+
+---
+
+## Implementation Planning Requirements
+
+Before writing ANY code for a new feature, you must:
+
+### 1. Create Feature Implementation Plan
+
+Document the following:
+
+**Feature Goal**: One-sentence description of what's being built
+
+**Technical Approach**: High-level architecture/design
+
+**PR Breakdown**: List each PR with:
+- PR number in sequence (PR1, PR2, etc.)
+- Estimated line count
+- Specific deliverables
+- Dependencies on previous PRs
+- User-facing impact (can app run after this PR merges?)
+
+**Example:**
+```
+Feature: User workout history tracking
+
+Technical Approach: Add Core Data models, repository layer, view models, and UI
+
+PR1: Database schema and models (500 lines)
+  - Core Data entities for Workout, Exercise, Set
+  - Migrations
+  - Unit tests
+  Impact: No user-facing changes, app runs normally
+
+PR2: Repository layer (600 lines)
+  - WorkoutRepository protocol and implementation
+  - CRUD operations
+  - Unit tests with mocked persistence
+  Impact: No user-facing changes, app runs normally
+
+PR3: ViewModel layer (700 lines)
+  - WorkoutHistoryViewModel
+  - WorkoutDetailViewModel
+  - Combine publishers for state
+  - Comprehensive unit tests
+  Impact: No user-facing changes, app runs normally
+
+PR4: History list UI (800 lines)
+  - SwiftUI views for workout list
+  - Navigation setup
+  - Empty state, loading state
+  - Unit tests for ViewModels
+  Impact: New history screen accessible but may be incomplete
+
+PR5: Detail view and editing (900 lines)
+  - Workout detail view
+  - Edit functionality
+  - Delete functionality
+  - Unit tests for all interactions
+  Impact: Fully functional history feature
+
+Total: ~3500 lines split into 5 PRs, each independently reviewable
+```
+
+### 2. Validate Each PR Is Independently Functional
+
+Each PR must leave the app in a working state:
+- ✅ App compiles
+- ✅ App runs without crashes
+- ✅ Tests pass
+- ✅ No broken user flows (even if new flow incomplete)
+- ✅ No half-implemented features visible to users
+
+**Acceptable**: Feature is incomplete but hidden/inaccessible
+**Unacceptable**: Feature is visible but non-functional
+
+### 3. Size Estimation
+
+Be honest about line counts:
+- Count tests (they're part of the PR)
+- Count generated code if you're writing the generator
+- Count new files + modifications to existing files
+- Buffer by 20% for unexpected complexity
+
+If your estimate exceeds 1000 lines, split further.
+
+---
+
+## Implementation Rules
+
+### During Development
+
+**Before starting each PR:**
+1. Review the implementation plan
+2. Confirm the PR scope is still valid
+3. Verify estimated line count is achievable
+4. Identify any new dependencies
+
+**During coding:**
+1. Track line count as you go
+2. If approaching 800 lines, evaluate:
+   - Can I defer any work to next PR?
+   - Am I adding unnecessary complexity?
+   - Should I split this PR?
+
+**Before committing:**
+1. Count actual lines changed: `git diff --stat main...HEAD`
+2. If >1000 lines, STOP:
+   - Analyze what can be moved to next PR
+   - Create new branch for continuation
+   - Cherry-pick or rebase commits to split work
+   - Keep current PR under 1000 lines
+
+### Handling Overages
+
+If you realize a PR will exceed 1000 lines:
+
+**Option 1: Pre-emptive Split (Preferred)**
+- Identify logical break point in current work
+- Complete current PR to break point
+- Open PR
+- Continue remaining work in new PR
+
+**Option 2: Retrospective Split**
+- Finish the work on feature branch
+- Create multiple PRs from the commits
+- Use `git cherry-pick` or interactive rebase
+- Submit PRs sequentially
+
+**Option 3: Rescope**
+- Defer non-critical parts to future PR
+- Mark as "Phase 2" in implementation plan
+- Complete essential parts only
+
+---
+
+## Measurement & Enforcement
+
+### How Line Count Is Calculated
+
+```bash
+# Total lines changed (additions + deletions)
+git diff --stat main...HEAD | tail -1
+
+# Detailed per-file breakdown
+git diff --stat main...HEAD
+```
+
+**What counts:**
+- All Swift source files
+- Test files
+- Project configuration changes (if significant)
+- Generated code you created
+- Asset catalog additions (estimated)
+
+**What doesn't count:**
+- Lock files (Package.resolved, Podfile.lock)
+- Auto-generated Core Data files
+- Third-party dependencies
+
+### Hard Limits
+
+- **Maximum**: 1000 lines changed per PR
+- **Target**: 500-800 lines per PR
+- **Ideal**: 300-500 lines per PR for complex features
+
+### Exceptions (Rare)
+
+The ONLY acceptable exceptions:
+1. **Large refactoring** that touches many files with minimal logic changes
+   - Must be pre-approved in implementation plan
+   - Must have justification why it can't be split
+
+2. **Generated code** where generator produces >1000 lines
+   - Generator itself must be in separate PR
+   - Generated output can be single large PR
+   - Must include tests proving generation works
+
+3. **Third-party integration** requiring extensive boilerplate
+   - Must document why boilerplate can't be incrementalized
+   - Must still aim for <1500 lines
+
+**Process for exceptions:**
+- Document exception in implementation plan
+- Explain why splitting is impractical
+- Get explicit approval before proceeding
+
+---
+
+## Quality Gates
+
+Before any PR is opened, verify:
+
+- [ ] Line count < 1000 (run `git diff --stat`)
+- [ ] PR is logical unit of work
+- [ ] App builds and runs
+- [ ] All tests pass
+- [ ] No broken user-facing functionality
+- [ ] PR description explains what's deliverable
+- [ ] Implementation plan updated with actual line count
+
+---
+
+## Multi-Agent Development Considerations
+
+When coordinating multiple agents working in parallel:
+
+### Each Agent Must Work in Stages
+
+**Bad approach:**
+```
+Agent 1: Implement entire feature X (3000 lines)
+Agent 2: Implement entire feature Y (4000 lines)
+Result: Two massive PRs that are impossible to review
+```
+
+**Good approach:**
+```
+Agent 1 Stage 1: Feature X foundation (600 lines) → PR1
+Agent 2 Stage 1: Feature Y foundation (500 lines) → PR2
+Agent 1 Stage 2: Feature X business logic (700 lines) → PR3
+Agent 2 Stage 2: Feature Y business logic (800 lines) → PR4
+Agent 1 Stage 3: Feature X UI (650 lines) → PR5
+Agent 2 Stage 3: Feature Y UI (750 lines) → PR6
+```
+
+### Stage Planning Requirements
+
+Each agent's work must be broken into 3-5 stages:
+1. **Foundation**: Models, protocols, basic structure
+2. **Logic**: Business logic, services, repositories
+3. **Integration**: Connecting components, state management
+4. **UI**: Views, view models, user-facing features
+5. **Polish**: Refinements, edge cases, optimizations
+
+Each stage should target 500-800 lines and result in an independent PR.
+
+### Collision Avoidance
+
+When planning parallel work:
+- Identify shared files/modules upfront
+- Assign ownership of each file/module
+- If agents must touch same file, work sequentially
+- Prefer composition over modification
+- Use protocols to define boundaries
+
+---
+
+## Consequences of Violation
+
+If a PR exceeds 1000 lines without prior exception approval:
+
+1. **PR will not be reviewed** until split into smaller PRs
+2. Implementation plan must be revised
+3. Work must be re-chunked and re-submitted
+
+This is not negotiable. Large PRs are a code quality issue that must be prevented, not fixed after the fact.
+
+---
+
+## Success Metrics
+
+A well-planned feature should have:
+- ✅ 3-7 PRs of 500-800 lines each
+- ✅ Each PR independently reviewable
+- ✅ Each PR leaves app in working state
+- ✅ Each PR merged within 1 review cycle
+- ✅ Feature complete in 1-2 weeks despite multiple PRs
+
+Compare this to:
+- ❌ 1 PR of 5000 lines
+- ❌ 8+ review cycles finding incremental issues
+- ❌ 3-4 weeks to merge
+- ❌ High risk of bugs escaping
+- ❌ Massive revert if issues found
+
+---
+
+## Remember
+
+**Small PRs are not slower. They're faster.**
+
+You will merge 7 well-crafted 700-line PRs faster than 1 sprawling 5000-line PR. The upfront planning is worth it.
+
+**Code quality depends on reviewability.**
+
+If a human or AI cannot comprehensively review your PR, bugs will slip through. Size is a proxy for reviewability.
+
+**Your PR size reflects your planning quality.**
+
+Large PRs indicate poor feature decomposition. Small, logical PRs indicate thoughtful engineering.
+
+---
+
+## Action Items
+
+Before implementing ANY feature:
+
+1. Write implementation plan with PR breakdown
+2. Verify each PR is <1000 lines (estimated)
+3. Confirm each PR leaves app functional
+4. Get plan reviewed if uncertain
+5. Execute plan incrementally
+6. Track actual vs estimated line counts
+7. Adjust future estimates based on learnings
+
+**This is how professional iOS development works at scale. No shortcuts.**

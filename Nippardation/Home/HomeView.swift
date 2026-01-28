@@ -165,14 +165,24 @@ struct HomeView: View {
             }
             .navigationTitle("Home")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    HStack(spacing: 16) {
+                        NavigationLink(destination: TemplateListView()) {
+                            Image(systemName: "doc.text")
+                        }
+                        NavigationLink(destination: ProgramListView()) {
+                            Image(systemName: "list.bullet.clipboard")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         if let user = authManager.user {
                             Label(user.email ?? "User", systemImage: "person.circle")
                         }
-                        
+
                         Divider()
-                        
+
                         Button(action: {
                             signOut()
                         }) {
