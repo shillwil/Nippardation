@@ -164,8 +164,9 @@ struct ActiveExerciseDetailView: View {
             if let exercise = viewModel.matchingExercise {
                 AddRepCountView(exercise: exercise) { newSet in
                     viewModel.addSet(newSet)
-                    // Update the binding to ensure changes propagate
-                    if let currentExercise = viewModel.currentExercise {
+                    // Update the binding to ensure changes propagate (with bounds check)
+                    if let currentExercise = viewModel.currentExercise,
+                       exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
                         workout.trackedExercises[exerciseIndex] = currentExercise
                     }
                 }
@@ -180,8 +181,9 @@ struct ActiveExerciseDetailView: View {
                     setType: $editingSetType,
                     onSave: { newReps, newWeight, newSetType in
                         viewModel.updateSet(at: index, reps: newReps, weight: newWeight, setType: newSetType)
-                        // Update the binding to ensure changes propagate
-                        if let currentExercise = viewModel.currentExercise {
+                        // Update the binding to ensure changes propagate (with bounds check)
+                        if let currentExercise = viewModel.currentExercise,
+                           exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
                             workout.trackedExercises[exerciseIndex] = currentExercise
                         }
                     }
@@ -223,8 +225,9 @@ struct ActiveExerciseDetailView: View {
     }
     
     private func saveAndClose() {
-        // Save changes through the workout binding
-        if let currentExercise = viewModel.currentExercise {
+        // Save changes through the workout binding (with bounds check)
+        if let currentExercise = viewModel.currentExercise,
+           exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
             workout.trackedExercises[exerciseIndex] = currentExercise
             // Update in workout manager
             workoutManager.updateExercise(at: exerciseIndex, with: currentExercise)

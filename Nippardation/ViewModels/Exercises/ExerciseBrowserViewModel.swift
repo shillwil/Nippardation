@@ -83,9 +83,8 @@ final class ExerciseBrowserViewModel: ObservableObject {
         if refresh {
             currentPage = 1
             exercises = []
-            // Cancel any in-progress request for refresh (e.g., new search query)
-            // This ensures fresh search results match the current search text
-            Task { await taskManager.cancel(id: "loadExercises") }
+            // Note: taskManager.run already cancels existing tasks with the same ID,
+            // so explicit cancel is not needed here
             isLoading = false
             isLoadingMore = false
         }
@@ -134,6 +133,9 @@ final class ExerciseBrowserViewModel: ObservableObject {
                         self.isLoadingMore = false
                     }
                 } catch {
+                    // Don't update state if cancelled - a new request has taken over
+                    guard !(error is CancellationError) else { return }
+
                     await MainActor.run {
                         // Fall back to cached exercises
                         if refresh {
@@ -170,18 +172,22 @@ final class ExerciseBrowserViewModel: ObservableObject {
     func applyFilters(_ newFilter: ExerciseFilter) {
         filter = newFilter
         // Sync searchText with filter to keep UI in sync
-        // Skip the debounce since we're calling loadExercises directly
-        skipNextDebounce = true
-        searchText = newFilter.searchText
+        // Only skip debounce if searchText is actually changing (to avoid stuck flag)
+        if searchText != newFilter.searchText {
+            skipNextDebounce = true
+            searchText = newFilter.searchText
+        }
         loadExercises(refresh: true)
     }
 
     /// Clears all filters
     func clearFilters() {
         filter.reset()
-        // Skip the debounce since we're calling loadExercises directly
-        skipNextDebounce = true
-        searchText = ""
+        // Only skip debounce if searchText is actually changing (to avoid stuck flag)
+        if !searchText.isEmpty {
+            skipNextDebounce = true
+            searchText = ""
+        }
         loadExercises(refresh: true)
     }
 
