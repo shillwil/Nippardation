@@ -135,7 +135,7 @@ struct DashboardView: View {
 
             WorkoutCarousel(
                 workouts: program.workouts,
-                currentDayIndex: program.currentDayIndex,
+                currentWorkoutServerId: program.currentWorkout?.serverId,
                 templates: viewModel.allTemplates
             )
         }

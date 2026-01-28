@@ -39,6 +39,9 @@ final class ExerciseBrowserViewModel: ObservableObject {
     private var currentPage = 1
     private let pageSize = 30
 
+    /// Flag to skip debounce when searchText is set programmatically
+    private var skipNextDebounce = false
+
     // MARK: - Initialization
 
     init(
@@ -58,8 +61,14 @@ final class ExerciseBrowserViewModel: ObservableObject {
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .removeDuplicates()
             .sink { [weak self] query in
-                self?.filter.searchText = query
-                self?.loadExercises(refresh: true)
+                guard let self = self else { return }
+                // Skip if this change was from applyFilters/clearFilters (already loaded)
+                if self.skipNextDebounce {
+                    self.skipNextDebounce = false
+                    return
+                }
+                self.filter.searchText = query
+                self.loadExercises(refresh: true)
             }
             .store(in: &cancellables)
     }
@@ -161,6 +170,8 @@ final class ExerciseBrowserViewModel: ObservableObject {
     func applyFilters(_ newFilter: ExerciseFilter) {
         filter = newFilter
         // Sync searchText with filter to keep UI in sync
+        // Skip the debounce since we're calling loadExercises directly
+        skipNextDebounce = true
         searchText = newFilter.searchText
         loadExercises(refresh: true)
     }
@@ -168,6 +179,8 @@ final class ExerciseBrowserViewModel: ObservableObject {
     /// Clears all filters
     func clearFilters() {
         filter.reset()
+        // Skip the debounce since we're calling loadExercises directly
+        skipNextDebounce = true
         searchText = ""
         loadExercises(refresh: true)
     }

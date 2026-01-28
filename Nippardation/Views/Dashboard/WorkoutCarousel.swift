@@ -10,14 +10,15 @@ import SwiftUI
 struct WorkoutCarousel: View {
 
     let workouts: [ProgramWorkout]
-    let currentDayIndex: Int
+    let currentWorkoutServerId: String?
     let templates: [Template]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
                 ForEach(workouts.sorted(by: { $0.dayNumber < $1.dayNumber })) { workout in
-                    workoutCard(workout, isNext: workout.dayNumber == currentDayIndex)
+                    // Compare by serverId to correctly identify the current workout
+                    workoutCard(workout, isNext: workout.serverId == currentWorkoutServerId)
                 }
             }
             .padding(.horizontal, 4)
@@ -97,7 +98,7 @@ struct WorkoutCarousel: View {
 #Preview {
     WorkoutCarousel(
         workouts: MockProgramRepository.samplePrograms[0].workouts,
-        currentDayIndex: 1,
+        currentWorkoutServerId: MockProgramRepository.samplePrograms[0].currentWorkout?.serverId,
         templates: MockTemplateRepository.sampleTemplates
     )
     .padding()
