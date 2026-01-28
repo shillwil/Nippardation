@@ -169,7 +169,7 @@ final class ProgramEditorViewModel: ObservableObject {
     ///   - template: The template to assign
     ///   - workoutIndex: The index of the workout to update
     func setTemplate(_ template: Template, for workoutIndex: Int) {
-        guard workoutIndex < workouts.count else { return }
+        guard workoutIndex >= 0 && workoutIndex < workouts.count else { return }
         workouts[workoutIndex].templateServerId = template.serverId
         workouts[workoutIndex].templateName = template.name
     }
@@ -179,7 +179,7 @@ final class ProgramEditorViewModel: ObservableObject {
     ///   - label: The new label
     ///   - workoutIndex: The index of the workout to update
     func setLabel(_ label: String, for workoutIndex: Int) {
-        guard workoutIndex < workouts.count else { return }
+        guard workoutIndex >= 0 && workoutIndex < workouts.count else { return }
         workouts[workoutIndex].dayLabel = label
     }
 

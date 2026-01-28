@@ -42,6 +42,9 @@ final class ProgramListViewModel: ObservableObject {
         if refresh {
             currentPage = 1
             programs = []
+            // Reset loading state to allow refresh during existing load
+            // taskManager.run will cancel the old task
+            isLoading = false
         }
 
         guard !isLoading else { return }
@@ -64,6 +67,9 @@ final class ProgramListViewModel: ObservableObject {
         if refresh {
             currentPage = 1
             programs = []
+            // Reset loading state to allow refresh during existing load
+            // taskManager.run will cancel the old task
+            isLoading = false
         }
 
         guard !isLoading else { return }

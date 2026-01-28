@@ -39,9 +39,6 @@ final class ExerciseBrowserViewModel: ObservableObject {
     private var currentPage = 1
     private let pageSize = 30
 
-    /// Flag to skip debounce when searchText is set programmatically
-    private var skipNextDebounce = false
-
     // MARK: - Initialization
 
     init(
@@ -62,11 +59,9 @@ final class ExerciseBrowserViewModel: ObservableObject {
             .removeDuplicates()
             .sink { [weak self] query in
                 guard let self = self else { return }
-                // Skip if this change was from applyFilters/clearFilters (already loaded)
-                if self.skipNextDebounce {
-                    self.skipNextDebounce = false
-                    return
-                }
+                // Skip if filter already has this search text (was set programmatically by applyFilters/clearFilters)
+                // This avoids double-loading while still allowing subsequent user typing to trigger loads
+                guard self.filter.searchText != query else { return }
                 self.filter.searchText = query
                 self.loadExercises(refresh: true)
             }
@@ -172,22 +167,17 @@ final class ExerciseBrowserViewModel: ObservableObject {
     func applyFilters(_ newFilter: ExerciseFilter) {
         filter = newFilter
         // Sync searchText with filter to keep UI in sync
-        // Only skip debounce if searchText is actually changing (to avoid stuck flag)
-        if searchText != newFilter.searchText {
-            skipNextDebounce = true
-            searchText = newFilter.searchText
-        }
+        // The debounce sink checks filter.searchText to avoid double-loading
+        searchText = newFilter.searchText
         loadExercises(refresh: true)
     }
 
     /// Clears all filters
     func clearFilters() {
         filter.reset()
-        // Only skip debounce if searchText is actually changing (to avoid stuck flag)
-        if !searchText.isEmpty {
-            skipNextDebounce = true
-            searchText = ""
-        }
+        // Sync searchText with filter to keep UI in sync
+        // The debounce sink checks filter.searchText to avoid double-loading
+        searchText = ""
         loadExercises(refresh: true)
     }
 

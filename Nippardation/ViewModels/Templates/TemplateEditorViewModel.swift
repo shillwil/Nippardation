@@ -121,7 +121,7 @@ final class TemplateEditorViewModel: ObservableObject {
     /// Removes an exercise at the given index
     /// - Parameter index: The index to remove
     func removeExercise(at index: Int) {
-        guard index < exercises.count else { return }
+        guard index >= 0 && index < exercises.count else { return }
         exercises.remove(at: index)
         reorderExercises()
     }
@@ -158,7 +158,7 @@ final class TemplateEditorViewModel: ObservableObject {
         restSeconds: Int? = nil,
         notes: String? = nil
     ) {
-        guard index < exercises.count else { return }
+        guard index >= 0 && index < exercises.count else { return }
         if let warmupSets = warmupSets {
             exercises[index].warmupSets = warmupSets
         }
