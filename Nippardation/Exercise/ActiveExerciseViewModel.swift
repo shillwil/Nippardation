@@ -8,10 +8,15 @@
 import SwiftUI
 import Combine
 
+@MainActor
 class ActiveExerciseViewModel: ObservableObject {
     // Data
     @Published var workout: TrackedWorkout
     @Published var matchingExercise: Exercise?
+
+    // Video
+    @Published var nativeVideoUrl: URL?
+    @Published var exerciseServerId: String?
 
     // Stats
     @Published var totalVolume: Double = 0
@@ -22,18 +27,23 @@ class ActiveExerciseViewModel: ObservableObject {
 
     // Dependencies
     private let workoutManager = WorkoutManager.shared
+    private let exerciseRepository: any ExerciseRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
 
-    init(workout: TrackedWorkout, exerciseIndex: Int) {
+    init(workout: TrackedWorkout, exerciseIndex: Int, exerciseRepository: (any ExerciseRepositoryProtocol)? = nil) {
         self.workout = workout
         // Clamp exerciseIndex to valid range to prevent array out of bounds crashes
         self.exerciseIndex = min(max(0, exerciseIndex), max(0, workout.trackedExercises.count - 1))
+        self.exerciseRepository = exerciseRepository ?? DependencyContainer.shared.exerciseRepository
 
         // Find matching exercise template
         findMatchingExercise()
 
         // Calculate initial stats
         updateStats()
+
+        // Look up video URL from exercise library
+        lookupExerciseVideo()
     }
 
     /// Indicates whether the exercise index is valid for the current workout
@@ -61,21 +71,31 @@ class ActiveExerciseViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Video URL Properties
+    // MARK: - Video Lookup
 
-    /// Returns the native video URL if available for the current exercise
-    /// This will be populated when ExerciseLibraryItem data with R2 URLs is available
-    var nativeVideoUrl: URL? {
-        // Currently returns nil as exercise templates use YouTube embeds
-        // When ExerciseLibraryItem data is integrated, this will return the R2 URL
-        return nil
-    }
+    /// Looks up the ExerciseLibraryItem from the repository to get the video URL
+    private func lookupExerciseVideo() {
+        guard isValidExercise else { return }
+        let exerciseName = workout.trackedExercises[exerciseIndex].exerciseName
 
-    /// Returns the exercise server ID for video caching
-    /// Uses the exercise name as a fallback identifier
-    var exerciseServerId: String? {
-        // When ExerciseLibraryItem data is integrated, this will return the actual server ID
-        return matchingExercise?.type.name
+        // Set fallback server ID from template name
+        exerciseServerId = matchingExercise?.type.name
+
+        Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                let results = try await self.exerciseRepository.searchExercises(query: exerciseName, limit: 5)
+                // Find exact name match first, fall back to first result
+                let match = results.first(where: { $0.name.lowercased() == exerciseName.lowercased() })
+                    ?? results.first
+                if let match = match {
+                    self.nativeVideoUrl = match.videoUrl
+                    self.exerciseServerId = match.serverId
+                }
+            } catch {
+                // Silently fail — video is supplementary, not critical
+            }
+        }
     }
 
     // MARK: - Set Management
