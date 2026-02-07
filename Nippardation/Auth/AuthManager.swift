@@ -66,7 +66,7 @@ struct BackendUser: Codable {
 struct LoginResponse: Codable {
     let success: Bool
     let message: String
-    let user: BackendUser
+    let data: BackendUser
 }
 
 // MARK: - AuthManager
@@ -205,7 +205,7 @@ class AuthManager: ObservableObject {
             let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
 
             await MainActor.run {
-                self.backendUser = loginResponse.user
+                self.backendUser = loginResponse.data
             }
         } catch {
             NSLog("Error syncing with backend: \(error)")
