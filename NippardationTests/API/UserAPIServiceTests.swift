@@ -48,7 +48,7 @@ struct UserAPIServiceTests {
         let service = createService()
 
         MockURLProtocol.requestHandler = { request in
-            #expect(request.url?.path.contains("api/users/me") == true)
+            #expect(request.url?.path.contains("api/me") == true)
             #expect(request.httpMethod == "GET")
 
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
@@ -67,7 +67,7 @@ struct UserAPIServiceTests {
         let service = createService()
 
         MockURLProtocol.requestHandler = { request in
-            #expect(request.url?.path.contains("api/users/me") == true)
+            #expect(request.url?.path.contains("api/me") == true)
             #expect(request.httpMethod == "PUT")
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
 
@@ -219,5 +219,167 @@ struct UserAPIServiceTests {
                 Issue.record("Expected unauthorized, got \(error)")
             }
         }
+    }
+
+    // MARK: - Path Validation Tests
+
+    @Test func fetchProfileUsesApiMeNotApiUsersMe() async throws {
+        let service = createService()
+
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            #expect(!path.contains("api/users/me"), "Path should use api/me, not api/users/me")
+            #expect(path.contains("api/me"))
+
+            return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
+        }
+
+        do {
+            _ = try await service.fetchProfile()
+        } catch {
+            // Expected
+        }
+    }
+
+    @Test func updateProfileUsesApiMeNotApiUsersMe() async throws {
+        let service = createService()
+
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            #expect(!path.contains("api/users/me"), "Path should use api/me, not api/users/me")
+            #expect(path.contains("api/me"))
+
+            return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
+        }
+
+        do {
+            _ = try await service.updateProfile(UpdateUserRequest(displayName: "Test"))
+        } catch {
+            // Expected
+        }
+    }
+
+    // MARK: - DTO Decoding Tests
+
+    @Test func backendUserDecodesFromSnakeCaseJSON() throws {
+        let json = """
+        {
+            "id": "user-123",
+            "firebase_uid": "fb-abc",
+            "email": "test@example.com",
+            "handle": "testuser",
+            "display_name": "Test User",
+            "profile_picture_url": "https://example.com/pic.jpg",
+            "bio": "Hello",
+            "height": 72.0,
+            "weight": 180.5,
+            "age": 30,
+            "gender": "male",
+            "unit_preference": "imperial",
+            "is_public_profile": true,
+            "total_volume_lifted_lbs": "125000.50",
+            "total_workouts": 100,
+            "current_workout_streak": 5,
+            "longest_workout_streak": 30,
+            "last_workout_date": "2025-01-15T00:00:00Z",
+            "push_notification_tokens": ["token1", "token2"],
+            "notifications_enabled": true,
+            "last_synced_at": "2025-01-15T12:00:00Z",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2025-01-15T12:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let user = try JSONDecoder().decode(BackendUser.self, from: json)
+
+        #expect(user.id == "user-123")
+        #expect(user.firebaseUid == "fb-abc")
+        #expect(user.email == "test@example.com")
+        #expect(user.handle == "testuser")
+        #expect(user.displayName == "Test User")
+        #expect(user.profilePictureUrl == "https://example.com/pic.jpg")
+        #expect(user.bio == "Hello")
+        #expect(user.height == 72.0)
+        #expect(user.weight == 180.5)
+        #expect(user.age == 30)
+        #expect(user.gender == "male")
+        #expect(user.unitPreference == "imperial")
+        #expect(user.isPublicProfile == true)
+        #expect(user.totalVolumeLiftedLbs == "125000.50")
+        #expect(user.totalWorkouts == 100)
+        #expect(user.currentWorkoutStreak == 5)
+        #expect(user.longestWorkoutStreak == 30)
+        #expect(user.lastWorkoutDate == "2025-01-15T00:00:00Z")
+        #expect(user.pushNotificationTokens == ["token1", "token2"])
+        #expect(user.notificationsEnabled == true)
+        #expect(user.lastSyncedAt == "2025-01-15T12:00:00Z")
+        #expect(user.createdAt == "2024-01-01T00:00:00Z")
+        #expect(user.updatedAt == "2025-01-15T12:00:00Z")
+    }
+
+    @Test func backendUserDecodesWithMinimalFields() throws {
+        let json = """
+        {
+            "id": "user-123",
+            "firebase_uid": "fb-abc",
+            "email": "test@example.com",
+            "handle": "testuser"
+        }
+        """.data(using: .utf8)!
+
+        let user = try JSONDecoder().decode(BackendUser.self, from: json)
+
+        #expect(user.id == "user-123")
+        #expect(user.firebaseUid == "fb-abc")
+        #expect(user.displayName == nil)
+        #expect(user.height == nil)
+        #expect(user.totalVolumeLiftedLbs == nil)
+        #expect(user.pushNotificationTokens == nil)
+        #expect(user.notificationsEnabled == nil)
+    }
+
+    @Test func userDTOTotalVolumeLiftedLbsIsString() throws {
+        let json = """
+        {
+            "id": "user-123",
+            "firebase_uid": "fb-abc",
+            "email": "test@example.com",
+            "handle": "testuser",
+            "total_volume_lifted_lbs": "125000.50"
+        }
+        """.data(using: .utf8)!
+
+        let user = try JSONDecoder().decode(UserDTO.self, from: json)
+
+        #expect(user.totalVolumeLiftedLbs == "125000.50")
+    }
+
+    @Test func userDTODecodesPushNotificationTokens() throws {
+        let json = """
+        {
+            "id": "user-123",
+            "firebase_uid": "fb-abc",
+            "email": "test@example.com",
+            "push_notification_tokens": ["token-abc", "token-def"]
+        }
+        """.data(using: .utf8)!
+
+        let user = try JSONDecoder().decode(UserDTO.self, from: json)
+
+        #expect(user.pushNotificationTokens == ["token-abc", "token-def"])
+    }
+
+    @Test func userDTODecodesWithNullPushNotificationTokens() throws {
+        let json = """
+        {
+            "id": "user-123",
+            "firebase_uid": "fb-abc",
+            "email": "test@example.com"
+        }
+        """.data(using: .utf8)!
+
+        let user = try JSONDecoder().decode(UserDTO.self, from: json)
+
+        #expect(user.pushNotificationTokens == nil)
     }
 }

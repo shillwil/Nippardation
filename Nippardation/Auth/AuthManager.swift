@@ -19,11 +19,48 @@ struct BackendUser: Codable {
     let displayName: String?
     let profilePictureUrl: String?
     let bio: String?
+    let height: Double?
+    let weight: Double?
+    let age: Int?
+    let gender: String?
     let unitPreference: String?
+    let isPublicProfile: Bool?
+    let totalVolumeLiftedLbs: String?
     let totalWorkouts: Int?
     let currentWorkoutStreak: Int?
+    let longestWorkoutStreak: Int?
+    let lastWorkoutDate: String?
+    let pushNotificationTokens: [String]?
+    let notificationsEnabled: Bool?
+    let lastSyncedAt: String?
     let createdAt: String?
     let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case firebaseUid = "firebase_uid"
+        case email
+        case handle
+        case displayName = "display_name"
+        case profilePictureUrl = "profile_picture_url"
+        case bio
+        case height
+        case weight
+        case age
+        case gender
+        case unitPreference = "unit_preference"
+        case isPublicProfile = "is_public_profile"
+        case totalVolumeLiftedLbs = "total_volume_lifted_lbs"
+        case totalWorkouts = "total_workouts"
+        case currentWorkoutStreak = "current_workout_streak"
+        case longestWorkoutStreak = "longest_workout_streak"
+        case lastWorkoutDate = "last_workout_date"
+        case pushNotificationTokens = "push_notification_tokens"
+        case notificationsEnabled = "notifications_enabled"
+        case lastSyncedAt = "last_synced_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
 }
 
 struct LoginResponse: Codable {
@@ -147,7 +184,7 @@ class AuthManager: ObservableObject {
 
     private func loginToBackend(idToken: String) async {
         do {
-            let url = AppConfiguration.shared.baseURL.appendingPathComponent("/api/auth/login")
+            let url = AppConfiguration.shared.baseURL.appendingPathComponent("api/auth/login")
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

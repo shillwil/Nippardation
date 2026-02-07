@@ -241,11 +241,12 @@ struct UserDTO: Codable {
     let gender: String?
     let unitPreference: String?
     let isPublicProfile: Bool?
-    let totalVolumeLiftedLbs: Double?
+    let totalVolumeLiftedLbs: String?
     let totalWorkouts: Int?
     let currentWorkoutStreak: Int?
     let longestWorkoutStreak: Int?
     let lastWorkoutDate: String?
+    let pushNotificationTokens: [String]?
     let notificationsEnabled: Bool?
     let lastSyncedAt: String?
     let createdAt: String?
@@ -270,6 +271,7 @@ struct UserDTO: Codable {
         case currentWorkoutStreak = "current_workout_streak"
         case longestWorkoutStreak = "longest_workout_streak"
         case lastWorkoutDate = "last_workout_date"
+        case pushNotificationTokens = "push_notification_tokens"
         case notificationsEnabled = "notifications_enabled"
         case lastSyncedAt = "last_synced_at"
         case createdAt = "created_at"
