@@ -63,17 +63,11 @@ struct ExerciseDTO: Codable, Identifiable {
 
 // MARK: - New Format Response Wrappers
 
-/// Response wrapper for the new exercise API format
+/// Response wrapper for the new exercise API format (server returns camelCase keys)
 struct ExerciseAPIResponse: Codable {
     let success: Bool
     let data: ExerciseAPIData
     let correlationId: String?
-
-    enum CodingKeys: String, CodingKey {
-        case success
-        case data
-        case correlationId = "correlation_id"
-    }
 }
 
 /// Data payload in the new exercise API format
@@ -83,7 +77,7 @@ struct ExerciseAPIData: Codable {
     let meta: ExerciseAPIMeta?
 }
 
-/// Pagination in the new exercise API format (cursor-based)
+/// Pagination in the new exercise API format (server returns camelCase keys)
 struct ExerciseAPIPagination: Codable {
     let nextCursor: String?
     let hasMore: Bool
@@ -91,26 +85,12 @@ struct ExerciseAPIPagination: Codable {
     let perPage: Int?
     let total: Int?
     let totalPages: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case nextCursor = "next_cursor"
-        case hasMore = "has_more"
-        case page
-        case perPage = "per_page"
-        case total
-        case totalPages = "total_pages"
-    }
 }
 
-/// Metadata in the new exercise API format
+/// Metadata in the new exercise API format (server returns camelCase keys)
 struct ExerciseAPIMeta: Codable {
     let searchApplied: Bool?
     let filtersApplied: [String]?
-
-    enum CodingKeys: String, CodingKey {
-        case searchApplied = "search_applied"
-        case filtersApplied = "filters_applied"
-    }
 }
 
 // MARK: - Legacy Format Response Wrapper

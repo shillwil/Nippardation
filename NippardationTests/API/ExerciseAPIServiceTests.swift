@@ -290,6 +290,8 @@ struct ExerciseAPIServiceTests {
     }
 
     @Test func newFormatResponseDecodesCorrectly() throws {
+        // Server returns camelCase keys for wrapper/pagination/meta,
+        // but snake_case for ExerciseDTO fields
         let json = """
         {
             "success": true,
@@ -298,19 +300,19 @@ struct ExerciseAPIServiceTests {
                     {"id": "ex_001", "name": "Bench Press", "primary_muscles": ["chest"]}
                 ],
                 "pagination": {
-                    "next_cursor": "abc123",
-                    "has_more": true,
+                    "nextCursor": "abc123",
+                    "hasMore": true,
                     "page": 1,
-                    "per_page": 20,
+                    "perPage": 20,
                     "total": 100,
-                    "total_pages": 5
+                    "totalPages": 5
                 },
                 "meta": {
-                    "search_applied": true,
-                    "filters_applied": ["muscleGroup"]
+                    "searchApplied": true,
+                    "filtersApplied": ["muscleGroup"]
                 }
             },
-            "correlation_id": "corr-123"
+            "correlationId": "corr-123"
         }
         """.data(using: .utf8)!
 
