@@ -66,7 +66,13 @@ struct BackendUser: Codable {
 struct LoginResponse: Codable {
     let success: Bool
     let message: String
-    let data: BackendUser
+    let data: LoginData
+}
+
+/// Login data wrapper — server nests user inside data.user
+struct LoginData: Codable {
+    let user: BackendUser
+    let token: String?
 }
 
 // MARK: - AuthManager
@@ -202,10 +208,16 @@ class AuthManager: ObservableObject {
                 throw NSError(domain: "Backend login failed", code: httpResponse.statusCode)
             }
 
+            #if DEBUG
+            if let rawJSON = String(data: data, encoding: .utf8) {
+                print("Login response: \(rawJSON)")
+            }
+            #endif
+
             let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
 
             await MainActor.run {
-                self.backendUser = loginResponse.data
+                self.backendUser = loginResponse.data.user
             }
         } catch {
             NSLog("Error syncing with backend: \(error)")
