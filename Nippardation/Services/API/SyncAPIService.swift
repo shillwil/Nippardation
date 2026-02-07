@@ -26,7 +26,16 @@ final class SyncAPIService: BaseAPIService, SyncAPIServiceProtocol, @unchecked S
         // Sync operations may take longer
         request.timeoutInterval = 60
 
-        return try await performRequest(request)
+        // Try new wrapped format first, fall back to flat format
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+
+        if let wrapped = try? decoder.decode(SyncAPIResponse.self, from: data) {
+            return wrapped.data
+        }
+
+        // Fall back to flat SyncResponseDTO (legacy)
+        return try decoder.decode(SyncResponseDTO.self, from: data)
     }
 
     // MARK: - Override for Sync-specific response handling

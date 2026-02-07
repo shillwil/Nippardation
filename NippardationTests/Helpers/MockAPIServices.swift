@@ -368,7 +368,6 @@ actor MockSyncAPIService: SyncAPIServiceProtocol {
         if shouldFail { throw failureError }
 
         return response ?? SyncResponseDTO(
-            success: true,
             syncedAt: ISO8601DateFormatter().string(from: Date()),
             conflicts: nil,
             serverData: nil,

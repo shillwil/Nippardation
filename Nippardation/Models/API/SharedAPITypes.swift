@@ -346,22 +346,21 @@ struct SyncDeviceInfo: Codable {
     let osVersion: String?
 }
 
-/// Response from sync endpoint
-/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
-struct SyncResponseDTO: Codable {
+/// Top-level response wrapper from sync endpoint
+struct SyncAPIResponse: Codable {
     let success: Bool
+    let message: String?
+    let data: SyncResponseDTO
+}
+
+/// Inner data from sync endpoint response
+/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
+/// Keys are camelCase to match API documentation
+struct SyncResponseDTO: Codable {
     let syncedAt: String
     let conflicts: [SyncAPIConflictDTO]?
     let serverData: ServerSyncDataDTO?
-    let stats: SyncStatsDTO
-
-    enum CodingKeys: String, CodingKey {
-        case success
-        case syncedAt = "synced_at"
-        case conflicts
-        case serverData = "server_data"
-        case stats
-    }
+    let stats: SyncStatsDTO?
 }
 
 /// Server data from sync (workouts from other devices)
@@ -408,16 +407,9 @@ struct SyncStatsDTO: Codable {
 }
 
 /// Conflict information from sync API
+/// Keys are camelCase to match API documentation
 struct SyncAPIConflictDTO: Codable {
-    let clientId: String
-    let serverId: String?
-    let reason: String
-    let resolution: String?
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case serverId = "server_id"
-        case reason
-        case resolution
-    }
+    let entityType: String
+    let entityId: String
+    let resolution: String
 }

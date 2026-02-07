@@ -199,7 +199,6 @@ enum SampleData {
     // MARK: - Sync
 
     static let syncResponse = SyncResponseDTO(
-        success: true,
         syncedAt: "2025-01-15T12:00:00Z",
         conflicts: nil,
         serverData: nil,

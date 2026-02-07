@@ -235,6 +235,80 @@ struct SyncAPIServiceTests {
         #expect(json["os_version"] == nil, "Should use camelCase osVersion, not snake_case")
     }
 
+    @Test func syncResponseDTODecodesCamelCaseKeys() throws {
+        let json = """
+        {
+            "syncedAt": "2025-01-15T12:00:00Z",
+            "conflicts": null,
+            "serverData": null,
+            "stats": {
+                "uploaded": 5,
+                "downloaded": 3,
+                "conflicts": 0
+            }
+        }
+        """.data(using: .utf8)!
+
+        let dto = try JSONDecoder().decode(SyncResponseDTO.self, from: json)
+        #expect(dto.syncedAt == "2025-01-15T12:00:00Z")
+        #expect(dto.conflicts == nil)
+        #expect(dto.serverData == nil)
+        #expect(dto.stats?.uploaded == 5)
+        #expect(dto.stats?.downloaded == 3)
+    }
+
+    @Test func syncResponseDTODecodesWithNilStats() throws {
+        let json = """
+        {
+            "syncedAt": "2025-01-15T12:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let dto = try JSONDecoder().decode(SyncResponseDTO.self, from: json)
+        #expect(dto.syncedAt == "2025-01-15T12:00:00Z")
+        #expect(dto.stats == nil)
+    }
+
+    @Test func syncAPIResponseWrapperDecodes() throws {
+        let json = """
+        {
+            "success": true,
+            "message": "Sync completed",
+            "data": {
+                "syncedAt": "2025-01-15T12:00:00Z",
+                "conflicts": null,
+                "serverData": null,
+                "stats": {
+                    "uploaded": 2,
+                    "downloaded": 1,
+                    "conflicts": 0
+                }
+            }
+        }
+        """.data(using: .utf8)!
+
+        let wrapper = try JSONDecoder().decode(SyncAPIResponse.self, from: json)
+        #expect(wrapper.success == true)
+        #expect(wrapper.message == "Sync completed")
+        #expect(wrapper.data.syncedAt == "2025-01-15T12:00:00Z")
+        #expect(wrapper.data.stats?.uploaded == 2)
+    }
+
+    @Test func syncAPIConflictDTODecodesCorrectly() throws {
+        let json = """
+        {
+            "entityType": "workout",
+            "entityId": "workout_001",
+            "resolution": "server_wins"
+        }
+        """.data(using: .utf8)!
+
+        let dto = try JSONDecoder().decode(SyncAPIConflictDTO.self, from: json)
+        #expect(dto.entityType == "workout")
+        #expect(dto.entityId == "workout_001")
+        #expect(dto.resolution == "server_wins")
+    }
+
     @Test func syncRequestDTOWithNilDeviceInfoOmitsIt() throws {
         let payload = SyncRequestDTO(
             deviceId: "device_123",

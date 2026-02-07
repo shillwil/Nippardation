@@ -199,29 +199,25 @@ final class SyncService: SyncServiceProtocol {
         // Send to server
         let response = try await apiService.sync(payload: payload)
 
-        // Process response
-        if response.success {
-            // Mark workouts as synced
-            // Note: The response should contain server IDs for the synced workouts
-            // For now, we'll mark them as synced with their client IDs
-            for workout in pendingWorkouts {
-                try? await workoutRepository.markWorkoutSynced(
-                    id: workout.id,
-                    serverId: workout.id.uuidString // Use client ID until we get server ID
-                )
-            }
+        // Process response — if we got a response without error, the sync succeeded
+        // Mark workouts as synced
+        for workout in pendingWorkouts {
+            try? await workoutRepository.markWorkoutSynced(
+                id: workout.id,
+                serverId: workout.id.uuidString // Use client ID until we get server ID
+            )
         }
 
         // Handle conflicts - deduplicate to avoid accumulation across retries
         if let responseConflicts = response.conflicts, !responseConflicts.isEmpty {
             for conflict in responseConflicts {
                 // Only add if this conflict ID doesn't already exist
-                if !conflicts.contains(where: { $0.id == conflict.clientId }) {
+                if !conflicts.contains(where: { $0.id == conflict.entityId }) {
                     conflicts.append(SyncConflict(
-                        id: conflict.clientId,
+                        id: conflict.entityId,
                         type: .workout,
-                        localVersion: conflict.clientId,
-                        remoteVersion: conflict.serverId as Any,
+                        localVersion: conflict.entityId,
+                        remoteVersion: conflict.resolution as Any,
                         detectedAt: Date()
                     ))
                 }
@@ -339,12 +335,11 @@ final class SyncService: SyncServiceProtocol {
 
         let response = try await apiService.sync(payload: payload)
 
-        if response.success {
-            try? await workoutRepository.markWorkoutSynced(
-                id: workout.id,
-                serverId: workout.id.uuidString
-            )
-        }
+        // If we got a response without error, the sync succeeded
+        try? await workoutRepository.markWorkoutSynced(
+            id: workout.id,
+            serverId: workout.id.uuidString
+        )
     }
 
     // MARK: - Background Sync
