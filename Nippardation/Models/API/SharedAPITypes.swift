@@ -330,16 +330,20 @@ struct UpdateUserRequest: Codable {
 
 /// Request body for sync endpoint
 /// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
+/// Keys are camelCase to match API documentation
 struct SyncRequestDTO: Codable {
     let deviceId: String
-    let lastSyncedAt: String?
+    let lastSyncTimestamp: String?
+    let deviceInfo: SyncDeviceInfo?
     let workouts: [WorkoutCreateDTO]
+}
 
-    enum CodingKeys: String, CodingKey {
-        case deviceId = "device_id"
-        case lastSyncedAt = "last_synced_at"
-        case workouts
-    }
+/// Device information included in sync requests
+struct SyncDeviceInfo: Codable {
+    let name: String?
+    let type: String       // "ios"
+    let appVersion: String
+    let osVersion: String?
 }
 
 /// Response from sync endpoint

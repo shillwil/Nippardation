@@ -35,7 +35,11 @@ struct SyncAPIServiceTests {
             // Verify body contains expected fields
             if let body = request.httpBody,
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
-                #expect(json["device_id"] as? String == "device_123")
+                #expect(json["deviceId"] as? String == "device_123")
+                #expect(json["lastSyncTimestamp"] as? String == "2025-01-01T00:00:00Z")
+                // Verify camelCase keys (not snake_case)
+                #expect(json["device_id"] == nil, "Should use camelCase deviceId, not snake_case device_id")
+                #expect(json["last_synced_at"] == nil, "Should use lastSyncTimestamp, not last_synced_at")
             }
 
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
@@ -43,7 +47,8 @@ struct SyncAPIServiceTests {
 
         let payload = SyncRequestDTO(
             deviceId: "device_123",
-            lastSyncedAt: "2025-01-01T00:00:00Z",
+            lastSyncTimestamp: "2025-01-01T00:00:00Z",
+            deviceInfo: nil,
             workouts: []
         )
 
@@ -81,7 +86,8 @@ struct SyncAPIServiceTests {
 
         let payload = SyncRequestDTO(
             deviceId: "device_123",
-            lastSyncedAt: nil,
+            lastSyncTimestamp: nil,
+            deviceInfo: nil,
             workouts: [workout]
         )
 
@@ -102,7 +108,7 @@ struct SyncAPIServiceTests {
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
-        let payload = SyncRequestDTO(deviceId: "device_123", lastSyncedAt: nil, workouts: [])
+        let payload = SyncRequestDTO(deviceId: "device_123", lastSyncTimestamp: nil, deviceInfo: nil, workouts: [])
 
         do {
             _ = try await service.sync(payload: payload)
@@ -124,7 +130,7 @@ struct SyncAPIServiceTests {
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
-        let payload = SyncRequestDTO(deviceId: "device_123", lastSyncedAt: nil, workouts: [])
+        let payload = SyncRequestDTO(deviceId: "device_123", lastSyncTimestamp: nil, deviceInfo: nil, workouts: [])
 
         do {
             _ = try await service.sync(payload: payload)
@@ -158,7 +164,8 @@ struct SyncAPIServiceTests {
 
         let payload = SyncRequestDTO(
             deviceId: "device_456",
-            lastSyncedAt: "2025-01-01T00:00:00Z",
+            lastSyncTimestamp: "2025-01-01T00:00:00Z",
+            deviceInfo: nil,
             workouts: [workout]
         )
 
@@ -172,5 +179,74 @@ struct SyncAPIServiceTests {
                 Issue.record("Expected unauthorized, got \(error)")
             }
         }
+    }
+
+    // MARK: - DTO Encoding Tests
+
+    @Test func syncRequestDTOEncodesCamelCaseKeys() throws {
+        let payload = SyncRequestDTO(
+            deviceId: "device_123",
+            lastSyncTimestamp: "2025-01-15T00:00:00Z",
+            deviceInfo: SyncDeviceInfo(
+                name: "iPhone 16",
+                type: "ios",
+                appVersion: "1.0.0",
+                osVersion: "18.0"
+            ),
+            workouts: []
+        )
+
+        let data = try JSONEncoder().encode(payload)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        // Verify camelCase keys
+        #expect(json["deviceId"] as? String == "device_123")
+        #expect(json["lastSyncTimestamp"] as? String == "2025-01-15T00:00:00Z")
+        #expect(json["deviceInfo"] != nil)
+
+        // Verify snake_case keys are NOT present
+        #expect(json["device_id"] == nil)
+        #expect(json["last_synced_at"] == nil)
+        #expect(json["last_sync_timestamp"] == nil)
+        #expect(json["device_info"] == nil)
+
+        // Verify deviceInfo contents
+        let deviceInfo = json["deviceInfo"] as? [String: Any]
+        #expect(deviceInfo?["type"] as? String == "ios")
+        #expect(deviceInfo?["appVersion"] as? String == "1.0.0")
+        #expect(deviceInfo?["osVersion"] as? String == "18.0")
+    }
+
+    @Test func syncDeviceInfoEncodesCorrectly() throws {
+        let info = SyncDeviceInfo(
+            name: nil,
+            type: "ios",
+            appVersion: "2.0.0",
+            osVersion: nil
+        )
+
+        let data = try JSONEncoder().encode(info)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        #expect(json["type"] as? String == "ios")
+        #expect(json["appVersion"] as? String == "2.0.0")
+        // name and osVersion should be null
+        #expect(json["app_version"] == nil, "Should use camelCase appVersion, not snake_case")
+        #expect(json["os_version"] == nil, "Should use camelCase osVersion, not snake_case")
+    }
+
+    @Test func syncRequestDTOWithNilDeviceInfoOmitsIt() throws {
+        let payload = SyncRequestDTO(
+            deviceId: "device_123",
+            lastSyncTimestamp: nil,
+            deviceInfo: nil,
+            workouts: []
+        )
+
+        let data = try JSONEncoder().encode(payload)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        #expect(json["deviceId"] as? String == "device_123")
+        // deviceInfo should be null (not absent, since Codable includes nil optionals)
     }
 }

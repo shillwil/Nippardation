@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 /// Concrete implementation of SyncServiceProtocol
 /// Handles bidirectional sync between local Core Data and server
@@ -190,7 +191,8 @@ final class SyncService: SyncServiceProtocol {
 
         let payload = SyncRequestDTO(
             deviceId: deviceId,
-            lastSyncedAt: lastSyncTime.map { ISO8601DateFormatter().string(from: $0) },
+            lastSyncTimestamp: lastSyncTime.map { ISO8601DateFormatter().string(from: $0) },
+            deviceInfo: buildDeviceInfo(),
             workouts: workoutDTOs
         )
 
@@ -330,7 +332,8 @@ final class SyncService: SyncServiceProtocol {
 
         let payload = SyncRequestDTO(
             deviceId: deviceId,
-            lastSyncedAt: nil,
+            lastSyncTimestamp: nil,
+            deviceInfo: buildDeviceInfo(),
             workouts: [workoutDTO]
         )
 
@@ -409,6 +412,17 @@ final class SyncService: SyncServiceProtocol {
     }
 
     // MARK: - Private Helpers
+
+    private func buildDeviceInfo() -> SyncDeviceInfo {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        return SyncDeviceInfo(
+            name: UIDevice.current.name,
+            type: "ios",
+            appVersion: appVersion,
+            osVersion: osVersion
+        )
+    }
 
     private func isSyncNeeded() -> Bool {
         guard let lastSync = lastSyncTime else {
