@@ -76,8 +76,8 @@ struct ExerciseAPIServiceTests {
             let queryItems = components?.queryItems ?? []
 
             // Verify filter query items are present
-            let muscleItems = queryItems.filter { $0.name == "muscle_groups[]" }
-            let equipmentItems = queryItems.filter { $0.name == "equipment[]" }
+            let muscleItems = queryItems.filter { $0.name == "muscleGroup" }
+            let equipmentItems = queryItems.filter { $0.name == "equipment" }
             let searchItems = queryItems.filter { $0.name == "q" }
 
             #expect(muscleItems.count == 1)
@@ -241,5 +241,110 @@ struct ExerciseAPIServiceTests {
                 Issue.record("Expected unauthorized, got \(error)")
             }
         }
+    }
+
+    // MARK: - Dual Format Decoding Tests
+
+    @Test func exerciseDTODecodesPopularityScoreAsDouble() throws {
+        let json = """
+        {
+            "id": "ex_001",
+            "name": "Bench Press",
+            "primary_muscles": ["chest"],
+            "popularity_score": 95.5
+        }
+        """.data(using: .utf8)!
+
+        let dto = try JSONDecoder.apiDecoder.decode(ExerciseDTO.self, from: json)
+        #expect(dto.popularityScore == 95.5)
+    }
+
+    @Test func exerciseDTODecodesLegacyMuscleGroupsField() throws {
+        let json = """
+        {
+            "id": "ex_001",
+            "name": "Bench Press",
+            "muscle_groups": ["chest", "triceps"],
+            "is_custom": false,
+            "created_by": "admin"
+        }
+        """.data(using: .utf8)!
+
+        let dto = try JSONDecoder.apiDecoder.decode(ExerciseDTO.self, from: json)
+        #expect(dto.primaryMuscles == nil)
+        #expect(dto.muscleGroups == ["chest", "triceps"])
+        #expect(dto.isCustom == false)
+        #expect(dto.createdBy == "admin")
+    }
+
+    @Test func exerciseDTODecodesPrimaryMusclesAsOptional() throws {
+        let json = """
+        {
+            "id": "ex_001",
+            "name": "Bench Press"
+        }
+        """.data(using: .utf8)!
+
+        let dto = try JSONDecoder.apiDecoder.decode(ExerciseDTO.self, from: json)
+        #expect(dto.primaryMuscles == nil)
+    }
+
+    @Test func newFormatResponseDecodesCorrectly() throws {
+        let json = """
+        {
+            "success": true,
+            "data": {
+                "exercises": [
+                    {"id": "ex_001", "name": "Bench Press", "primary_muscles": ["chest"]}
+                ],
+                "pagination": {
+                    "next_cursor": "abc123",
+                    "has_more": true,
+                    "page": 1,
+                    "per_page": 20,
+                    "total": 100,
+                    "total_pages": 5
+                },
+                "meta": {
+                    "search_applied": true,
+                    "filters_applied": ["muscleGroup"]
+                }
+            },
+            "correlation_id": "corr-123"
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder.apiDecoder.decode(ExerciseAPIResponse.self, from: json)
+        #expect(response.success == true)
+        #expect(response.data.exercises.count == 1)
+        #expect(response.data.exercises[0].name == "Bench Press")
+        #expect(response.data.pagination.nextCursor == "abc123")
+        #expect(response.data.pagination.hasMore == true)
+        #expect(response.data.meta?.searchApplied == true)
+        #expect(response.correlationId == "corr-123")
+    }
+
+    @Test func legacyFormatResponseDecodesCorrectly() throws {
+        let json = """
+        {
+            "success": true,
+            "data": [
+                {"id": "ex_001", "name": "Bench Press", "muscle_groups": ["chest"]}
+            ],
+            "pagination": {
+                "page": 1,
+                "per_page": 20,
+                "total": 50,
+                "total_pages": 3
+            }
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder.apiDecoder.decode(ExerciseLegacyResponse.self, from: json)
+        #expect(response.success == true)
+        #expect(response.data.count == 1)
+        #expect(response.data[0].muscleGroups == ["chest"])
+        #expect(response.pagination.page == 1)
+        #expect(response.pagination.totalPages == 3)
     }
 }

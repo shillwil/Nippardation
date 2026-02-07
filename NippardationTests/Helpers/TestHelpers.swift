@@ -28,7 +28,10 @@ enum SampleData {
         thumbnailUrl: "https://example.com/thumb.jpg",
         popularityScore: 95,
         createdAt: "2025-01-01T00:00:00Z",
-        updatedAt: "2025-01-01T00:00:00Z"
+        updatedAt: "2025-01-01T00:00:00Z",
+        muscleGroups: nil,
+        isCustom: nil,
+        createdBy: nil
     )
 
     static let exerciseDTO2 = ExerciseDTO(
@@ -45,7 +48,10 @@ enum SampleData {
         thumbnailUrl: nil,
         popularityScore: 98,
         createdAt: nil,
-        updatedAt: nil
+        updatedAt: nil,
+        muscleGroups: nil,
+        isCustom: nil,
+        createdBy: nil
     )
 
     static let paginationDTO = PaginationDTO(

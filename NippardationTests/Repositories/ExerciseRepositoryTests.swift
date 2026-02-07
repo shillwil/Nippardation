@@ -215,7 +215,10 @@ struct ExerciseRepositoryTests {
                 thumbnailUrl: nil,
                 popularityScore: 10,
                 createdAt: nil,
-                updatedAt: nil
+                updatedAt: nil,
+                muscleGroups: nil,
+                isCustom: nil,
+                createdBy: nil
             ),
             ExerciseDTO(
                 id: "high",
@@ -231,7 +234,10 @@ struct ExerciseRepositoryTests {
                 thumbnailUrl: nil,
                 popularityScore: 100,
                 createdAt: nil,
-                updatedAt: nil
+                updatedAt: nil,
+                muscleGroups: nil,
+                isCustom: nil,
+                createdBy: nil
             )
         ])
 

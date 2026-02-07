@@ -33,7 +33,7 @@ actor MockExerciseAPIService: ExerciseAPIServiceProtocol {
         // Filter by muscle groups
         if let muscleGroups = filters?.muscleGroups, !muscleGroups.isEmpty {
             filtered = filtered.filter { exercise in
-                !muscleGroups.isDisjoint(with: Set(exercise.primaryMuscles))
+                !muscleGroups.isDisjoint(with: Set(exercise.primaryMuscles ?? []))
             }
         }
 
@@ -409,7 +409,10 @@ extension ExerciseDTO {
             thumbnailUrl: "https://example.com/thumb",
             popularityScore: 100,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         )
     }
 }

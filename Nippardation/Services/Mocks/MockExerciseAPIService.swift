@@ -61,9 +61,10 @@ final class MockExerciseAPIService: ExerciseAPIServiceProtocol, @unchecked Senda
         if let filters = filters {
             if !filters.muscleGroups.isEmpty {
                 filtered = filtered.filter { dto in
+                    let primary = dto.primaryMuscles ?? []
                     let targetMuscles = filters.includePrimaryOnly
-                        ? Set(dto.primaryMuscles)
-                        : Set(dto.primaryMuscles + (dto.secondaryMuscles ?? []))
+                        ? Set(primary)
+                        : Set(primary + (dto.secondaryMuscles ?? []))
                     return !filters.muscleGroups.isDisjoint(with: targetMuscles)
                 }
             }
@@ -175,7 +176,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: "https://example.com/thumbs/bench_press.jpg",
             popularityScore: 95,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_002",
@@ -191,7 +195,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: "https://example.com/thumbs/squat.jpg",
             popularityScore: 98,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_003",
@@ -207,7 +214,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: "https://example.com/thumbs/deadlift.jpg",
             popularityScore: 97,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_004",
@@ -223,7 +233,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: nil,
             popularityScore: 90,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_005",
@@ -239,7 +252,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: nil,
             popularityScore: 75,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_006",
@@ -255,7 +271,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: nil,
             popularityScore: 80,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_007",
@@ -271,7 +290,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: nil,
             popularityScore: 78,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_008",
@@ -287,7 +309,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: nil,
             popularityScore: 85,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_009",
@@ -303,7 +328,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: nil,
             popularityScore: 88,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         ),
         ExerciseDTO(
             id: "ex_010",
@@ -319,7 +347,10 @@ extension MockExerciseAPIService {
             thumbnailUrl: nil,
             popularityScore: 70,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         )
     ]
 
