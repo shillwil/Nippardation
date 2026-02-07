@@ -148,45 +148,9 @@ final class SyncService: SyncServiceProtocol {
         }
 
         // Build sync payload
+        let userId = AuthManager.shared.currentUser?.uid ?? deviceId
         let workoutDTOs = pendingWorkouts.map { workout -> WorkoutCreateDTO in
-            let exerciseDTOs = workout.trackedExercises.enumerated().map { (index, exercise) -> WorkoutExerciseCreateDTO in
-                let setDTOs = exercise.trackedSets.enumerated().map { (setIndex, set) -> WorkoutSetCreateDTO in
-                    WorkoutSetCreateDTO(
-                        clientId: set.id.uuidString,
-                        setNumber: setIndex + 1,
-                        setType: set.setType.rawValue,
-                        targetReps: nil,
-                        completedReps: set.reps,
-                        weight: set.weight,
-                        weightUnit: "lbs",
-                        rpe: nil,
-                        notes: nil
-                    )
-                }
-
-                return WorkoutExerciseCreateDTO(
-                    clientId: exercise.id.uuidString,
-                    exerciseId: nil,
-                    exerciseName: exercise.exerciseName,
-                    orderIndex: index,
-                    sets: setDTOs,
-                    notes: nil
-                )
-            }
-
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-            return WorkoutCreateDTO(
-                clientId: workout.id.uuidString,
-                templateId: nil,
-                templateName: workout.workoutTemplate,
-                startedAt: formatter.string(from: workout.startTime ?? workout.date),
-                completedAt: workout.endTime.map { formatter.string(from: $0) },
-                durationSeconds: workout.duration.map { Int($0) },
-                notes: nil,
-                exercises: exerciseDTOs
-            )
+            WorkoutMapper.toCreateDTO(workout, userId: userId)
         }
 
         let payload = SyncRequestDTO(
@@ -287,44 +251,8 @@ final class SyncService: SyncServiceProtocol {
         }
 
         // Build sync payload for single workout
-        let exerciseDTOs = workout.trackedExercises.enumerated().map { (index, exercise) -> WorkoutExerciseCreateDTO in
-            let setDTOs = exercise.trackedSets.enumerated().map { (setIndex, set) -> WorkoutSetCreateDTO in
-                WorkoutSetCreateDTO(
-                    clientId: set.id.uuidString,
-                    setNumber: setIndex + 1,
-                    setType: set.setType.rawValue,
-                    targetReps: nil,
-                    completedReps: set.reps,
-                    weight: set.weight,
-                    weightUnit: "lbs",
-                    rpe: nil,
-                    notes: nil
-                )
-            }
-
-            return WorkoutExerciseCreateDTO(
-                clientId: exercise.id.uuidString,
-                exerciseId: nil,
-                exerciseName: exercise.exerciseName,
-                orderIndex: index,
-                sets: setDTOs,
-                notes: nil
-            )
-        }
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let workoutDTO = WorkoutCreateDTO(
-            clientId: workout.id.uuidString,
-            templateId: nil,
-            templateName: workout.workoutTemplate,
-            startedAt: formatter.string(from: workout.startTime ?? workout.date),
-            completedAt: workout.endTime.map { formatter.string(from: $0) },
-            durationSeconds: workout.duration.map { Int($0) },
-            notes: nil,
-            exercises: exerciseDTOs
-        )
+        let userId = AuthManager.shared.currentUser?.uid ?? deviceId
+        let workoutDTO = WorkoutMapper.toCreateDTO(workout, userId: userId)
 
         let payload = SyncRequestDTO(
             deviceId: deviceId,

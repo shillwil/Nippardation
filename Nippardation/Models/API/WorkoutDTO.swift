@@ -94,71 +94,39 @@ struct WorkoutSyncRequest: Codable {
     let workouts: [WorkoutCreateDTO]
 }
 
-/// Workout for create/sync requests
+/// Workout for create/sync requests (camelCase keys match API sync schema)
 struct WorkoutCreateDTO: Codable {
     let clientId: String
-    let templateId: String?
+    let userId: String
+    let date: String
+    let name: String?
     let templateName: String?
-    let startedAt: String
-    let completedAt: String?
+    let startTime: String
+    let endTime: String?
     let durationSeconds: Int?
-    let notes: String?
+    let isCompleted: Bool
+    let updatedAt: String
     let exercises: [WorkoutExerciseCreateDTO]
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case templateId = "template_id"
-        case templateName = "template_name"
-        case startedAt = "started_at"
-        case completedAt = "completed_at"
-        case durationSeconds = "duration_seconds"
-        case notes
-        case exercises
-    }
 }
 
-/// Workout exercise for create requests
+/// Workout exercise for create requests (camelCase keys match API sync schema)
 struct WorkoutExerciseCreateDTO: Codable {
     let clientId: String
-    let exerciseId: String?
     let exerciseName: String
-    let orderIndex: Int
+    let muscleGroups: [String]
     let sets: [WorkoutSetCreateDTO]
-    let notes: String?
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case exerciseId = "exercise_id"
-        case exerciseName = "exercise_name"
-        case orderIndex = "order_index"
-        case sets
-        case notes
-    }
+    let updatedAt: String
 }
 
-/// Workout set for create requests
+/// Workout set for create requests (camelCase keys match API sync schema)
 struct WorkoutSetCreateDTO: Codable {
     let clientId: String
-    let setNumber: Int
     let setType: String
-    let targetReps: Int?
-    let completedReps: Int?
+    let reps: Int?
     let weight: Double?
-    let weightUnit: String?
-    let rpe: Double?
-    let notes: String?
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case setNumber = "set_number"
-        case setType = "set_type"
-        case targetReps = "target_reps"
-        case completedReps = "completed_reps"
-        case weight
-        case weightUnit = "weight_unit"
-        case rpe
-        case notes
-    }
+    let exerciseTypeName: String
+    let exerciseTypeMuscleGroups: [String]
+    let updatedAt: String
 }
 
 /// Response from workout sync endpoint with server IDs mapped to client IDs

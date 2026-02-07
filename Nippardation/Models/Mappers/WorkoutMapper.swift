@@ -64,25 +64,29 @@ enum WorkoutMapper {
     // MARK: - Domain to DTO (for syncing)
 
     /// Converts a TrackedWorkout to a WorkoutCreateDTO for syncing
-    static func toCreateDTO(_ workout: TrackedWorkout) -> WorkoutCreateDTO {
-        WorkoutCreateDTO(
+    static func toCreateDTO(_ workout: TrackedWorkout, userId: String) -> WorkoutCreateDTO {
+        let now = formatDate(Date())
+        return WorkoutCreateDTO(
             clientId: workout.id.uuidString,
-            templateId: nil,
+            userId: userId,
+            date: formatDate(workout.date),
+            name: workout.workoutTemplate,
             templateName: workout.workoutTemplate,
-            startedAt: formatDate(workout.startTime ?? workout.date),
-            completedAt: workout.endTime.map { formatDate($0) },
+            startTime: formatDate(workout.startTime ?? workout.date),
+            endTime: workout.endTime.map { formatDate($0) },
             durationSeconds: workout.duration.map { Int($0) },
-            notes: nil,
-            exercises: workout.trackedExercises.enumerated().map { index, exercise in
-                WorkoutExerciseMapper.toCreateDTO(exercise, orderIndex: index)
+            isCompleted: workout.isCompleted,
+            updatedAt: now,
+            exercises: workout.trackedExercises.map { exercise in
+                WorkoutExerciseMapper.toCreateDTO(exercise, updatedAt: now)
             }
         )
     }
 
     /// Converts multiple TrackedWorkouts to a WorkoutSyncRequest
-    static func toSyncRequest(_ workouts: [TrackedWorkout]) -> WorkoutSyncRequest {
+    static func toSyncRequest(_ workouts: [TrackedWorkout], userId: String) -> WorkoutSyncRequest {
         WorkoutSyncRequest(
-            workouts: workouts.map { toCreateDTO($0) }
+            workouts: workouts.map { toCreateDTO($0, userId: userId) }
         )
     }
 
@@ -134,16 +138,15 @@ enum WorkoutMapper {
 enum WorkoutExerciseMapper {
 
     /// Converts a TrackedExercise to a WorkoutExerciseCreateDTO
-    static func toCreateDTO(_ exercise: TrackedExercise, orderIndex: Int) -> WorkoutExerciseCreateDTO {
+    static func toCreateDTO(_ exercise: TrackedExercise, updatedAt: String) -> WorkoutExerciseCreateDTO {
         WorkoutExerciseCreateDTO(
             clientId: exercise.id.uuidString,
-            exerciseId: nil,
             exerciseName: exercise.exerciseName,
-            orderIndex: orderIndex,
-            sets: exercise.trackedSets.enumerated().map { setIndex, set in
-                WorkoutSetMapper.toCreateDTO(set, setNumber: setIndex + 1)
+            muscleGroups: exercise.muscleGroups,
+            sets: exercise.trackedSets.map { set in
+                WorkoutSetMapper.toCreateDTO(set, updatedAt: updatedAt)
             },
-            notes: nil
+            updatedAt: updatedAt
         )
     }
 
@@ -164,17 +167,15 @@ enum WorkoutExerciseMapper {
 enum WorkoutSetMapper {
 
     /// Converts a TrackedSet to a WorkoutSetCreateDTO
-    static func toCreateDTO(_ set: TrackedSet, setNumber: Int) -> WorkoutSetCreateDTO {
+    static func toCreateDTO(_ set: TrackedSet, updatedAt: String) -> WorkoutSetCreateDTO {
         WorkoutSetCreateDTO(
             clientId: set.id.uuidString,
-            setNumber: setNumber,
             setType: set.setType.rawValue,
-            targetReps: nil,
-            completedReps: set.reps,
+            reps: set.reps,
             weight: set.weight,
-            weightUnit: "lbs",
-            rpe: nil,
-            notes: nil
+            exerciseTypeName: set.exerciseType.name,
+            exerciseTypeMuscleGroups: set.exerciseType.muscleGroup.map { $0.rawValue },
+            updatedAt: updatedAt
         )
     }
 

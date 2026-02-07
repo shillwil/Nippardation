@@ -67,7 +67,9 @@ struct SyncAPIServiceTests {
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
                let workouts = json["workouts"] as? [[String: Any]] {
                 #expect(workouts.count == 1)
-                #expect(workouts[0]["client_id"] as? String == "workout_001")
+                #expect(workouts[0]["clientId"] as? String == "workout_001")
+                // Verify camelCase keys (not snake_case)
+                #expect(workouts[0]["client_id"] == nil, "Should use camelCase clientId, not snake_case")
             }
 
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
@@ -75,12 +77,15 @@ struct SyncAPIServiceTests {
 
         let workout = WorkoutCreateDTO(
             clientId: "workout_001",
-            templateId: "tmpl_001",
+            userId: "user_001",
+            date: "2025-01-15T00:00:00Z",
+            name: "Push Day",
             templateName: "Push Day",
-            startedAt: "2025-01-15T10:00:00Z",
-            completedAt: "2025-01-15T11:00:00Z",
+            startTime: "2025-01-15T10:00:00Z",
+            endTime: "2025-01-15T11:00:00Z",
             durationSeconds: 3600,
-            notes: nil,
+            isCompleted: true,
+            updatedAt: "2025-01-15T11:00:00Z",
             exercises: []
         )
 
@@ -153,12 +158,15 @@ struct SyncAPIServiceTests {
 
         let workout = WorkoutCreateDTO(
             clientId: "workout_002",
-            templateId: "tmpl_001",
+            userId: "user_001",
+            date: "2025-01-15T00:00:00Z",
+            name: "Pull Day",
             templateName: "Pull Day",
-            startedAt: "2025-01-15T10:00:00Z",
-            completedAt: "2025-01-15T11:00:00Z",
+            startTime: "2025-01-15T10:00:00Z",
+            endTime: "2025-01-15T11:00:00Z",
             durationSeconds: 3600,
-            notes: nil,
+            isCompleted: true,
+            updatedAt: "2025-01-15T11:00:00Z",
             exercises: []
         )
 
@@ -307,6 +315,74 @@ struct SyncAPIServiceTests {
         #expect(dto.entityType == "workout")
         #expect(dto.entityId == "workout_001")
         #expect(dto.resolution == "server_wins")
+    }
+
+    @Test func workoutCreateDTOEncodesCamelCaseKeys() throws {
+        let workout = WorkoutCreateDTO(
+            clientId: "workout_001",
+            userId: "user_001",
+            date: "2025-01-15T00:00:00Z",
+            name: "Push Day",
+            templateName: "Push Day",
+            startTime: "2025-01-15T10:00:00Z",
+            endTime: "2025-01-15T11:00:00Z",
+            durationSeconds: 3600,
+            isCompleted: true,
+            updatedAt: "2025-01-15T11:00:00Z",
+            exercises: [
+                WorkoutExerciseCreateDTO(
+                    clientId: "exercise_001",
+                    exerciseName: "Bench Press",
+                    muscleGroups: ["chest", "triceps"],
+                    sets: [
+                        WorkoutSetCreateDTO(
+                            clientId: "set_001",
+                            setType: "working",
+                            reps: 10,
+                            weight: 135.0,
+                            exerciseTypeName: "Bench Press",
+                            exerciseTypeMuscleGroups: ["chest", "triceps"],
+                            updatedAt: "2025-01-15T11:00:00Z"
+                        )
+                    ],
+                    updatedAt: "2025-01-15T11:00:00Z"
+                )
+            ]
+        )
+
+        let data = try JSONEncoder().encode(workout)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        // Verify camelCase keys on workout
+        #expect(json["clientId"] as? String == "workout_001")
+        #expect(json["userId"] as? String == "user_001")
+        #expect(json["startTime"] as? String == "2025-01-15T10:00:00Z")
+        #expect(json["endTime"] as? String == "2025-01-15T11:00:00Z")
+        #expect(json["isCompleted"] as? Bool == true)
+        #expect(json["updatedAt"] as? String == "2025-01-15T11:00:00Z")
+
+        // Verify snake_case keys are NOT present
+        #expect(json["client_id"] == nil, "Should use camelCase clientId")
+        #expect(json["user_id"] == nil, "Should use camelCase userId")
+        #expect(json["started_at"] == nil, "Should use camelCase startTime")
+        #expect(json["start_time"] == nil, "Should use camelCase startTime")
+        #expect(json["template_id"] == nil, "templateId field removed")
+
+        // Verify exercise camelCase keys
+        let exercises = json["exercises"] as! [[String: Any]]
+        #expect(exercises[0]["clientId"] as? String == "exercise_001")
+        #expect(exercises[0]["exerciseName"] as? String == "Bench Press")
+        #expect(exercises[0]["muscleGroups"] as? [String] == ["chest", "triceps"])
+        #expect(exercises[0]["exercise_name"] == nil, "Should use camelCase exerciseName")
+
+        // Verify set camelCase keys
+        let sets = exercises[0]["sets"] as! [[String: Any]]
+        #expect(sets[0]["clientId"] as? String == "set_001")
+        #expect(sets[0]["reps"] as? Int == 10)
+        #expect(sets[0]["exerciseTypeName"] as? String == "Bench Press")
+        #expect(sets[0]["exerciseTypeMuscleGroups"] as? [String] == ["chest", "triceps"])
+        #expect(sets[0]["client_id"] == nil, "Should use camelCase clientId")
+        #expect(sets[0]["completed_reps"] == nil, "Field renamed to reps")
     }
 
     @Test func syncRequestDTOWithNilDeviceInfoOmitsIt() throws {
