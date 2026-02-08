@@ -74,7 +74,7 @@ struct UserAPIServiceTests {
             // Verify body contains expected fields
             if let body = request.httpBody,
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
-                #expect(json["display_name"] as? String == "New Name")
+                #expect(json["displayName"] as? String == "New Name")
                 #expect(json["bio"] as? String == "Updated bio")
             }
 
@@ -99,15 +99,15 @@ struct UserAPIServiceTests {
         MockURLProtocol.requestHandler = { request in
             if let body = request.httpBody,
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
-                #expect(json["display_name"] as? String == "Full Update")
+                #expect(json["displayName"] as? String == "Full Update")
                 #expect(json["bio"] as? String == "Full bio")
                 #expect(json["height"] as? Double == 180.0)
                 #expect(json["weight"] as? Double == 75.0)
                 #expect(json["age"] as? Int == 25)
                 #expect(json["gender"] as? String == "male")
-                #expect(json["unit_preference"] as? String == "metric")
-                #expect(json["is_public_profile"] as? Bool == true)
-                #expect(json["notifications_enabled"] as? Bool == false)
+                #expect(json["unitPreference"] as? String == "metric")
+                #expect(json["isPublicProfile"] as? Bool == true)
+                #expect(json["notificationsEnabled"] as? Bool == false)
             }
 
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
@@ -138,8 +138,8 @@ struct UserAPIServiceTests {
         MockURLProtocol.requestHandler = { request in
             if let body = request.httpBody,
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
-                // Only display_name should be present
-                #expect(json["display_name"] as? String == "Only Name")
+                // Only displayName should be present
+                #expect(json["displayName"] as? String == "Only Name")
                 // Other fields should not be in JSON (or be null)
                 // Note: Swift's JSONEncoder includes null for nil optionals by default
             }
@@ -261,32 +261,32 @@ struct UserAPIServiceTests {
 
     // MARK: - DTO Decoding Tests
 
-    @Test func backendUserDecodesFromSnakeCaseJSON() throws {
+    @Test func backendUserDecodesFromCamelCaseJSON() throws {
         let json = """
         {
             "id": "user-123",
-            "firebase_uid": "fb-abc",
+            "firebaseUid": "fb-abc",
             "email": "test@example.com",
             "handle": "testuser",
-            "display_name": "Test User",
-            "profile_picture_url": "https://example.com/pic.jpg",
+            "displayName": "Test User",
+            "profilePictureUrl": "https://example.com/pic.jpg",
             "bio": "Hello",
             "height": 72.0,
             "weight": 180.5,
             "age": 30,
             "gender": "male",
-            "unit_preference": "imperial",
-            "is_public_profile": true,
-            "total_volume_lifted_lbs": "125000.50",
-            "total_workouts": 100,
-            "current_workout_streak": 5,
-            "longest_workout_streak": 30,
-            "last_workout_date": "2025-01-15T00:00:00Z",
-            "push_notification_tokens": ["token1", "token2"],
-            "notifications_enabled": true,
-            "last_synced_at": "2025-01-15T12:00:00Z",
-            "created_at": "2024-01-01T00:00:00Z",
-            "updated_at": "2025-01-15T12:00:00Z"
+            "unitPreference": "imperial",
+            "isPublicProfile": true,
+            "totalVolumeLiftedLbs": "125000.50",
+            "totalWorkouts": 100,
+            "currentWorkoutStreak": 5,
+            "longestWorkoutStreak": 30,
+            "lastWorkoutDate": "2025-01-15T00:00:00Z",
+            "pushNotificationTokens": ["token1", "token2"],
+            "notificationsEnabled": true,
+            "lastSyncedAt": "2025-01-15T12:00:00Z",
+            "createdAt": "2024-01-01T00:00:00Z",
+            "updatedAt": "2025-01-15T12:00:00Z"
         }
         """.data(using: .utf8)!
 
@@ -321,7 +321,7 @@ struct UserAPIServiceTests {
         let json = """
         {
             "id": "user-123",
-            "firebase_uid": "fb-abc",
+            "firebaseUid": "fb-abc",
             "email": "test@example.com",
             "handle": "testuser"
         }
@@ -342,10 +342,10 @@ struct UserAPIServiceTests {
         let json = """
         {
             "id": "user-123",
-            "firebase_uid": "fb-abc",
+            "firebaseUid": "fb-abc",
             "email": "test@example.com",
             "handle": "testuser",
-            "total_volume_lifted_lbs": "125000.50"
+            "totalVolumeLiftedLbs": "125000.50"
         }
         """.data(using: .utf8)!
 
@@ -358,9 +358,9 @@ struct UserAPIServiceTests {
         let json = """
         {
             "id": "user-123",
-            "firebase_uid": "fb-abc",
+            "firebaseUid": "fb-abc",
             "email": "test@example.com",
-            "push_notification_tokens": ["token-abc", "token-def"]
+            "pushNotificationTokens": ["token-abc", "token-def"]
         }
         """.data(using: .utf8)!
 
@@ -373,7 +373,7 @@ struct UserAPIServiceTests {
         let json = """
         {
             "id": "user-123",
-            "firebase_uid": "fb-abc",
+            "firebaseUid": "fb-abc",
             "email": "test@example.com"
         }
         """.data(using: .utf8)!

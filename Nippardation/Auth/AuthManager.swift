@@ -36,31 +36,6 @@ struct BackendUser: Codable {
     let createdAt: String?
     let updatedAt: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case firebaseUid = "firebase_uid"
-        case email
-        case handle
-        case displayName = "display_name"
-        case profilePictureUrl = "profile_picture_url"
-        case bio
-        case height
-        case weight
-        case age
-        case gender
-        case unitPreference = "unit_preference"
-        case isPublicProfile = "is_public_profile"
-        case totalVolumeLiftedLbs = "total_volume_lifted_lbs"
-        case totalWorkouts = "total_workouts"
-        case currentWorkoutStreak = "current_workout_streak"
-        case longestWorkoutStreak = "longest_workout_streak"
-        case lastWorkoutDate = "last_workout_date"
-        case pushNotificationTokens = "push_notification_tokens"
-        case notificationsEnabled = "notifications_enabled"
-        case lastSyncedAt = "last_synced_at"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
 }
 
 struct LoginResponse: Codable {
@@ -207,12 +182,6 @@ class AuthManager: ObservableObject {
                 print("Backend login failed: \(errorText)")
                 throw NSError(domain: "Backend login failed", code: httpResponse.statusCode)
             }
-
-            #if DEBUG
-            if let rawJSON = String(data: data, encoding: .utf8) {
-                print("Login response: \(rawJSON)")
-            }
-            #endif
 
             let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
 

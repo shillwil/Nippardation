@@ -90,8 +90,8 @@ struct JSONCodersTests {
         {
             "id": "ex_001",
             "name": "Bench Press",
-            "primary_muscles": ["chest"],
-            "secondary_muscles": ["triceps"],
+            "primaryMuscles": ["chest"],
+            "secondaryMuscles": ["triceps"],
             "equipment": "barbell",
             "difficulty": "intermediate"
         }
@@ -111,9 +111,9 @@ struct JSONCodersTests {
         let json = """
         {
             "page": 1,
-            "per_page": 20,
+            "perPage": 20,
             "total": 100,
-            "total_pages": 5
+            "totalPages": 5
         }
         """.data(using: .utf8)!
 
@@ -128,8 +128,8 @@ struct JSONCodersTests {
     @Test func decoderWorksWithPaginationInfo() throws {
         let json = """
         {
-            "next_cursor": "page_2",
-            "has_more": true
+            "nextCursor": "page_2",
+            "hasMore": true
         }
         """.data(using: .utf8)!
 

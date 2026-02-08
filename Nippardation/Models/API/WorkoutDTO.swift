@@ -31,18 +31,6 @@ struct WorkoutDTO: Codable, Identifiable {
     let createdAt: String?
     let updatedAt: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case templateId = "template_id"
-        case templateName = "template_name"
-        case startedAt = "started_at"
-        case completedAt = "completed_at"
-        case durationSeconds = "duration_seconds"
-        case notes
-        case exercises
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
 }
 
 /// Workout exercise data transfer object
@@ -54,14 +42,6 @@ struct WorkoutExerciseDTO: Codable, Identifiable {
     let sets: [WorkoutSetDTO]
     let notes: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case exerciseId = "exercise_id"
-        case exerciseName = "exercise_name"
-        case orderIndex = "order_index"
-        case sets
-        case notes
-    }
 }
 
 /// Workout set data transfer object
@@ -76,17 +56,6 @@ struct WorkoutSetDTO: Codable, Identifiable {
     let rpe: Double?
     let notes: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case setNumber = "set_number"
-        case setType = "set_type"
-        case targetReps = "target_reps"
-        case completedReps = "completed_reps"
-        case weight
-        case weightUnit = "weight_unit"
-        case rpe
-        case notes
-    }
 }
 
 /// Request body for syncing workouts
@@ -139,11 +108,6 @@ struct WorkoutSyncResponseDTO: Codable {
 struct SyncedItemDTO: Codable {
     let clientId: String
     let serverId: String
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case serverId = "server_id"
-    }
 }
 
 /// Conflict information when sync fails for an item
@@ -151,10 +115,4 @@ struct SyncConflictDTO: Codable {
     let clientId: String
     let reason: String
     let serverVersion: WorkoutDTO?
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case reason
-        case serverVersion = "server_version"
-    }
 }

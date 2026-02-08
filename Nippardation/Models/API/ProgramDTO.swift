@@ -34,21 +34,6 @@ struct ProgramDTO: Codable, Identifiable {
     let createdAt: String?
     let updatedAt: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case description
-        case daysPerWeek = "days_per_week"
-        case durationWeeks = "duration_weeks"
-        case workouts
-        case isActive = "is_active"
-        case currentDayIndex = "current_day_index"
-        case timesCompleted = "times_completed"
-        case isPublic = "is_public"
-        case isAiGenerated = "is_ai_generated"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
 }
 
 /// Program workout data transfer object
@@ -59,13 +44,6 @@ struct ProgramWorkoutDTO: Codable, Identifiable {
     let templateId: String
     let template: TemplateDTO?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case dayNumber = "day_number"
-        case dayLabel = "day_label"
-        case templateId = "template_id"
-        case template
-    }
 }
 
 /// Request body for creating/updating programs
@@ -77,14 +55,6 @@ struct ProgramCreateRequest: Codable {
     let workouts: [ProgramWorkoutCreateDTO]
     let isPublic: Bool
 
-    enum CodingKeys: String, CodingKey {
-        case name
-        case description
-        case daysPerWeek = "days_per_week"
-        case durationWeeks = "duration_weeks"
-        case workouts
-        case isPublic = "is_public"
-    }
 }
 
 /// Program workout for create/update requests
@@ -92,21 +62,10 @@ struct ProgramWorkoutCreateDTO: Codable {
     let dayNumber: Int
     let dayLabel: String?
     let templateId: String
-
-    enum CodingKeys: String, CodingKey {
-        case dayNumber = "day_number"
-        case dayLabel = "day_label"
-        case templateId = "template_id"
-    }
 }
 
 /// Request body for updating program progress
 struct ProgramProgressUpdateRequest: Codable {
     let currentDayIndex: Int
     let timesCompleted: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case currentDayIndex = "current_day_index"
-        case timesCompleted = "times_completed"
-    }
 }

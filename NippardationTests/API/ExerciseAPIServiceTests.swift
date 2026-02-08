@@ -250,8 +250,8 @@ struct ExerciseAPIServiceTests {
         {
             "id": "ex_001",
             "name": "Bench Press",
-            "primary_muscles": ["chest"],
-            "popularity_score": 95.5
+            "primaryMuscles": ["chest"],
+            "popularityScore": 95.5
         }
         """.data(using: .utf8)!
 
@@ -264,9 +264,9 @@ struct ExerciseAPIServiceTests {
         {
             "id": "ex_001",
             "name": "Bench Press",
-            "muscle_groups": ["chest", "triceps"],
-            "is_custom": false,
-            "created_by": "admin"
+            "muscleGroups": ["chest", "triceps"],
+            "isCustom": false,
+            "createdBy": "admin"
         }
         """.data(using: .utf8)!
 
@@ -290,14 +290,13 @@ struct ExerciseAPIServiceTests {
     }
 
     @Test func newFormatResponseDecodesCorrectly() throws {
-        // Server returns camelCase keys for wrapper/pagination/meta,
-        // but snake_case for ExerciseDTO fields
+        // Server returns camelCase keys for all fields
         let json = """
         {
             "success": true,
             "data": {
                 "exercises": [
-                    {"id": "ex_001", "name": "Bench Press", "primary_muscles": ["chest"]}
+                    {"id": "ex_001", "name": "Bench Press", "primaryMuscles": ["chest"]}
                 ],
                 "pagination": {
                     "nextCursor": "abc123",
@@ -331,13 +330,13 @@ struct ExerciseAPIServiceTests {
         {
             "success": true,
             "data": [
-                {"id": "ex_001", "name": "Bench Press", "muscle_groups": ["chest"]}
+                {"id": "ex_001", "name": "Bench Press", "muscleGroups": ["chest"]}
             ],
             "pagination": {
                 "page": 1,
-                "per_page": 20,
+                "perPage": 20,
                 "total": 50,
-                "total_pages": 3
+                "totalPages": 3
             }
         }
         """.data(using: .utf8)!

@@ -52,7 +52,8 @@ final class ExerciseAPIService: BaseAPIService, ExerciseAPIServiceProtocol, @unc
         try validateResponse(response, data: data)
 
         // Try new format first, then legacy, then flat format
-        if let newFormat = try? decoder.decode(ExerciseAPIResponse.self, from: data) {
+        do {
+            let newFormat = try decoder.decode(ExerciseAPIResponse.self, from: data)
             let p = newFormat.data.pagination
             let paginationInfo = PaginationInfo(
                 nextCursor: p.nextCursor ?? p.page.flatMap { page in
@@ -62,6 +63,8 @@ final class ExerciseAPIService: BaseAPIService, ExerciseAPIServiceProtocol, @unc
                 hasMore: p.hasMore
             )
             return (newFormat.data.exercises, paginationInfo)
+        } catch {
+            // Fall through to try legacy formats
         }
 
         if let legacyFormat = try? decoder.decode(ExerciseLegacyResponse.self, from: data) {
