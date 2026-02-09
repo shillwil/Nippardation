@@ -64,6 +64,19 @@ final class TemplateEditorViewModel: ObservableObject {
         exercises.reduce(0) { $0 + $1.warmupSets }
     }
 
+    /// Distribution of working sets across muscle groups for the analysis chart
+    var muscleGroupDistribution: [(MuscleGroup, Double)] {
+        var counts: [MuscleGroup: Double] = [:]
+        for exercise in exercises {
+            guard let muscles = exercise.exerciseLibraryItem?.primaryMuscles else { continue }
+            let setsPerMuscle = Double(exercise.workingSets) / max(Double(muscles.count), 1)
+            for muscle in muscles {
+                counts[muscle, default: 0] += setsPerMuscle
+            }
+        }
+        return counts.sorted { $0.value > $1.value }
+    }
+
     // MARK: - Initialization
 
     init(
