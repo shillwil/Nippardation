@@ -20,36 +20,49 @@ struct TemplateSelectorSheet: View {
                     ProgressView("Loading templates...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if templates.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Templates", systemImage: "doc.text")
-                    } description: {
-                        Text("Create a template first to use in your program")
+                    VStack(spacing: AppSpacing.lg) {
+                        ContentUnavailableView {
+                            Label("No Templates", systemImage: "doc.text")
+                        } description: {
+                            Text("Create a template to use in your program")
+                        }
+
+                        createTemplateLink
+                            .padding(.horizontal, AppSpacing.md)
                     }
                 } else {
-                    List(templates) { template in
-                        Button {
-                            onSelect(template)
-                            dismiss()
-                        } label: {
-                            HStack(spacing: AppSpacing.sm) {
-                                IconCircle(
-                                    icon: "doc.text.fill",
-                                    color: .appTheme,
-                                    size: 36
-                                )
+                    List {
+                        Section {
+                            createTemplateLink
+                        }
 
-                                VStack(alignment: .leading, spacing: AppSpacing.xxs) {
-                                    Text(template.name)
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(.primary)
+                        Section {
+                            ForEach(templates) { template in
+                                Button {
+                                    onSelect(template)
+                                    dismiss()
+                                } label: {
+                                    HStack(spacing: AppSpacing.sm) {
+                                        IconCircle(
+                                            icon: "doc.text.fill",
+                                            color: .appTheme,
+                                            size: 36
+                                        )
 
-                                    Text("\(template.exerciseCount) exercises · \(template.totalWorkingSets) sets")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        VStack(alignment: .leading, spacing: AppSpacing.xxs) {
+                                            Text(template.name)
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.primary)
+
+                                            Text("\(template.exerciseCount) exercises · \(template.totalWorkingSets) sets")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+
+                                        Spacer()
+                                    }
                                 }
-
-                                Spacer()
                             }
                         }
                     }
@@ -62,6 +75,29 @@ struct TemplateSelectorSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+        }
+    }
+
+    private var createTemplateLink: some View {
+        NavigationLink {
+            TemplateEditorView(onSave: { template in
+                onSelect(template)
+                dismiss()
+            })
+        } label: {
+            HStack(spacing: AppSpacing.sm) {
+                IconCircle(
+                    icon: "plus",
+                    color: .green,
+                    size: 36
+                )
+
+                Text("Create New Template")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Spacer()
             }
         }
     }

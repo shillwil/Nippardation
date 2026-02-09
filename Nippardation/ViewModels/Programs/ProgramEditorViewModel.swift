@@ -212,6 +212,11 @@ final class ProgramEditorViewModel: ObservableObject {
         guard workoutIndex >= 0 && workoutIndex < workouts.count else { return }
         workouts[workoutIndex].templateServerId = template.serverId
         workouts[workoutIndex].templateName = template.name
+
+        // Ensure newly created templates are available for other day assignments and program save
+        if !availableTemplates.contains(where: { $0.serverId == template.serverId }) {
+            availableTemplates.append(template)
+        }
     }
 
     /// Updates the label for a workout at the given index

@@ -15,29 +15,25 @@ struct WorkoutCarousel: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
+            HStack(spacing: AppSpacing.md) {
                 ForEach(workouts.sorted(by: { $0.dayNumber < $1.dayNumber })) { workout in
-                    // Compare by serverId to correctly identify the current workout
                     workoutCard(workout, isNext: workout.serverId == currentWorkoutServerId)
                 }
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 8)
+            .padding(.horizontal, AppSpacing.xxs)
+            .padding(.vertical, AppSpacing.xs)
         }
     }
 
     @ViewBuilder
     private func workoutCard(_ workout: ProgramWorkout, isNext: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
             HStack {
-                Text(workout.dayIndicator)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(isNext ? .white : .secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(isNext ? Color.blue : Color.gray.opacity(0.2))
-                    .cornerRadius(4)
+                PillBadge(
+                    text: workout.dayIndicator,
+                    color: isNext ? .appTheme : .gray,
+                    style: isNext ? .filled : .tinted
+                )
 
                 Spacer()
 
@@ -45,7 +41,7 @@ struct WorkoutCarousel: View {
                     Text("Next")
                         .font(.caption2)
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.appTheme)
                 }
             }
 
@@ -58,7 +54,6 @@ struct WorkoutCarousel: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                // Show exercise names
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(template.exercises.prefix(3)) { exercise in
                         Text("• \(exercise.exerciseLibraryItem?.name ?? "Exercise")")
@@ -73,13 +68,13 @@ struct WorkoutCarousel: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding()
+        .padding(AppSpacing.sm)
         .frame(width: 180)
-        .background(isNext ? Color.blue.opacity(0.1) : Color(.secondarySystemBackground))
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(isNext ? Color.blue.opacity(0.5) : Color.clear, lineWidth: 2)
+        .cardStyle(
+            cornerRadius: AppCornerRadius.large,
+            hasBorder: isNext,
+            borderColor: Color.appTheme.opacity(0.5),
+            backgroundColor: isNext ? Color.appTheme.opacity(0.1) : Color(.secondarySystemBackground)
         )
     }
 

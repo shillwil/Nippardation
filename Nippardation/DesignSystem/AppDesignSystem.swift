@@ -65,10 +65,11 @@ struct CardModifier: ViewModifier {
     var shadow: AppShadow = .card
     var hasBorder: Bool = false
     var borderColor: Color = Color.primary.opacity(0.1)
+    var backgroundColor: Color = Color(.secondarySystemBackground)
 
     func body(content: Content) -> some View {
         content
-            .background(Color(.secondarySystemBackground))
+            .background(backgroundColor)
             .cornerRadius(cornerRadius)
             .shadow(
                 color: shadow.color,
@@ -113,7 +114,7 @@ struct GradientCardModifier: ViewModifier {
     var colors: [Color]
     var cornerRadius: CGFloat = AppCornerRadius.xl
     var hasBorder: Bool = true
-    var borderColor: Color = Color.blue.opacity(0.3)
+    var borderColor: Color = Color.appTheme.opacity(0.3)
 
     func body(content: Content) -> some View {
         content
@@ -143,13 +144,15 @@ extension View {
         cornerRadius: CGFloat = AppCornerRadius.large,
         shadow: AppShadow = .card,
         hasBorder: Bool = false,
-        borderColor: Color = Color.primary.opacity(0.1)
+        borderColor: Color = Color.primary.opacity(0.1),
+        backgroundColor: Color = Color(.secondarySystemBackground)
     ) -> some View {
         modifier(CardModifier(
             cornerRadius: cornerRadius,
             shadow: shadow,
             hasBorder: hasBorder,
-            borderColor: borderColor
+            borderColor: borderColor,
+            backgroundColor: backgroundColor
         ))
     }
 
@@ -164,10 +167,10 @@ extension View {
     }
 
     func gradientCardStyle(
-        colors: [Color] = [Color.blue.opacity(0.15), Color.blue.opacity(0.05)],
+        colors: [Color] = [Color("appTheme").opacity(0.15), Color("appTheme").opacity(0.05)],
         cornerRadius: CGFloat = AppCornerRadius.xl,
         hasBorder: Bool = true,
-        borderColor: Color = Color.blue.opacity(0.3)
+        borderColor: Color = Color("appTheme").opacity(0.3)
     ) -> some View {
         modifier(GradientCardModifier(
             colors: colors,
