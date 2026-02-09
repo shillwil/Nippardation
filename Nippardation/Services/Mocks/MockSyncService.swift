@@ -177,9 +177,9 @@ final class MockSyncService: SyncServiceProtocol {
     func addMockConflict() {
         conflicts.append(SyncConflict(
             id: UUID().uuidString,
-            type: .workout,
-            localVersion: "Local workout data",
-            remoteVersion: "Remote workout data",
+            entityType: .workout,
+            entityId: "mock-workout-id",
+            resolution: "server_wins",
             detectedAt: Date()
         ))
     }

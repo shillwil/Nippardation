@@ -179,9 +179,9 @@ final class SyncService: SyncServiceProtocol {
                 if !conflicts.contains(where: { $0.id == conflict.entityId }) {
                     conflicts.append(SyncConflict(
                         id: conflict.entityId,
-                        type: .workout,
-                        localVersion: conflict.entityId,
-                        remoteVersion: conflict.resolution as Any,
+                        entityType: .workout,
+                        entityId: conflict.entityId,
+                        resolution: conflict.resolution,
                         detectedAt: Date()
                     ))
                 }
@@ -297,7 +297,7 @@ final class SyncService: SyncServiceProtocol {
         switch resolution {
         case .keepLocal:
             // Force push local version to server
-            if case .workout = conflict.type {
+            if case .workout = conflict.entityType {
                 if let id = UUID(uuidString: conflictId) {
                     try await syncWorkout(id: id)
                 }
@@ -311,7 +311,7 @@ final class SyncService: SyncServiceProtocol {
         case .merge:
             // Future: implement smart merge
             // For now, treat as keepLocal
-            if case .workout = conflict.type {
+            if case .workout = conflict.entityType {
                 if let id = UUID(uuidString: conflictId) {
                     try await syncWorkout(id: id)
                 }

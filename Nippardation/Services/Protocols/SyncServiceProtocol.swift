@@ -160,9 +160,9 @@ enum SyncError: LocalizedError {
 /// A sync conflict that needs resolution
 struct SyncConflict: Identifiable {
     let id: String
-    let type: ConflictType
-    let localVersion: Any
-    let remoteVersion: Any
+    let entityType: ConflictType
+    let entityId: String
+    let resolution: String
     let detectedAt: Date
 
     enum ConflictType {
