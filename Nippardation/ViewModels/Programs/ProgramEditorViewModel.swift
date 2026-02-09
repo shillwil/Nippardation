@@ -20,6 +20,7 @@ final class ProgramEditorViewModel: ObservableObject {
     @Published var workouts: [EditableWorkout] = []
     @Published var isIndefinite: Bool = true
     @Published var selectedDays: Set<Int> = []
+    @Published var restDays: Set<Int> = []
 
     @Published var isSaving = false
     @Published var isLoadingTemplates = false
@@ -62,6 +63,15 @@ final class ProgramEditorViewModel: ObservableObject {
     /// Validates Step 1 of the wizard (name + days selected)
     var isStep1Valid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && !selectedDays.isEmpty
+    }
+
+    /// Validates Step 2 of the wizard (all non-rest days have templates)
+    var isStep2Valid: Bool {
+        for (index, workout) in workouts.enumerated() {
+            if restDays.contains(index) { continue }
+            if workout.templateServerId == nil { return false }
+        }
+        return !workouts.isEmpty
     }
 
     // MARK: - Initialization
@@ -178,6 +188,19 @@ final class ProgramEditorViewModel: ObservableObject {
         // Renumber
         for i in 0..<workouts.count {
             workouts[i].dayNumber = i
+        }
+    }
+
+    /// Toggles a workout day as a rest day
+    func toggleRestDay(at index: Int) {
+        guard index >= 0 && index < workouts.count else { return }
+        if restDays.contains(index) {
+            restDays.remove(index)
+        } else {
+            restDays.insert(index)
+            // Clear template assignment when marking as rest
+            workouts[index].templateServerId = nil
+            workouts[index].templateName = nil
         }
     }
 
