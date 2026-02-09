@@ -73,7 +73,8 @@ struct WorkoutCarousel: View {
         .cardStyle(
             cornerRadius: AppCornerRadius.large,
             hasBorder: isNext,
-            borderColor: Color.appTheme.opacity(0.5)
+            borderColor: Color.appTheme.opacity(0.5),
+            backgroundColor: isNext ? Color.appTheme.opacity(0.1) : Color(.secondarySystemBackground)
         )
     }
 

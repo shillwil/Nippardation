@@ -65,10 +65,11 @@ struct CardModifier: ViewModifier {
     var shadow: AppShadow = .card
     var hasBorder: Bool = false
     var borderColor: Color = Color.primary.opacity(0.1)
+    var backgroundColor: Color = Color(.secondarySystemBackground)
 
     func body(content: Content) -> some View {
         content
-            .background(Color(.secondarySystemBackground))
+            .background(backgroundColor)
             .cornerRadius(cornerRadius)
             .shadow(
                 color: shadow.color,
@@ -143,13 +144,15 @@ extension View {
         cornerRadius: CGFloat = AppCornerRadius.large,
         shadow: AppShadow = .card,
         hasBorder: Bool = false,
-        borderColor: Color = Color.primary.opacity(0.1)
+        borderColor: Color = Color.primary.opacity(0.1),
+        backgroundColor: Color = Color(.secondarySystemBackground)
     ) -> some View {
         modifier(CardModifier(
             cornerRadius: cornerRadius,
             shadow: shadow,
             hasBorder: hasBorder,
-            borderColor: borderColor
+            borderColor: borderColor,
+            backgroundColor: backgroundColor
         ))
     }
 

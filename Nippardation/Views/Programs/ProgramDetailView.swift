@@ -164,7 +164,8 @@ struct ProgramDetailView: View {
         .padding(AppSpacing.sm)
         .cardStyle(
             hasBorder: isNext,
-            borderColor: Color.appTheme.opacity(0.3)
+            borderColor: Color.appTheme.opacity(0.3),
+            backgroundColor: isNext ? Color.appTheme.opacity(0.1) : Color(.secondarySystemBackground)
         )
     }
 
