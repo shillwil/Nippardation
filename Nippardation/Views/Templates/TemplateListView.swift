@@ -2,7 +2,7 @@
 //  TemplateListView.swift
 //  Nippardation
 //
-//  List view for displaying and managing workout templates
+//  Grid view for displaying and managing workout templates
 //
 
 import SwiftUI
@@ -13,6 +13,11 @@ struct TemplateListView: View {
     @State private var showCreateTemplate = false
     @State private var templateToDelete: Template?
     @State private var showDeleteConfirmation = false
+
+    private let columns = [
+        GridItem(.flexible(), spacing: AppSpacing.sm),
+        GridItem(.flexible(), spacing: AppSpacing.sm)
+    ]
 
     var body: some View {
         content
@@ -69,16 +74,16 @@ struct TemplateListView: View {
         if viewModel.isLoading && viewModel.templates.isEmpty {
             loadingView
         } else if viewModel.templates.isEmpty {
-            emptyView
+            TemplateEmptyStateView(onCreate: { showCreateTemplate = true })
         } else {
-            templateList
+            templateGrid
         }
     }
 
     // MARK: - Subviews
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppSpacing.md) {
             ProgressView()
             Text("Loading templates...")
                 .foregroundColor(.secondary)
@@ -86,83 +91,65 @@ struct TemplateListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var emptyView: some View {
-        ContentUnavailableView {
-            Label("No Templates", systemImage: "doc.text")
-        } description: {
-            Text("Create your first template to get started")
-        } actions: {
-            Button("Create Template") {
-                showCreateTemplate = true
+    private var templateGrid: some View {
+        ScrollView {
+            VStack(spacing: AppSpacing.md) {
+                // Search bar
+                searchBar
+
+                // Grid
+                LazyVGrid(columns: columns, spacing: AppSpacing.sm) {
+                    // "New Template" card as first item
+                    NewTemplateCard(onTap: { showCreateTemplate = true })
+
+                    ForEach(viewModel.filteredTemplates) { template in
+                        NavigationLink(destination: TemplateEditorView(existingTemplate: template)) {
+                            TemplateGridCard(template: template)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                viewModel.duplicateTemplate(template)
+                            } label: {
+                                Label("Duplicate", systemImage: "doc.on.doc")
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                templateToDelete = template
+                                showDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
             }
-            .buttonStyle(.borderedProminent)
+            .padding(AppSpacing.md)
         }
     }
 
-    private var templateList: some View {
-        List {
-            ForEach(viewModel.templates) { template in
-                NavigationLink(destination: TemplateEditorView(existingTemplate: template)) {
-                    TemplateCard(template: template)
-                }
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        templateToDelete = template
-                        showDeleteConfirmation = true
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-                .swipeActions(edge: .leading) {
-                    Button {
-                        viewModel.duplicateTemplate(template)
-                    } label: {
-                        Label("Duplicate", systemImage: "doc.on.doc")
-                    }
-                    .tint(.blue)
+    private var searchBar: some View {
+        HStack(spacing: AppSpacing.xs) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+
+            TextField("Search templates...", text: $viewModel.searchText)
+                .textFieldStyle(.plain)
+
+            if !viewModel.searchText.isEmpty {
+                Button {
+                    viewModel.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
                 }
             }
         }
-        .listStyle(.plain)
-    }
-}
-
-// MARK: - Template Card
-
-struct TemplateCard: View {
-
-    let template: Template
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(template.name)
-                    .font(.headline)
-
-                Spacer()
-
-                if template.isAiGenerated {
-                    Image(systemName: "sparkles")
-                        .foregroundColor(.purple)
-                        .font(.caption)
-                }
-            }
-
-            if let description = template.description {
-                Text(description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
-
-            HStack(spacing: 16) {
-                Label("\(template.exerciseCount) exercises", systemImage: "figure.strengthtraining.traditional")
-                Label("\(template.totalWorkingSets) sets", systemImage: "number")
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-        }
-        .padding(.vertical, 8)
+        .padding(AppSpacing.sm)
+        .background(Color(.tertiarySystemBackground))
+        .cornerRadius(AppCornerRadius.medium)
     }
 }
 

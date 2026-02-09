@@ -14,8 +14,16 @@ final class TemplateListViewModel: ObservableObject {
     // MARK: - Published State
 
     @Published var templates: [Template] = []
+    @Published var searchText: String = ""
     @Published var isLoading = false
     @Published var error: String?
+
+    /// Templates filtered by search text
+    var filteredTemplates: [Template] {
+        guard !searchText.isEmpty else { return templates }
+        let query = searchText.lowercased()
+        return templates.filter { $0.name.lowercased().contains(query) }
+    }
 
     // MARK: - Dependencies
 
