@@ -89,8 +89,11 @@ struct TemplateEditorView: View {
         }
         .onChange(of: viewModel.savedTemplate) { _, newValue in
             if let template = newValue {
-                onSave?(template)
-                dismiss()
+                if let onSave {
+                    onSave(template)
+                } else {
+                    dismiss()
+                }
             }
         }
         .disabled(viewModel.isSaving)
