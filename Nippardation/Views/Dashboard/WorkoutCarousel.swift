@@ -15,7 +15,7 @@ struct WorkoutCarousel: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: AppSpacing.sm) {
+            HStack(spacing: AppSpacing.md) {
                 ForEach(workouts.sorted(by: { $0.dayNumber < $1.dayNumber })) { workout in
                     workoutCard(workout, isNext: workout.serverId == currentWorkoutServerId)
                 }

@@ -113,7 +113,7 @@ struct GradientCardModifier: ViewModifier {
     var colors: [Color]
     var cornerRadius: CGFloat = AppCornerRadius.xl
     var hasBorder: Bool = true
-    var borderColor: Color = Color.blue.opacity(0.3)
+    var borderColor: Color = Color("appTheme").opacity(0.3)
 
     func body(content: Content) -> some View {
         content
@@ -164,10 +164,10 @@ extension View {
     }
 
     func gradientCardStyle(
-        colors: [Color] = [Color.blue.opacity(0.15), Color.blue.opacity(0.05)],
+        colors: [Color] = [Color("appTheme").opacity(0.15), Color("appTheme").opacity(0.05)],
         cornerRadius: CGFloat = AppCornerRadius.xl,
         hasBorder: Bool = true,
-        borderColor: Color = Color.blue.opacity(0.3)
+        borderColor: Color = Color("appTheme").opacity(0.3)
     ) -> some View {
         modifier(GradientCardModifier(
             colors: colors,
