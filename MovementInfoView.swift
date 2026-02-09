@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WebKit
 
 struct MovementInfoView: View {
     @EnvironmentObject var viewModel: ActiveExerciseViewModel
@@ -32,7 +33,7 @@ struct MovementInfoView: View {
             .cornerRadius(12)
             .padding(.horizontal)
 
-            // Video section - only show if native video URL is available
+            // Video section
             videoSection
         }
     }
@@ -42,6 +43,7 @@ struct MovementInfoView: View {
     @ViewBuilder
     private var videoSection: some View {
         if let videoUrl = nativeVideoUrl {
+            // Native video player from backend URL
             VStack(alignment: .leading, spacing: 8) {
                 Text("Example")
                     .font(.headline)
@@ -56,9 +58,20 @@ struct MovementInfoView: View {
                 .frame(height: 220)
                 .padding(.horizontal)
             }
+        } else if !exercise.example.isEmpty {
+            // Fallback to YouTube iframe from template data
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Example")
+                    .font(.headline)
+                    .padding(.horizontal)
+
+                YouTubeEmbedView(html: exercise.example)
+                    .aspectRatio(1.8, contentMode: .fit)
+                    .cornerRadius(12)
+                    .frame(height: 200)
+                    .padding(.horizontal)
+            }
         }
-        // When no native video URL is available, gracefully degrade by showing nothing
-        // This replaces the old WebView-based YouTube player
     }
 
     // MARK: - Helper Views
@@ -77,4 +90,37 @@ struct MovementInfoView: View {
                 .fontWeight(.medium)
         }
     }
+}
+
+// MARK: - YouTube Embed View
+
+struct YouTubeEmbedView: UIViewRepresentable {
+    let html: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.scrollView.isScrollEnabled = false
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        let wrapped = """
+        <html>
+        <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+        <style>
+        body { margin: 0; padding: 0; background: transparent; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        iframe { width: 100%; height: 100%; border: none; border-radius: 12px; }
+        </style>
+        </head>
+        <body>\(html)</body>
+        </html>
+        """
+        webView.loadHTMLString(wrapped, baseURL: nil)
+        return webView
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
 }
