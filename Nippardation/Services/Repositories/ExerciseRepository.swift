@@ -73,8 +73,8 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
             // Convert domain filter to API filter
             let apiFilters = filter.map { convertToAPIFilters($0) }
 
-            // Calculate cursor from page (API uses cursor-based pagination)
-            let cursor = validPage > 1 ? String((validPage - 1) * defaultPageSize) : nil
+            // Pass page number as cursor (API service converts to page query param)
+            let cursor = validPage > 1 ? String(validPage) : nil
 
             // Fetch from API
             let (dtos, pagination) = try await apiService.fetchExercises(

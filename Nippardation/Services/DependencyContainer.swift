@@ -117,10 +117,10 @@ final class DependencyContainer: ObservableObject {
         // Register real video cache service
         self.videoCacheService = VideoCacheService()
 
-        // TODO: Replace with real implementations when available
-        // self.exerciseRepository = ExerciseRepository()
-        // self.templateRepository = TemplateRepository()
-        // etc.
+        // Register real exercise API service and repository
+        let exerciseAPI = ExerciseAPIService()
+        self.exerciseAPIService = exerciseAPI
+        self.exerciseRepository = ExerciseRepository(apiService: exerciseAPI)
     }
 
     /// Configures the container with mock services for testing/previews

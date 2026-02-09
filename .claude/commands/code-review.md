@@ -74,7 +74,7 @@ swiftlint lint
 **Manual code quality checks**
 - [ ] No force-unwraps without explicit documented reason
 - [ ] No force-try without proper justification
-- [ ] No `as!` force casts
+- [ ] No force casts (as! operator)
 - [ ] No hardcoded strings (use localization)
 - [ ] No magic numbers (use named constants)
 - [ ] No commented-out code blocks
@@ -272,8 +272,8 @@ grep -rn "!\[" --include="*.swift" .
 grep -rn "as!" --include="*.swift" .
 ```
 
-- [ ] NO force unwraps (`!`) without documented safety guarantee
-- [ ] NO force casts (`as!`) without proven type safety
+- [ ] NO force unwraps (the ! operator) without documented safety guarantee
+- [ ] NO force casts (as! operator) without proven type safety
 - [ ] All force unwraps on constants (URLs, UUIDs) are verified at compile-time
 - [ ] Optional binding (`if let`, `guard let`) used instead of force unwrap
 
@@ -291,11 +291,11 @@ grep -rn "\[i\]" --include="*.swift" .
 - [ ] No array access after potential modification without re-validation
 
 **Empty collection edge cases**
-- [ ] `.first!` never used (use `.first` with optional handling)
-- [ ] `.last!` never used (use `.last` with optional handling)
+- [ ] .first force unwrap never used (use .first with optional handling)
+- [ ] .last force unwrap never used (use .last with optional handling)
 - [ ] Empty arrays handled gracefully (show empty state, not crash)
 - [ ] Division by `count` checks for zero first
-- [ ] `randomElement()!` not used (returns optional)
+- [ ] randomElement() force unwrap not used (returns optional)
 
 **Optional chaining patterns**
 - [ ] Computed properties return optionals when data may not exist

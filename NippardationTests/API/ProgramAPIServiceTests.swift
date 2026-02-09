@@ -104,7 +104,7 @@ struct ProgramAPIServiceTests {
             if let body = request.httpBody,
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
                 #expect(json["name"] as? String == "New Program")
-                #expect(json["days_per_week"] as? Int == 5)
+                #expect(json["daysPerWeek"] as? Int == 5)
             }
 
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)

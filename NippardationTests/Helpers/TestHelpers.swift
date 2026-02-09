@@ -28,7 +28,10 @@ enum SampleData {
         thumbnailUrl: "https://example.com/thumb.jpg",
         popularityScore: 95,
         createdAt: "2025-01-01T00:00:00Z",
-        updatedAt: "2025-01-01T00:00:00Z"
+        updatedAt: "2025-01-01T00:00:00Z",
+        muscleGroups: nil,
+        isCustom: nil,
+        createdBy: nil
     )
 
     static let exerciseDTO2 = ExerciseDTO(
@@ -45,7 +48,10 @@ enum SampleData {
         thumbnailUrl: nil,
         popularityScore: 98,
         createdAt: nil,
-        updatedAt: nil
+        updatedAt: nil,
+        muscleGroups: nil,
+        isCustom: nil,
+        createdBy: nil
     )
 
     static let paginationDTO = PaginationDTO(
@@ -178,11 +184,12 @@ enum SampleData {
         gender: "male",
         unitPreference: "metric",
         isPublicProfile: true,
-        totalVolumeLiftedLbs: 10000.0,
+        totalVolumeLiftedLbs: "10000.00",
         totalWorkouts: 50,
         currentWorkoutStreak: 5,
         longestWorkoutStreak: 10,
         lastWorkoutDate: "2025-01-15T00:00:00Z",
+        pushNotificationTokens: nil,
         notificationsEnabled: true,
         lastSyncedAt: "2025-01-15T00:00:00Z",
         createdAt: "2025-01-01T00:00:00Z",
@@ -192,7 +199,6 @@ enum SampleData {
     // MARK: - Sync
 
     static let syncResponse = SyncResponseDTO(
-        success: true,
         syncedAt: "2025-01-15T12:00:00Z",
         conflicts: nil,
         serverData: nil,

@@ -33,7 +33,7 @@ final class UserAPIService: BaseAPIService, UserAPIServiceProtocol, @unchecked S
     }
 
     func fetchProfile() async throws -> UserDTO {
-        let url = AppConfiguration.shared.baseURL.appendingPathComponent("api/users/me")
+        let url = AppConfiguration.shared.baseURL.appendingPathComponent("api/me")
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -44,7 +44,7 @@ final class UserAPIService: BaseAPIService, UserAPIServiceProtocol, @unchecked S
     }
 
     func updateProfile(_ updateRequest: UpdateUserRequest) async throws -> UserDTO {
-        let url = AppConfiguration.shared.baseURL.appendingPathComponent("api/users/me")
+        let url = AppConfiguration.shared.baseURL.appendingPathComponent("api/me")
 
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"

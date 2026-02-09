@@ -27,7 +27,7 @@ struct ExerciseFiltersQueryItemsTests {
         let queryItems = filters.toQueryItems()
 
         #expect(queryItems.count == 1)
-        #expect(queryItems[0].name == "muscle_groups[]")
+        #expect(queryItems[0].name == "muscleGroup")
         #expect(queryItems[0].value == "chest")
     }
 
@@ -35,7 +35,7 @@ struct ExerciseFiltersQueryItemsTests {
         let filters = ExerciseFilters(muscleGroups: ["chest", "back", "shoulders"])
         let queryItems = filters.toQueryItems()
 
-        let muscleItems = queryItems.filter { $0.name == "muscle_groups[]" }
+        let muscleItems = queryItems.filter { $0.name == "muscleGroup" }
         #expect(muscleItems.count == 3)
 
         let values = Set(muscleItems.compactMap { $0.value })
@@ -51,7 +51,7 @@ struct ExerciseFiltersQueryItemsTests {
         let queryItems = filters.toQueryItems()
 
         #expect(queryItems.count == 1)
-        #expect(queryItems[0].name == "equipment[]")
+        #expect(queryItems[0].name == "equipment")
         #expect(queryItems[0].value == "barbell")
     }
 
@@ -59,7 +59,7 @@ struct ExerciseFiltersQueryItemsTests {
         let filters = ExerciseFilters(equipment: ["barbell", "dumbbell"])
         let queryItems = filters.toQueryItems()
 
-        let equipmentItems = queryItems.filter { $0.name == "equipment[]" }
+        let equipmentItems = queryItems.filter { $0.name == "equipment" }
         #expect(equipmentItems.count == 2)
     }
 
@@ -70,7 +70,7 @@ struct ExerciseFiltersQueryItemsTests {
         let queryItems = filters.toQueryItems()
 
         #expect(queryItems.count == 1)
-        #expect(queryItems[0].name == "difficulties[]")
+        #expect(queryItems[0].name == "difficulty")
         #expect(queryItems[0].value == "beginner")
     }
 
@@ -80,7 +80,7 @@ struct ExerciseFiltersQueryItemsTests {
         let filters = ExerciseFilters(movementPatterns: ["push", "pull"])
         let queryItems = filters.toQueryItems()
 
-        let patternItems = queryItems.filter { $0.name == "movement_patterns[]" }
+        let patternItems = queryItems.filter { $0.name == "movementPattern" }
         #expect(patternItems.count == 2)
     }
 
@@ -90,7 +90,7 @@ struct ExerciseFiltersQueryItemsTests {
         let filters = ExerciseFilters(exerciseTypes: ["compound", "isolation"])
         let queryItems = filters.toQueryItems()
 
-        let typeItems = queryItems.filter { $0.name == "exercise_types[]" }
+        let typeItems = queryItems.filter { $0.name == "exerciseType" }
         #expect(typeItems.count == 2)
     }
 
@@ -149,11 +149,11 @@ struct ExerciseFiltersQueryItemsTests {
         // 2 muscle groups + 1 equipment + 1 difficulty + 1 pattern + 1 type + 1 search + 1 primary = 8
         #expect(queryItems.count == 8)
 
-        #expect(queryItems.filter { $0.name == "muscle_groups[]" }.count == 2)
-        #expect(queryItems.filter { $0.name == "equipment[]" }.count == 1)
-        #expect(queryItems.filter { $0.name == "difficulties[]" }.count == 1)
-        #expect(queryItems.filter { $0.name == "movement_patterns[]" }.count == 1)
-        #expect(queryItems.filter { $0.name == "exercise_types[]" }.count == 1)
+        #expect(queryItems.filter { $0.name == "muscleGroup" }.count == 2)
+        #expect(queryItems.filter { $0.name == "equipment" }.count == 1)
+        #expect(queryItems.filter { $0.name == "difficulty" }.count == 1)
+        #expect(queryItems.filter { $0.name == "movementPattern" }.count == 1)
+        #expect(queryItems.filter { $0.name == "exerciseType" }.count == 1)
         #expect(queryItems.filter { $0.name == "q" }.count == 1)
         #expect(queryItems.filter { $0.name == "primary_only" }.count == 1)
     }

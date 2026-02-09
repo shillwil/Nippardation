@@ -13,11 +13,6 @@ import Foundation
 struct PaginationInfo: Codable {
     let nextCursor: String?
     let hasMore: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case nextCursor = "next_cursor"
-        case hasMore = "has_more"
-    }
 }
 
 // MARK: - Exercise Filters
@@ -50,15 +45,6 @@ struct ExerciseFilters: Codable {
         self.includePrimaryOnly = includePrimaryOnly
     }
 
-    enum CodingKeys: String, CodingKey {
-        case muscleGroups = "muscle_groups"
-        case equipment
-        case difficulties
-        case movementPatterns = "movement_patterns"
-        case exerciseTypes = "exercise_types"
-        case searchQuery = "search_query"
-        case includePrimaryOnly = "include_primary_only"
-    }
 }
 
 /// Filter options DTO with counts for each filter value
@@ -69,13 +55,6 @@ struct ExerciseFilterOptionsDTO: Codable {
     let movementPatterns: [FilterOptionDTO]
     let exerciseTypes: [FilterOptionDTO]
 
-    enum CodingKeys: String, CodingKey {
-        case muscleGroups = "muscle_groups"
-        case difficulties
-        case equipment
-        case movementPatterns = "movement_patterns"
-        case exerciseTypes = "exercise_types"
-    }
 }
 
 /// Individual filter option with label and count
@@ -94,12 +73,6 @@ struct CreateTemplateRequest: Codable {
     let exercises: [TemplateExerciseInput]
     let isPublic: Bool
 
-    enum CodingKeys: String, CodingKey {
-        case name
-        case description
-        case exercises
-        case isPublic = "is_public"
-    }
 }
 
 /// Request body for updating template metadata
@@ -123,15 +96,6 @@ struct TemplateExerciseInput: Codable {
     let restSeconds: Int?
     let notes: String?
 
-    enum CodingKeys: String, CodingKey {
-        case exerciseId = "exercise_id"
-        case orderIndex = "order_index"
-        case warmupSets = "warmup_sets"
-        case workingSets = "working_sets"
-        case targetReps = "target_reps"
-        case restSeconds = "rest_seconds"
-        case notes
-    }
 }
 
 // MARK: - Program Request Types
@@ -145,14 +109,6 @@ struct CreateProgramRequest: Codable {
     let workouts: [ProgramWorkoutInput]
     let isPublic: Bool
 
-    enum CodingKeys: String, CodingKey {
-        case name
-        case description
-        case daysPerWeek = "days_per_week"
-        case durationWeeks = "duration_weeks"
-        case workouts
-        case isPublic = "is_public"
-    }
 }
 
 /// Request body for updating program metadata
@@ -174,12 +130,6 @@ struct UpdateProgramRequest: Codable {
         self.durationWeeks = durationWeeks
     }
 
-    enum CodingKeys: String, CodingKey {
-        case name
-        case description
-        case daysPerWeek = "days_per_week"
-        case durationWeeks = "duration_weeks"
-    }
 }
 
 /// Input for program workouts when creating/updating
@@ -188,11 +138,6 @@ struct ProgramWorkoutInput: Codable {
     let dayLabel: String?
     let templateId: String
 
-    enum CodingKeys: String, CodingKey {
-        case dayNumber = "day_number"
-        case dayLabel = "day_label"
-        case templateId = "template_id"
-    }
 }
 
 /// Active program response with next workout info
@@ -201,11 +146,6 @@ struct ActiveProgramDTO: Codable {
     let nextWorkout: ProgramWorkoutDTO?
     let isCompleted: Bool
 
-    enum CodingKeys: String, CodingKey {
-        case program
-        case nextWorkout = "next_workout"
-        case isCompleted = "is_completed"
-    }
 }
 
 /// Summary of a template (used in program workout responses)
@@ -215,12 +155,6 @@ struct TemplateSummaryDTO: Codable {
     let description: String?
     let exerciseCount: Int
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case description
-        case exerciseCount = "exercise_count"
-    }
 }
 
 // MARK: - User Types
@@ -241,40 +175,17 @@ struct UserDTO: Codable {
     let gender: String?
     let unitPreference: String?
     let isPublicProfile: Bool?
-    let totalVolumeLiftedLbs: Double?
+    let totalVolumeLiftedLbs: String?
     let totalWorkouts: Int?
     let currentWorkoutStreak: Int?
     let longestWorkoutStreak: Int?
     let lastWorkoutDate: String?
+    let pushNotificationTokens: [String]?
     let notificationsEnabled: Bool?
     let lastSyncedAt: String?
     let createdAt: String?
     let updatedAt: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case firebaseUid = "firebase_uid"
-        case email
-        case handle
-        case displayName = "display_name"
-        case profilePictureUrl = "profile_picture_url"
-        case bio
-        case height
-        case weight
-        case age
-        case gender
-        case unitPreference = "unit_preference"
-        case isPublicProfile = "is_public_profile"
-        case totalVolumeLiftedLbs = "total_volume_lifted_lbs"
-        case totalWorkouts = "total_workouts"
-        case currentWorkoutStreak = "current_workout_streak"
-        case longestWorkoutStreak = "longest_workout_streak"
-        case lastWorkoutDate = "last_workout_date"
-        case notificationsEnabled = "notifications_enabled"
-        case lastSyncedAt = "last_synced_at"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
 }
 
 /// Request body for updating user profile
@@ -311,51 +222,43 @@ struct UpdateUserRequest: Codable {
         self.notificationsEnabled = notificationsEnabled
     }
 
-    enum CodingKeys: String, CodingKey {
-        case displayName = "display_name"
-        case bio
-        case height
-        case weight
-        case age
-        case gender
-        case unitPreference = "unit_preference"
-        case isPublicProfile = "is_public_profile"
-        case notificationsEnabled = "notifications_enabled"
-    }
 }
 
 // MARK: - Sync Types
 
 /// Request body for sync endpoint
 /// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
+/// Keys are camelCase to match API documentation
 struct SyncRequestDTO: Codable {
     let deviceId: String
-    let lastSyncedAt: String?
+    let lastSyncTimestamp: String?
+    let deviceInfo: SyncDeviceInfo?
     let workouts: [WorkoutCreateDTO]
-
-    enum CodingKeys: String, CodingKey {
-        case deviceId = "device_id"
-        case lastSyncedAt = "last_synced_at"
-        case workouts
-    }
 }
 
-/// Response from sync endpoint
-/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
-struct SyncResponseDTO: Codable {
+/// Device information included in sync requests
+struct SyncDeviceInfo: Codable {
+    let name: String?
+    let type: String       // "ios"
+    let appVersion: String
+    let osVersion: String?
+}
+
+/// Top-level response wrapper from sync endpoint
+struct SyncAPIResponse: Codable {
     let success: Bool
+    let message: String?
+    let data: SyncResponseDTO
+}
+
+/// Inner data from sync endpoint response
+/// Note: All date fields are ISO8601 strings to ensure consistent decoding across all DTOs
+/// Keys are camelCase to match API documentation
+struct SyncResponseDTO: Codable {
     let syncedAt: String
     let conflicts: [SyncAPIConflictDTO]?
     let serverData: ServerSyncDataDTO?
-    let stats: SyncStatsDTO
-
-    enum CodingKeys: String, CodingKey {
-        case success
-        case syncedAt = "synced_at"
-        case conflicts
-        case serverData = "server_data"
-        case stats
-    }
+    let stats: SyncStatsDTO?
 }
 
 /// Server data from sync (workouts from other devices)
@@ -363,11 +266,6 @@ struct SyncResponseDTO: Codable {
 struct ServerSyncDataDTO: Codable {
     let workouts: [WorkoutSyncDTO]
     let lastServerSync: String
-
-    enum CodingKeys: String, CodingKey {
-        case workouts
-        case lastServerSync = "last_server_sync"
-    }
 }
 
 /// Workout data for sync (subset of full workout)
@@ -382,16 +280,6 @@ struct WorkoutSyncDTO: Codable {
     let totalSets: Int
     let totalVolume: Double?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case templateName = "template_name"
-        case startedAt = "started_at"
-        case completedAt = "completed_at"
-        case durationSeconds = "duration_seconds"
-        case exerciseCount = "exercise_count"
-        case totalSets = "total_sets"
-        case totalVolume = "total_volume"
-    }
 }
 
 /// Sync statistics
@@ -402,16 +290,9 @@ struct SyncStatsDTO: Codable {
 }
 
 /// Conflict information from sync API
+/// Keys are camelCase to match API documentation
 struct SyncAPIConflictDTO: Codable {
-    let clientId: String
-    let serverId: String?
-    let reason: String
-    let resolution: String?
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case serverId = "server_id"
-        case reason
-        case resolution
-    }
+    let entityType: String
+    let entityId: String
+    let resolution: String
 }

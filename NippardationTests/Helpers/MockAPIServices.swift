@@ -33,7 +33,7 @@ actor MockExerciseAPIService: ExerciseAPIServiceProtocol {
         // Filter by muscle groups
         if let muscleGroups = filters?.muscleGroups, !muscleGroups.isEmpty {
             filtered = filtered.filter { exercise in
-                !muscleGroups.isDisjoint(with: Set(exercise.primaryMuscles))
+                !muscleGroups.isDisjoint(with: Set(exercise.primaryMuscles ?? []))
             }
         }
 
@@ -368,7 +368,6 @@ actor MockSyncAPIService: SyncAPIServiceProtocol {
         if shouldFail { throw failureError }
 
         return response ?? SyncResponseDTO(
-            success: true,
             syncedAt: ISO8601DateFormatter().string(from: Date()),
             conflicts: nil,
             serverData: nil,
@@ -409,7 +408,10 @@ extension ExerciseDTO {
             thumbnailUrl: "https://example.com/thumb",
             popularityScore: 100,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         )
     }
 }

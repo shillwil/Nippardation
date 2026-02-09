@@ -18,7 +18,7 @@ enum ExerciseMapper {
             id: UUID(),
             serverId: dto.id,
             name: dto.name,
-            primaryMuscles: mapMuscleGroups(dto.primaryMuscles),
+            primaryMuscles: mapMuscleGroups(dto.primaryMuscles ?? dto.muscleGroups ?? []),
             secondaryMuscles: mapMuscleGroups(dto.secondaryMuscles ?? []),
             equipment: mapEquipment(dto.equipment),
             difficulty: mapDifficulty(dto.difficulty),
@@ -27,7 +27,7 @@ enum ExerciseMapper {
             instructions: dto.instructions,
             videoUrl: dto.videoUrl.flatMap { URL(string: $0) },
             thumbnailUrl: dto.thumbnailUrl.flatMap { URL(string: $0) },
-            popularityScore: dto.popularityScore ?? 0,
+            popularityScore: Int(dto.popularityScore ?? 0),
             lastFetchedAt: Date()
         )
     }
@@ -53,9 +53,12 @@ enum ExerciseMapper {
             instructions: item.instructions,
             videoUrl: item.videoUrl?.absoluteString,
             thumbnailUrl: item.thumbnailUrl?.absoluteString,
-            popularityScore: item.popularityScore,
+            popularityScore: Double(item.popularityScore),
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            muscleGroups: nil,
+            isCustom: nil,
+            createdBy: nil
         )
     }
 

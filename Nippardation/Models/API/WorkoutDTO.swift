@@ -31,18 +31,6 @@ struct WorkoutDTO: Codable, Identifiable {
     let createdAt: String?
     let updatedAt: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case templateId = "template_id"
-        case templateName = "template_name"
-        case startedAt = "started_at"
-        case completedAt = "completed_at"
-        case durationSeconds = "duration_seconds"
-        case notes
-        case exercises
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
 }
 
 /// Workout exercise data transfer object
@@ -54,14 +42,6 @@ struct WorkoutExerciseDTO: Codable, Identifiable {
     let sets: [WorkoutSetDTO]
     let notes: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case exerciseId = "exercise_id"
-        case exerciseName = "exercise_name"
-        case orderIndex = "order_index"
-        case sets
-        case notes
-    }
 }
 
 /// Workout set data transfer object
@@ -76,17 +56,6 @@ struct WorkoutSetDTO: Codable, Identifiable {
     let rpe: Double?
     let notes: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case setNumber = "set_number"
-        case setType = "set_type"
-        case targetReps = "target_reps"
-        case completedReps = "completed_reps"
-        case weight
-        case weightUnit = "weight_unit"
-        case rpe
-        case notes
-    }
 }
 
 /// Request body for syncing workouts
@@ -94,71 +63,39 @@ struct WorkoutSyncRequest: Codable {
     let workouts: [WorkoutCreateDTO]
 }
 
-/// Workout for create/sync requests
+/// Workout for create/sync requests (camelCase keys match API sync schema)
 struct WorkoutCreateDTO: Codable {
     let clientId: String
-    let templateId: String?
+    let userId: String
+    let date: String
+    let name: String?
     let templateName: String?
-    let startedAt: String
-    let completedAt: String?
+    let startTime: String
+    let endTime: String?
     let durationSeconds: Int?
-    let notes: String?
+    let isCompleted: Bool
+    let updatedAt: String
     let exercises: [WorkoutExerciseCreateDTO]
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case templateId = "template_id"
-        case templateName = "template_name"
-        case startedAt = "started_at"
-        case completedAt = "completed_at"
-        case durationSeconds = "duration_seconds"
-        case notes
-        case exercises
-    }
 }
 
-/// Workout exercise for create requests
+/// Workout exercise for create requests (camelCase keys match API sync schema)
 struct WorkoutExerciseCreateDTO: Codable {
     let clientId: String
-    let exerciseId: String?
     let exerciseName: String
-    let orderIndex: Int
+    let muscleGroups: [String]
     let sets: [WorkoutSetCreateDTO]
-    let notes: String?
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case exerciseId = "exercise_id"
-        case exerciseName = "exercise_name"
-        case orderIndex = "order_index"
-        case sets
-        case notes
-    }
+    let updatedAt: String
 }
 
-/// Workout set for create requests
+/// Workout set for create requests (camelCase keys match API sync schema)
 struct WorkoutSetCreateDTO: Codable {
     let clientId: String
-    let setNumber: Int
     let setType: String
-    let targetReps: Int?
-    let completedReps: Int?
+    let reps: Int?
     let weight: Double?
-    let weightUnit: String?
-    let rpe: Double?
-    let notes: String?
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case setNumber = "set_number"
-        case setType = "set_type"
-        case targetReps = "target_reps"
-        case completedReps = "completed_reps"
-        case weight
-        case weightUnit = "weight_unit"
-        case rpe
-        case notes
-    }
+    let exerciseTypeName: String
+    let exerciseTypeMuscleGroups: [String]
+    let updatedAt: String
 }
 
 /// Response from workout sync endpoint with server IDs mapped to client IDs
@@ -171,11 +108,6 @@ struct WorkoutSyncResponseDTO: Codable {
 struct SyncedItemDTO: Codable {
     let clientId: String
     let serverId: String
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case serverId = "server_id"
-    }
 }
 
 /// Conflict information when sync fails for an item
@@ -183,10 +115,4 @@ struct SyncConflictDTO: Codable {
     let clientId: String
     let reason: String
     let serverVersion: WorkoutDTO?
-
-    enum CodingKeys: String, CodingKey {
-        case clientId = "client_id"
-        case reason
-        case serverVersion = "server_version"
-    }
 }

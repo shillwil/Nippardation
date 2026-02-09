@@ -13,23 +13,23 @@ extension ExerciseFilters {
         var items: [URLQueryItem] = []
 
         for muscle in muscleGroups {
-            items.append(URLQueryItem(name: "muscle_groups[]", value: muscle))
+            items.append(URLQueryItem(name: "muscleGroup", value: muscle))
         }
 
         for equip in equipment {
-            items.append(URLQueryItem(name: "equipment[]", value: equip))
+            items.append(URLQueryItem(name: "equipment", value: equip))
         }
 
         for diff in difficulties {
-            items.append(URLQueryItem(name: "difficulties[]", value: diff))
+            items.append(URLQueryItem(name: "difficulty", value: diff))
         }
 
         for pattern in movementPatterns {
-            items.append(URLQueryItem(name: "movement_patterns[]", value: pattern))
+            items.append(URLQueryItem(name: "movementPattern", value: pattern))
         }
 
         for type in exerciseTypes {
-            items.append(URLQueryItem(name: "exercise_types[]", value: type))
+            items.append(URLQueryItem(name: "exerciseType", value: type))
         }
 
         if !searchQuery.isEmpty {

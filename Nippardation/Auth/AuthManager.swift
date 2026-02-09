@@ -19,17 +19,35 @@ struct BackendUser: Codable {
     let displayName: String?
     let profilePictureUrl: String?
     let bio: String?
+    let height: Double?
+    let weight: Double?
+    let age: Int?
+    let gender: String?
     let unitPreference: String?
+    let isPublicProfile: Bool?
+    let totalVolumeLiftedLbs: String?
     let totalWorkouts: Int?
     let currentWorkoutStreak: Int?
+    let longestWorkoutStreak: Int?
+    let lastWorkoutDate: String?
+    let pushNotificationTokens: [String]?
+    let notificationsEnabled: Bool?
+    let lastSyncedAt: String?
     let createdAt: String?
     let updatedAt: String?
+
 }
 
 struct LoginResponse: Codable {
     let success: Bool
     let message: String
+    let data: LoginData
+}
+
+/// Login data wrapper — server nests user inside data.user
+struct LoginData: Codable {
     let user: BackendUser
+    let token: String?
 }
 
 // MARK: - AuthManager
@@ -147,7 +165,7 @@ class AuthManager: ObservableObject {
 
     private func loginToBackend(idToken: String) async {
         do {
-            let url = AppConfiguration.shared.baseURL.appendingPathComponent("/api/auth/login")
+            let url = AppConfiguration.shared.baseURL.appendingPathComponent("api/auth/login")
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -168,7 +186,7 @@ class AuthManager: ObservableObject {
             let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
 
             await MainActor.run {
-                self.backendUser = loginResponse.user
+                self.backendUser = loginResponse.data.user
             }
         } catch {
             NSLog("Error syncing with backend: \(error)")

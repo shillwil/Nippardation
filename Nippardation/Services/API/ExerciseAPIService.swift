@@ -48,14 +48,39 @@ final class ExerciseAPIService: BaseAPIService, ExerciseAPIServiceProtocol, @unc
         request.httpMethod = "GET"
         try await addAuthHeader(to: &request)
 
-        let response: ExerciseListResponse = try await performRequest(request)
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
 
-        // Convert PaginationDTO to PaginationInfo
-        let hasMore = response.pagination.page < response.pagination.totalPages
-        let nextCursor = hasMore ? String(response.pagination.page + 1) : nil
+        // Try new format first, then legacy, then flat format
+        do {
+            let newFormat = try decoder.decode(ExerciseAPIResponse.self, from: data)
+            let p = newFormat.data.pagination
+            let paginationInfo = PaginationInfo(
+                nextCursor: p.nextCursor ?? p.page.flatMap { page in
+                    let totalPages = p.totalPages ?? 0
+                    return page < totalPages ? String(page + 1) : nil
+                },
+                hasMore: p.hasMore
+            )
+            return (newFormat.data.exercises, paginationInfo)
+        } catch {
+            // Fall through to try legacy formats
+        }
+
+        if let legacyFormat = try? decoder.decode(ExerciseLegacyResponse.self, from: data) {
+            let p = legacyFormat.pagination
+            let hasMore = p.page < p.totalPages
+            let nextCursor = hasMore ? String(p.page + 1) : nil
+            return (legacyFormat.data, PaginationInfo(nextCursor: nextCursor, hasMore: hasMore))
+        }
+
+        // Fall back to current flat format
+        let flatFormat = try decoder.decode(ExerciseListResponse.self, from: data)
+        let hasMore = flatFormat.pagination.page < flatFormat.pagination.totalPages
+        let nextCursor = hasMore ? String(flatFormat.pagination.page + 1) : nil
         let paginationInfo = PaginationInfo(nextCursor: nextCursor, hasMore: hasMore)
 
-        return (response.exercises, paginationInfo)
+        return (flatFormat.exercises, paginationInfo)
     }
 
     func fetchExercise(id: String) async throws -> ExerciseDTO {

@@ -29,16 +29,6 @@ struct TemplateDTO: Codable, Identifiable {
     let createdAt: String?
     let updatedAt: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case description
-        case exercises
-        case isPublic = "is_public"
-        case isAiGenerated = "is_ai_generated"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
 }
 
 /// Template exercise data transfer object
@@ -53,17 +43,6 @@ struct TemplateExerciseDTO: Codable, Identifiable {
     let restSeconds: Int?
     let notes: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case exerciseId = "exercise_id"
-        case exercise
-        case orderIndex = "order_index"
-        case warmupSets = "warmup_sets"
-        case workingSets = "working_sets"
-        case targetReps = "target_reps"
-        case restSeconds = "rest_seconds"
-        case notes
-    }
 }
 
 /// Request body for creating/updating templates
@@ -73,12 +52,6 @@ struct TemplateCreateRequest: Codable {
     let exercises: [TemplateExerciseCreateDTO]
     let isPublic: Bool
 
-    enum CodingKeys: String, CodingKey {
-        case name
-        case description
-        case exercises
-        case isPublic = "is_public"
-    }
 }
 
 /// Template exercise for create/update requests
@@ -91,13 +64,4 @@ struct TemplateExerciseCreateDTO: Codable {
     let restSeconds: Int?
     let notes: String?
 
-    enum CodingKeys: String, CodingKey {
-        case exerciseId = "exercise_id"
-        case orderIndex = "order_index"
-        case warmupSets = "warmup_sets"
-        case workingSets = "working_sets"
-        case targetReps = "target_reps"
-        case restSeconds = "rest_seconds"
-        case notes
-    }
 }

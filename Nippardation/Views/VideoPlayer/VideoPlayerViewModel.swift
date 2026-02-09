@@ -110,8 +110,9 @@ final class VideoPlayerViewModel: ObservableObject {
                 }
             } catch {
                 if !Task.isCancelled {
-                    self.error = "Failed to load video"
-                    self.isLoading = false
+                    // Cache download failed — fall back to direct streaming
+                    setupPlayerItem(with: remoteURL)
+                    isLoading = false
                 }
             }
         }

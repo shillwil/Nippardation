@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 /// Concrete implementation of SyncServiceProtocol
 /// Handles bidirectional sync between local Core Data and server
@@ -147,79 +148,40 @@ final class SyncService: SyncServiceProtocol {
         }
 
         // Build sync payload
+        let userId = AuthManager.shared.currentUser?.uid ?? deviceId
         let workoutDTOs = pendingWorkouts.map { workout -> WorkoutCreateDTO in
-            let exerciseDTOs = workout.trackedExercises.enumerated().map { (index, exercise) -> WorkoutExerciseCreateDTO in
-                let setDTOs = exercise.trackedSets.enumerated().map { (setIndex, set) -> WorkoutSetCreateDTO in
-                    WorkoutSetCreateDTO(
-                        clientId: set.id.uuidString,
-                        setNumber: setIndex + 1,
-                        setType: set.setType.rawValue,
-                        targetReps: nil,
-                        completedReps: set.reps,
-                        weight: set.weight,
-                        weightUnit: "lbs",
-                        rpe: nil,
-                        notes: nil
-                    )
-                }
-
-                return WorkoutExerciseCreateDTO(
-                    clientId: exercise.id.uuidString,
-                    exerciseId: nil,
-                    exerciseName: exercise.exerciseName,
-                    orderIndex: index,
-                    sets: setDTOs,
-                    notes: nil
-                )
-            }
-
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-            return WorkoutCreateDTO(
-                clientId: workout.id.uuidString,
-                templateId: nil,
-                templateName: workout.workoutTemplate,
-                startedAt: formatter.string(from: workout.startTime ?? workout.date),
-                completedAt: workout.endTime.map { formatter.string(from: $0) },
-                durationSeconds: workout.duration.map { Int($0) },
-                notes: nil,
-                exercises: exerciseDTOs
-            )
+            WorkoutMapper.toCreateDTO(workout, userId: userId)
         }
 
         let payload = SyncRequestDTO(
             deviceId: deviceId,
-            lastSyncedAt: lastSyncTime.map { ISO8601DateFormatter().string(from: $0) },
+            lastSyncTimestamp: lastSyncTime.map { ISO8601DateFormatter().string(from: $0) },
+            deviceInfo: buildDeviceInfo(),
             workouts: workoutDTOs
         )
 
         // Send to server
         let response = try await apiService.sync(payload: payload)
 
-        // Process response
-        if response.success {
-            // Mark workouts as synced
-            // Note: The response should contain server IDs for the synced workouts
-            // For now, we'll mark them as synced with their client IDs
-            for workout in pendingWorkouts {
-                try? await workoutRepository.markWorkoutSynced(
-                    id: workout.id,
-                    serverId: workout.id.uuidString // Use client ID until we get server ID
-                )
-            }
+        // Process response — if we got a response without error, the sync succeeded
+        // Mark workouts as synced
+        for workout in pendingWorkouts {
+            try? await workoutRepository.markWorkoutSynced(
+                id: workout.id,
+                serverId: workout.id.uuidString // Use client ID until we get server ID
+            )
         }
 
         // Handle conflicts - deduplicate to avoid accumulation across retries
         if let responseConflicts = response.conflicts, !responseConflicts.isEmpty {
             for conflict in responseConflicts {
                 // Only add if this conflict ID doesn't already exist
-                if !conflicts.contains(where: { $0.id == conflict.clientId }) {
+                if !conflicts.contains(where: { $0.id == conflict.entityId }) {
                     conflicts.append(SyncConflict(
-                        id: conflict.clientId,
-                        type: .workout,
-                        localVersion: conflict.clientId,
-                        remoteVersion: conflict.serverId as Any,
+                        id: conflict.entityId,
+                        entityType: .workout,
+                        entityId: conflict.entityId,
+                        resolution: conflict.resolution,
                         detectedAt: Date()
                     ))
                 }
@@ -289,59 +251,23 @@ final class SyncService: SyncServiceProtocol {
         }
 
         // Build sync payload for single workout
-        let exerciseDTOs = workout.trackedExercises.enumerated().map { (index, exercise) -> WorkoutExerciseCreateDTO in
-            let setDTOs = exercise.trackedSets.enumerated().map { (setIndex, set) -> WorkoutSetCreateDTO in
-                WorkoutSetCreateDTO(
-                    clientId: set.id.uuidString,
-                    setNumber: setIndex + 1,
-                    setType: set.setType.rawValue,
-                    targetReps: nil,
-                    completedReps: set.reps,
-                    weight: set.weight,
-                    weightUnit: "lbs",
-                    rpe: nil,
-                    notes: nil
-                )
-            }
-
-            return WorkoutExerciseCreateDTO(
-                clientId: exercise.id.uuidString,
-                exerciseId: nil,
-                exerciseName: exercise.exerciseName,
-                orderIndex: index,
-                sets: setDTOs,
-                notes: nil
-            )
-        }
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let workoutDTO = WorkoutCreateDTO(
-            clientId: workout.id.uuidString,
-            templateId: nil,
-            templateName: workout.workoutTemplate,
-            startedAt: formatter.string(from: workout.startTime ?? workout.date),
-            completedAt: workout.endTime.map { formatter.string(from: $0) },
-            durationSeconds: workout.duration.map { Int($0) },
-            notes: nil,
-            exercises: exerciseDTOs
-        )
+        let userId = AuthManager.shared.currentUser?.uid ?? deviceId
+        let workoutDTO = WorkoutMapper.toCreateDTO(workout, userId: userId)
 
         let payload = SyncRequestDTO(
             deviceId: deviceId,
-            lastSyncedAt: nil,
+            lastSyncTimestamp: nil,
+            deviceInfo: buildDeviceInfo(),
             workouts: [workoutDTO]
         )
 
         let response = try await apiService.sync(payload: payload)
 
-        if response.success {
-            try? await workoutRepository.markWorkoutSynced(
-                id: workout.id,
-                serverId: workout.id.uuidString
-            )
-        }
+        // If we got a response without error, the sync succeeded
+        try? await workoutRepository.markWorkoutSynced(
+            id: workout.id,
+            serverId: workout.id.uuidString
+        )
     }
 
     // MARK: - Background Sync
@@ -371,7 +297,7 @@ final class SyncService: SyncServiceProtocol {
         switch resolution {
         case .keepLocal:
             // Force push local version to server
-            if case .workout = conflict.type {
+            if case .workout = conflict.entityType {
                 if let id = UUID(uuidString: conflictId) {
                     try await syncWorkout(id: id)
                 }
@@ -385,7 +311,7 @@ final class SyncService: SyncServiceProtocol {
         case .merge:
             // Future: implement smart merge
             // For now, treat as keepLocal
-            if case .workout = conflict.type {
+            if case .workout = conflict.entityType {
                 if let id = UUID(uuidString: conflictId) {
                     try await syncWorkout(id: id)
                 }
@@ -409,6 +335,17 @@ final class SyncService: SyncServiceProtocol {
     }
 
     // MARK: - Private Helpers
+
+    private func buildDeviceInfo() -> SyncDeviceInfo {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        return SyncDeviceInfo(
+            name: UIDevice.current.name,
+            type: "ios",
+            appVersion: appVersion,
+            osVersion: osVersion
+        )
+    }
 
     private func isSyncNeeded() -> Bool {
         guard let lastSync = lastSyncTime else {
