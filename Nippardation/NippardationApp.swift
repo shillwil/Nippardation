@@ -38,7 +38,7 @@ struct NippardationApp: App {
     var body: some Scene {
         WindowGroup {
             if authManager.isAuthenticated {
-                HomeView()
+                MainTabView()
                     .environmentObject(authManager)
                     .onChange(of: UIApplication.shared.applicationState) { oldState, newState in
                         if newState == .background {
