@@ -23,6 +23,11 @@ extension ExerciseFilter {
         return count
     }
 
+    /// Returns true if filters beyond muscle groups are active
+    var hasNonMuscleFilters: Bool {
+        !equipment.isEmpty || difficulty != nil || movementPattern != nil || exerciseType != nil
+    }
+
     /// Creates a copy with the search text updated
     func withSearchText(_ text: String) -> ExerciseFilter {
         var copy = self

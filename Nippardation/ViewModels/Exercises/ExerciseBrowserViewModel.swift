@@ -20,6 +20,7 @@ final class ExerciseBrowserViewModel: ObservableObject {
     @Published var error: String?
     @Published var hasMore = false
     @Published var searchText: String = ""
+    @Published var recentlyUsedExercises: [ExerciseLibraryItem] = []
 
     // MARK: - Selection State (for picker mode)
 
@@ -126,6 +127,7 @@ final class ExerciseBrowserViewModel: ObservableObject {
                         self.error = nil
                         self.isLoading = false
                         self.isLoadingMore = false
+                        self.populateRecentlyUsed()
                     }
                 } catch {
                     // Don't update state if cancelled - a new request has taken over
@@ -179,6 +181,44 @@ final class ExerciseBrowserViewModel: ObservableObject {
         // The debounce sink checks filter.searchText to avoid double-loading
         searchText = ""
         loadExercises(refresh: true)
+    }
+
+    /// Toggles a muscle group filter. Passing nil clears all muscle group filters.
+    func toggleMuscleGroupFilter(_ muscle: MuscleGroup?) {
+        guard let muscle = muscle else {
+            filter.muscleGroups = []
+            loadExercises(refresh: true)
+            return
+        }
+        if filter.muscleGroups.contains(muscle) {
+            filter.muscleGroups.remove(muscle)
+        } else {
+            filter.muscleGroups.insert(muscle)
+        }
+        loadExercises(refresh: true)
+    }
+
+    /// Populates recently used exercises by matching completed workout exercise names
+    func populateRecentlyUsed() {
+        let completedWorkouts = WorkoutManager.shared.completedWorkouts
+        // Collect unique exercise names from recent workouts (most recent first)
+        var seenNames = Set<String>()
+        var recentNames: [String] = []
+        for workout in completedWorkouts.sorted(by: { $0.date > $1.date }) {
+            for exercise in workout.trackedExercises {
+                if seenNames.insert(exercise.exerciseName).inserted {
+                    recentNames.append(exercise.exerciseName)
+                }
+                if recentNames.count >= 5 { break }
+            }
+            if recentNames.count >= 5 { break }
+        }
+
+        guard !recentNames.isEmpty else { return }
+
+        // Match against loaded library exercises
+        let nameSet = Set(recentNames)
+        recentlyUsedExercises = exercises.filter { nameSet.contains($0.name) }
     }
 
     // MARK: - Selection (Picker Mode)

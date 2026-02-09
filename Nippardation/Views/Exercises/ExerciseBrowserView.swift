@@ -57,24 +57,44 @@ struct ExerciseBrowserContent: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Search bar
-            searchBar
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                // Search bar
+                searchBar
 
-            // Filter chips
-            if viewModel.filter.activeFilterCount > 0 {
-                filterChips
+                // Muscle group filter bar
+                MuscleGroupFilterBar(
+                    selectedMuscles: viewModel.filter.muscleGroups,
+                    onToggle: { muscle in
+                        viewModel.toggleMuscleGroupFilter(muscle)
+                    }
+                )
+                .padding(.bottom, AppSpacing.xs)
+
+                // Advanced filter chips
+                if viewModel.filter.hasNonMuscleFilters {
+                    filterChips
+                }
+
+                // Exercise list
+                if viewModel.isLoading && viewModel.exercises.isEmpty {
+                    Spacer()
+                    ProgressView("Loading exercises...")
+                    Spacer()
+                } else if viewModel.exercises.isEmpty {
+                    emptyView
+                } else {
+                    exerciseList
+                }
             }
 
-            // Exercise list
-            if viewModel.isLoading && viewModel.exercises.isEmpty {
-                Spacer()
-                ProgressView("Loading exercises...")
-                Spacer()
-            } else if viewModel.exercises.isEmpty {
-                emptyView
-            } else {
-                exerciseList
+            // Floating selection button
+            if viewModel.isPickerMode && !viewModel.selectedExercises.isEmpty {
+                FloatingSelectionButton(
+                    count: viewModel.selectedExercises.count,
+                    action: {}
+                )
+                .padding(.bottom, AppSpacing.lg)
             }
         }
         .navigationTitle("Exercises")
@@ -117,7 +137,7 @@ struct ExerciseBrowserContent: View {
     // MARK: - Subviews
 
     private var searchBar: some View {
-        HStack {
+        HStack(spacing: AppSpacing.xs) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
 
@@ -134,23 +154,16 @@ struct ExerciseBrowserContent: View {
                 }
             }
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(10)
-        .padding()
+        .padding(AppSpacing.sm)
+        .background(Color(.tertiarySystemBackground))
+        .cornerRadius(AppCornerRadius.medium)
+        .padding(.horizontal, AppSpacing.md)
+        .padding(.top, AppSpacing.sm)
     }
 
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack {
-                ForEach(Array(viewModel.filter.muscleGroups), id: \.self) { muscle in
-                    filterChip(muscle.rawValue.capitalized) {
-                        var newFilter = viewModel.filter
-                        newFilter.muscleGroups.remove(muscle)
-                        viewModel.applyFilters(newFilter)
-                    }
-                }
-
                 ForEach(Array(viewModel.filter.equipment), id: \.self) { equip in
                     filterChip(equip.displayName) {
                         var newFilter = viewModel.filter
@@ -180,9 +193,9 @@ struct ExerciseBrowserContent: View {
                 }
                 .font(.caption)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, AppSpacing.md)
         }
-        .padding(.bottom, 8)
+        .padding(.bottom, AppSpacing.xs)
     }
 
     private func filterChip(_ value: String, onRemove: @escaping () -> Void) -> some View {
@@ -197,8 +210,8 @@ struct ExerciseBrowserContent: View {
         .font(.caption)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color.blue.opacity(0.2))
-        .foregroundColor(.blue)
+        .background(Color.appTheme.opacity(0.2))
+        .foregroundColor(.appTheme)
         .cornerRadius(16)
     }
 
@@ -218,31 +231,57 @@ struct ExerciseBrowserContent: View {
 
     private var exerciseList: some View {
         List {
-            ForEach(viewModel.exercises) { exercise in
-                ExercisePickerRow(
-                    exercise: exercise,
-                    isSelected: viewModel.isPickerMode ? viewModel.isSelected(exercise) : nil,
-                    onTap: {
-                        if viewModel.isPickerMode {
-                            viewModel.toggleSelection(exercise)
-                        } else {
-                            onSelect?(exercise)
-                        }
+            // Recently used section
+            if !viewModel.recentlyUsedExercises.isEmpty && viewModel.searchText.isEmpty {
+                Section {
+                    ForEach(viewModel.recentlyUsedExercises) { exercise in
+                        ExerciseSelectionRow(
+                            exercise: exercise,
+                            isSelected: viewModel.isPickerMode ? viewModel.isSelected(exercise) : nil,
+                            onTap: {
+                                if viewModel.isPickerMode {
+                                    viewModel.toggleSelection(exercise)
+                                } else {
+                                    onSelect?(exercise)
+                                }
+                            }
+                        )
                     }
-                )
+                } header: {
+                    SectionHeader(title: "Recently Used")
+                }
             }
 
-            if viewModel.hasMore {
-                HStack {
-                    Spacer()
-                    if viewModel.isLoadingMore {
-                        ProgressView()
+            // Library section
+            Section {
+                ForEach(viewModel.exercises) { exercise in
+                    ExerciseSelectionRow(
+                        exercise: exercise,
+                        isSelected: viewModel.isPickerMode ? viewModel.isSelected(exercise) : nil,
+                        onTap: {
+                            if viewModel.isPickerMode {
+                                viewModel.toggleSelection(exercise)
+                            } else {
+                                onSelect?(exercise)
+                            }
+                        }
+                    )
+                }
+
+                if viewModel.hasMore {
+                    HStack {
+                        Spacer()
+                        if viewModel.isLoadingMore {
+                            ProgressView()
+                        }
+                        Spacer()
                     }
-                    Spacer()
+                    .onAppear {
+                        viewModel.loadMore()
+                    }
                 }
-                .onAppear {
-                    viewModel.loadMore()
-                }
+            } header: {
+                SectionHeader(title: "Library")
             }
         }
         .listStyle(.plain)
