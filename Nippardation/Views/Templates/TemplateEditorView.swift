@@ -13,24 +13,38 @@ struct TemplateEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showExercisePicker = false
+    @State private var editingExercise: ExerciseEditContext?
+
+    /// Wrapper to make exercise editing state identifiable for sheet presentation
+    struct ExerciseEditContext: Identifiable {
+        let id = UUID()
+        let index: Int
+        let exercise: TemplateEditorViewModel.EditableExercise
+    }
 
     init(existingTemplate: Template? = nil) {
         self._viewModel = StateObject(wrappedValue: TemplateEditorViewModel(existingTemplate: existingTemplate))
     }
 
     var body: some View {
-        List {
-            // Basic Info
-            basicInfoSection
+        ScrollView {
+            VStack(spacing: AppSpacing.lg) {
+                // Basic Info
+                basicInfoSection
 
-            // Summary
-            summarySection
+                // Summary stats
+                summarySection
 
-            // Exercises
-            exercisesSection
+                // Muscle analysis chart
+                MuscleAnalysisChart(distribution: viewModel.muscleGroupDistribution)
 
-            // Add Exercise Button
-            addExerciseSection
+                // Exercises
+                exercisesSection
+
+                // Add Exercise Button
+                addExerciseButton
+            }
+            .padding(AppSpacing.md)
         }
         .navigationTitle(viewModel.isEditing ? "Edit Template" : "New Template")
         .navigationBarTitleDisplayMode(.inline)
@@ -50,6 +64,24 @@ struct TemplateEditorView: View {
         }
         .sheet(isPresented: $showExercisePicker) {
             exercisePickerSheet
+        }
+        .sheet(item: $editingExercise) { context in
+            ExerciseConfigSheet(
+                exercise: context.exercise,
+                onSave: { warmup, working, reps, rest, notes in
+                    viewModel.updateExercise(
+                        at: context.index,
+                        warmupSets: warmup,
+                        workingSets: working,
+                        targetReps: reps,
+                        restSeconds: rest,
+                        notes: notes
+                    )
+                },
+                onDelete: {
+                    viewModel.removeExercise(at: context.index)
+                }
+            )
         }
         .onChange(of: viewModel.savedTemplate) { _, newValue in
             if newValue != nil {
@@ -79,105 +111,88 @@ struct TemplateEditorView: View {
     // MARK: - Sections
 
     private var basicInfoSection: some View {
-        Section("Basic Info") {
-            TextField("Template Name", text: $viewModel.name)
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("Template Name")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+
+            TextField("e.g., Push Day", text: $viewModel.name)
+                .textFieldStyle(.roundedBorder)
 
             TextField("Description (optional)", text: $viewModel.description, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
                 .lineLimit(3...6)
         }
+        .padding(AppSpacing.md)
+        .cardStyle()
     }
 
     private var summarySection: some View {
-        Section {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("\(viewModel.exercises.count)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("Exercises")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                VStack(alignment: .leading) {
-                    Text("\(viewModel.totalWarmupSets)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("Warmup Sets")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                VStack(alignment: .leading) {
-                    Text("\(viewModel.totalWorkingSets)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("Working Sets")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.vertical, 4)
+        HStack(spacing: AppSpacing.sm) {
+            summaryItem(value: "\(viewModel.exercises.count)", label: "Exercises")
+            summaryItem(value: "\(viewModel.totalWarmupSets)", label: "Warmup")
+            summaryItem(value: "\(viewModel.totalWorkingSets)", label: "Working")
         }
     }
 
+    private func summaryItem(value: String, label: String) -> some View {
+        VStack(spacing: AppSpacing.xxs) {
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(AppSpacing.sm)
+        .cardStyle()
+    }
+
     private var exercisesSection: some View {
-        Section {
+        VStack(spacing: AppSpacing.sm) {
+            SectionHeader(title: "Exercises (\(viewModel.exercises.count))")
+
             if viewModel.exercises.isEmpty {
-                ContentUnavailableView {
-                    Label("No Exercises", systemImage: "figure.strengthtraining.traditional")
-                } description: {
+                VStack(spacing: AppSpacing.xs) {
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .font(.title)
+                        .foregroundColor(.secondary)
                     Text("Add exercises to build your template")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-                .listRowBackground(Color.clear)
+                .frame(maxWidth: .infinity)
+                .padding(AppSpacing.xl)
             } else {
                 ForEach(Array(viewModel.exercises.enumerated()), id: \.element.id) { index, exercise in
-                    TemplateExerciseRow(
+                    ExerciseEditorCard(
                         exercise: exercise,
-                        onUpdate: { warmup, working, reps, rest, notes in
-                            viewModel.updateExercise(
-                                at: index,
-                                warmupSets: warmup,
-                                workingSets: working,
-                                targetReps: reps,
-                                restSeconds: rest,
-                                notes: notes
-                            )
+                        onConfigure: {
+                            editingExercise = ExerciseEditContext(index: index, exercise: exercise)
                         },
                         onDelete: {
                             viewModel.removeExercise(at: index)
                         }
                     )
                 }
-                .onMove { from, to in
-                    viewModel.moveExercises(from: from, to: to)
-                }
-                .onDelete { offsets in
-                    viewModel.removeExercises(at: offsets)
-                }
-            }
-        } header: {
-            HStack {
-                Text("Exercises")
-                Spacer()
-                EditButton()
-                    .font(.caption)
             }
         }
     }
 
-    private var addExerciseSection: some View {
-        Section {
-            Button {
-                showExercisePicker = true
-            } label: {
-                Label("Add Exercises", systemImage: "plus.circle")
+    private var addExerciseButton: some View {
+        Button {
+            showExercisePicker = true
+        } label: {
+            HStack {
+                Image(systemName: "plus.circle.fill")
+                Text("Add Exercises")
             }
+            .fontWeight(.semibold)
+            .frame(maxWidth: .infinity)
         }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
     }
 
     // MARK: - Exercise Picker Sheet
@@ -197,7 +212,6 @@ struct TemplateEditorView: View {
 
 // MARK: - Exercise Picker Sheet Helper
 
-/// A separate view to properly manage the ExerciseBrowserView state for selection
 private struct ExercisePickerSheet: View {
     let onCancel: () -> Void
     let onConfirm: ([ExerciseLibraryItem]) -> Void
