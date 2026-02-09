@@ -15,6 +15,9 @@ struct TemplateEditorView: View {
     @State private var showExercisePicker = false
     @State private var editingExercise: ExerciseEditContext?
 
+    /// Optional callback fired with the newly saved template
+    private var onSave: ((Template) -> Void)?
+
     /// Wrapper to make exercise editing state identifiable for sheet presentation
     struct ExerciseEditContext: Identifiable {
         let id = UUID()
@@ -22,8 +25,9 @@ struct TemplateEditorView: View {
         let exercise: TemplateEditorViewModel.EditableExercise
     }
 
-    init(existingTemplate: Template? = nil) {
+    init(existingTemplate: Template? = nil, onSave: ((Template) -> Void)? = nil) {
         self._viewModel = StateObject(wrappedValue: TemplateEditorViewModel(existingTemplate: existingTemplate))
+        self.onSave = onSave
     }
 
     var body: some View {
@@ -84,7 +88,8 @@ struct TemplateEditorView: View {
             )
         }
         .onChange(of: viewModel.savedTemplate) { _, newValue in
-            if newValue != nil {
+            if let template = newValue {
+                onSave?(template)
                 dismiss()
             }
         }
