@@ -68,7 +68,8 @@ struct HeroWorkoutCard: View {
         let muscles = template.exercises
             .compactMap { $0.exerciseLibraryItem }
             .flatMap { $0.primaryMuscles }
-        let unique = Array(Set(muscles))
+        var seen = Set<MuscleGroup>()
+        let unique = muscles.filter { seen.insert($0).inserted }
         let names = unique.prefix(3).map { $0.rawValue.capitalized }
         if unique.count > 3 {
             return names.joined(separator: ", ") + " +\(unique.count - 3)"

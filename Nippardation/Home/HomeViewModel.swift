@@ -60,6 +60,8 @@ class HomeViewModel: ObservableObject {
 
                         if let workout = program?.currentWorkout {
                             self.nextTemplate = workout.template
+                        } else {
+                            self.nextTemplate = nil
                         }
                     }
 

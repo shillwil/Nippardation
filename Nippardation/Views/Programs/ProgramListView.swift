@@ -2,7 +2,7 @@
 //  ProgramListView.swift
 //  Nippardation
 //
-//  List view for displaying and managing workout programs
+//  Card-based view for displaying and managing workout programs
 //
 
 import SwiftUI
@@ -69,7 +69,7 @@ struct ProgramListView: View {
         if viewModel.isLoading && viewModel.programs.isEmpty {
             loadingView
         } else if viewModel.programs.isEmpty {
-            emptyView
+            ProgramEmptyStateView(onCreate: { showCreateProgram = true })
         } else {
             programList
         }
@@ -78,7 +78,7 @@ struct ProgramListView: View {
     // MARK: - Subviews
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppSpacing.md) {
             ProgressView()
             Text("Loading programs...")
                 .foregroundColor(.secondary)
@@ -86,64 +86,54 @@ struct ProgramListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var emptyView: some View {
-        ContentUnavailableView {
-            Label("No Programs", systemImage: "list.bullet.clipboard")
-        } description: {
-            Text("Create your first program to get started")
-        } actions: {
-            Button("Create Program") {
-                showCreateProgram = true
-            }
-            .buttonStyle(.borderedProminent)
-        }
-    }
-
     private var programList: some View {
-        List {
-            ForEach(viewModel.programs) { program in
-                NavigationLink(destination: ProgramDetailView(programServerId: program.serverId)) {
-                    ProgramCard(program: program)
-                }
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        programToDelete = program
-                        showDeleteConfirmation = true
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+        ScrollView {
+            LazyVStack(spacing: AppSpacing.md) {
+                ForEach(viewModel.programs) { program in
+                    NavigationLink(destination: ProgramDetailView(programServerId: program.serverId)) {
+                        ProgramLibraryCard(program: program)
                     }
-
-                    if !program.isActive {
-                        Button {
-                            viewModel.activateProgram(program)
-                        } label: {
-                            Label("Activate", systemImage: "checkmark.circle")
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        if !program.isActive {
+                            Button {
+                                viewModel.activateProgram(program)
+                            } label: {
+                                Label("Activate", systemImage: "checkmark.circle")
+                            }
                         }
-                        .tint(.green)
-                    }
-                }
-                .swipeActions(edge: .leading) {
-                    Button {
-                        viewModel.duplicateProgram(program)
-                    } label: {
-                        Label("Duplicate", systemImage: "doc.on.doc")
-                    }
-                    .tint(.blue)
-                }
-            }
 
-            if viewModel.hasMore {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
+                        Button {
+                            viewModel.duplicateProgram(program)
+                        } label: {
+                            Label("Duplicate", systemImage: "doc.on.doc")
+                        }
+
+                        Divider()
+
+                        Button(role: .destructive) {
+                            programToDelete = program
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
-                .onAppear {
-                    viewModel.loadMore()
+
+                if viewModel.hasMore {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .padding(.vertical, AppSpacing.md)
+                    .onAppear {
+                        viewModel.loadMore()
+                    }
                 }
             }
+            .padding(AppSpacing.md)
         }
-        .listStyle(.plain)
     }
 }
 
