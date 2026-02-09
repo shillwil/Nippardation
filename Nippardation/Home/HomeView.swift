@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    @ObservedObject var viewModel = HomeViewModel()
+    @StateObject private var viewModel = HomeViewModel()
     @ObservedObject private var workoutManager = WorkoutManager.shared
 
     @State private var startNewWorkout: Bool = false
@@ -20,93 +20,56 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    // Workout Stats Chart
+                VStack(spacing: AppSpacing.lg) {
+                    // Hero workout card
+                    heroSection
+                        .padding(.horizontal, AppSpacing.md)
+                        .padding(.top, AppSpacing.xs)
+
+                    // Activity stats
+                    if !workoutManager.completedWorkouts.isEmpty {
+                        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                            SectionHeader(title: "This Week")
+                                .padding(.horizontal, AppSpacing.md)
+
+                            ActivityStatCards(
+                                workoutsThisWeek: viewModel.workoutsThisWeek,
+                                totalVolume: viewModel.totalVolumeFormatted,
+                                weeklyConsistency: viewModel.weeklyConsistency
+                            )
+                        }
+                    }
+
+                    // Volume chart
                     if !workoutManager.completedWorkouts.isEmpty {
                         WorkoutStatsView()
-                            .padding(.top, 8)
+                            .padding(.horizontal, AppSpacing.md)
                     }
 
-                    // Workout Templates
-                    VStack(alignment: .leading) {
-                        Text("Workout Templates")
-                            .font(.headline)
-                            .padding(.horizontal)
-
-                        ForEach(viewModel.workouts, id: \.self) { workout in
-                            NavigationLink {
-                                ExercisesListView(workout: workout)
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(workout.name)
-                                            .font(.headline)
-                                            .foregroundColor(.primary)
-
-                                        Text("\(workout.exercises.count) exercises")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding()
-                                .background(Color(.secondarySystemBackground))
-                                .cornerRadius(12)
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
+                    // Active plan details
+                    PlanDetailsSection(
+                        program: viewModel.activeProgram,
+                        nextWorkout: viewModel.nextWorkout
+                    )
+                    .padding(.horizontal, AppSpacing.md)
 
                     // Recent Workouts Section
                     if !workoutManager.completedWorkouts.isEmpty {
-                        VStack(alignment: .leading) {
-                            Text("Recent Workouts")
-                                .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.top, 8)
-
-                            ForEach(workoutManager.completedWorkouts.prefix(3)) { workout in
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(workout.workoutTemplate)
-                                            .font(.headline)
-
-                                        Text(workout.formattedDate)
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    if let duration = workout.formattedDuration {
-                                        Text(duration)
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .padding()
-                                .background(Color(.secondarySystemBackground))
-                                .cornerRadius(12)
-                            }
-                            .padding(.horizontal)
-                        }
+                        recentWorkoutsSection
+                            .padding(.horizontal, AppSpacing.md)
                     }
 
                     Spacer(minLength: 100)
                 }
             }
 
+            // FAB overlay
             VStack {
                 Spacer()
 
                 HStack {
                     Spacer()
 
-                    // Conditionally show either Resume or Start New Workout button
                     if workoutManager.isWorkoutInProgress {
                         Button {
                             showActiveWorkout = true
@@ -121,7 +84,7 @@ struct HomeView: View {
                             .padding()
                             .background(Color.green)
                             .foregroundColor(.white)
-                            .cornerRadius(16)
+                            .cornerRadius(AppCornerRadius.large)
                             .shadow(radius: 2)
                         }
                     } else {
@@ -138,7 +101,7 @@ struct HomeView: View {
                             .padding()
                             .background(Color.appTheme)
                             .foregroundColor(.white)
-                            .cornerRadius(16)
+                            .cornerRadius(AppCornerRadius.large)
                             .shadow(radius: 2)
                         }
                     }
@@ -157,23 +120,82 @@ struct HomeView: View {
                     }
                 }
             }
-
         }
         .navigationTitle("Home")
         .onAppear {
-            // Refresh workout data when the view appears
             workoutManager.loadCompletedWorkouts()
+            viewModel.loadDashboard()
+            viewModel.computeWeeklyStats(from: workoutManager.completedWorkouts)
 
-            // Check for active workout on first appear only
             if !didCheckForActiveWorkout {
-                // Explicitly force the WorkoutManager to check for cached workout
                 workoutManager.checkForActiveWorkout()
                 didCheckForActiveWorkout = true
+            }
+        }
+        .onChange(of: workoutManager.completedWorkouts.count) {
+            viewModel.computeWeeklyStats(from: workoutManager.completedWorkouts)
+        }
+    }
+
+    // MARK: - Hero Section
+
+    @ViewBuilder
+    private var heroSection: some View {
+        if let program = viewModel.activeProgram {
+            HeroWorkoutCard(
+                workout: viewModel.nextWorkout,
+                template: viewModel.nextTemplate,
+                programProgress: program.progress,
+                onStart: {
+                    if workoutManager.isWorkoutInProgress {
+                        showActiveWorkout = true
+                    } else {
+                        startNewWorkout = true
+                    }
+                }
+            )
+        } else {
+            HeroWorkoutFallbackCard(onChooseProgram: {
+                startNewWorkout = true
+            })
+        }
+    }
+
+    // MARK: - Recent Workouts
+
+    private var recentWorkoutsSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            SectionHeader(title: "Recent Workouts")
+
+            ForEach(workoutManager.completedWorkouts.prefix(3)) { workout in
+                HStack {
+                    VStack(alignment: .leading, spacing: AppSpacing.xxs) {
+                        Text(workout.workoutTemplate)
+                            .font(.headline)
+
+                        Text(workout.formattedDate)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    if let duration = workout.formattedDuration {
+                        Text(duration)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(AppSpacing.md)
+                .cardStyle()
             }
         }
     }
 }
 
 #Preview {
-    HomeView()
+    NavigationStack {
+        HomeView()
+    }
+    .withDependencies(.preview)
 }
