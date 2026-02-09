@@ -12,38 +12,24 @@ struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    if viewModel.isLoading && viewModel.activeProgram == nil {
-                        ProgressView()
-                            .padding(.top, 50)
-                    } else if let program = viewModel.activeProgram {
-                        // Active program content
-                        activeProgramContent(program)
-                    } else {
-                        // No active program
-                        noProgramContent
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Dashboard")
-            .refreshable {
-                await viewModel.refreshAsync()
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        NavigationLink(destination: TemplateListView()) {
-                            Image(systemName: "doc.text")
-                        }
-                        NavigationLink(destination: ProgramListView()) {
-                            Image(systemName: "list.bullet.clipboard")
-                        }
-                    }
+        ScrollView {
+            VStack(spacing: 24) {
+                if viewModel.isLoading && viewModel.activeProgram == nil {
+                    ProgressView()
+                        .padding(.top, 50)
+                } else if let program = viewModel.activeProgram {
+                    // Active program content
+                    activeProgramContent(program)
+                } else {
+                    // No active program
+                    noProgramContent
                 }
             }
+            .padding()
+        }
+        .navigationTitle("Dashboard")
+        .refreshable {
+            await viewModel.refreshAsync()
         }
         .onAppear {
             viewModel.loadDashboard()
