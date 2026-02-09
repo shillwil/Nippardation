@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Binding var selectedTab: AppTab
+
     @StateObject private var viewModel = HomeViewModel()
     @ObservedObject private var workoutManager = WorkoutManager.shared
 
@@ -156,7 +158,7 @@ struct HomeView: View {
             )
         } else {
             HeroWorkoutFallbackCard(onChooseProgram: {
-                startNewWorkout = true
+                selectedTab = .programs
             })
         }
     }
@@ -195,7 +197,7 @@ struct HomeView: View {
 
 #Preview {
     NavigationStack {
-        HomeView()
+        HomeView(selectedTab: .constant(.home))
     }
     .withDependencies(.preview)
 }
