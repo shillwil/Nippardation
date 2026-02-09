@@ -27,13 +27,9 @@ struct ProgramWizardView: View {
                 case 0:
                     ProgramWizardStep1(viewModel: viewModel)
                 case 1:
-                    // Step 2: Schedule builder (PR9)
-                    Text("Step 2: Schedule — Coming in PR9")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ProgramWizardStep2(viewModel: viewModel)
                 case 2:
-                    // Step 3: Review (PR9)
-                    Text("Step 3: Review — Coming in PR9")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ProgramWizardStep3(viewModel: viewModel)
                 default:
                     EmptyView()
                 }
@@ -104,7 +100,7 @@ struct ProgramWizardView: View {
     private var isCurrentStepValid: Bool {
         switch currentStep {
         case 0: return viewModel.isStep1Valid
-        case 1: return true // Step 2 validation in PR9
+        case 1: return viewModel.isStep2Valid
         case 2: return viewModel.isValid
         default: return false
         }
