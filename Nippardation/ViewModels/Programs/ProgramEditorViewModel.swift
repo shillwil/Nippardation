@@ -19,6 +19,7 @@ final class ProgramEditorViewModel: ObservableObject {
     @Published var durationWeeks: Int? = nil
     @Published var workouts: [EditableWorkout] = []
     @Published var isIndefinite: Bool = true
+    @Published var selectedDays: Set<Int> = []
 
     @Published var isSaving = false
     @Published var isLoadingTemplates = false
@@ -58,6 +59,11 @@ final class ProgramEditorViewModel: ObservableObject {
         workouts.allSatisfy { $0.templateServerId != nil }
     }
 
+    /// Validates Step 1 of the wizard (name + days selected)
+    var isStep1Valid: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && !selectedDays.isEmpty
+    }
+
     // MARK: - Initialization
 
     init(
@@ -93,6 +99,17 @@ final class ProgramEditorViewModel: ObservableObject {
             .dropFirst()
             .sink { [weak self] _ in
                 self?.updateWorkoutCount()
+            }
+            .store(in: &cancellables)
+
+        // Sync selectedDays count with daysPerWeek
+        $selectedDays
+            .dropFirst()
+            .sink { [weak self] days in
+                guard let self = self else { return }
+                if days.count != self.daysPerWeek {
+                    self.daysPerWeek = days.count
+                }
             }
             .store(in: &cancellables)
 
