@@ -57,7 +57,9 @@ final class ProgramEditorViewModel: ObservableObject {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         daysPerWeek > 0 &&
         daysPerWeek <= 7 &&
-        workouts.allSatisfy { $0.templateServerId != nil }
+        workouts.enumerated().allSatisfy { index, workout in
+            restDays.contains(index) || workout.templateServerId != nil
+        }
     }
 
     /// Validates Step 1 of the wizard (name + days selected)
@@ -183,6 +185,8 @@ final class ProgramEditorViewModel: ObservableObject {
         } else if daysPerWeek < currentCount {
             // Remove workouts
             workouts = Array(workouts.prefix(daysPerWeek))
+            // Remove stale rest day indices that are now out of range
+            restDays = restDays.filter { $0 < daysPerWeek }
         }
 
         // Renumber
@@ -235,7 +239,8 @@ final class ProgramEditorViewModel: ObservableObject {
         // Capture @MainActor properties before entering async context
         let capturedName = name
         let capturedDescription = description
-        let capturedDaysPerWeek = daysPerWeek
+        let trainingDaysPerWeek = workouts.enumerated().filter { !restDays.contains($0.offset) }.count
+        let capturedDaysPerWeek = trainingDaysPerWeek
         let capturedIsIndefinite = isIndefinite
         let capturedDurationWeeks = durationWeeks
         let capturedWorkouts = workouts

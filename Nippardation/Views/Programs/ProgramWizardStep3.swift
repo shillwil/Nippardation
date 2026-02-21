@@ -55,7 +55,7 @@ struct ProgramWizardStep3: View {
 
                 HStack(spacing: AppSpacing.md) {
                     PillBadge(
-                        text: "\(viewModel.daysPerWeek) days/week",
+                        text: "\(trainingDayCount) days/week",
                         color: .appTheme,
                         style: .tinted
                     )
