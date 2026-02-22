@@ -213,6 +213,7 @@ final class ProgramEditorViewModel: ObservableObject {
     /// Updates the workout count to match daysPerWeek
     func updateWorkoutCount() {
         let currentCount = workouts.count
+        guard daysPerWeek != currentCount else { return }
 
         if daysPerWeek > currentCount {
             // Add workouts
