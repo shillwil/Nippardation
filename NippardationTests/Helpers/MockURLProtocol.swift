@@ -10,11 +10,30 @@ import Foundation
 /// Mock URL protocol for testing network requests
 final class MockURLProtocol: URLProtocol {
 
-    /// Handler to provide mock responses
-    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data?))?
+    typealias RequestHandler = (URLRequest) throws -> (HTTPURLResponse, Data?)
 
-    /// Recorded requests for verification
-    static var recordedRequests: [URLRequest] = []
+    private static let sessionIDHeader = "X-MockURLProtocol-Session-ID"
+    private static let stateQueue = DispatchQueue(label: "MockURLProtocol.State")
+
+    // Global (legacy) state
+    private static var globalRequestHandler: RequestHandler?
+    private static var globalRecordedRequests: [URLRequest] = []
+
+    // Session-scoped state for parallel-safe tests
+    private static var sessionRequestHandlers: [String: RequestHandler] = [:]
+    private static var sessionRecordedRequests: [String: [URLRequest]] = [:]
+
+    /// Legacy shared handler. Prefer `setRequestHandler(for:_:)` to avoid cross-test interference.
+    static var requestHandler: RequestHandler? {
+        get { stateQueue.sync { globalRequestHandler } }
+        set { stateQueue.sync { globalRequestHandler = newValue } }
+    }
+
+    /// Legacy shared request capture. Prefer `recordedRequests(for:)` for session-scoped access.
+    static var recordedRequests: [URLRequest] {
+        get { stateQueue.sync { globalRecordedRequests } }
+        set { stateQueue.sync { globalRecordedRequests = newValue } }
+    }
 
     override class func canInit(with request: URLRequest) -> Bool {
         return true
@@ -25,9 +44,10 @@ final class MockURLProtocol: URLProtocol {
     }
 
     override func startLoading() {
-        Self.recordedRequests.append(request)
+        let sessionID = request.value(forHTTPHeaderField: Self.sessionIDHeader)
+        Self.recordRequest(request, for: sessionID)
 
-        guard let handler = Self.requestHandler else {
+        guard let handler = Self.handler(for: sessionID) ?? Self.requestHandler else {
             let error = NSError(domain: "MockURLProtocol", code: -1, userInfo: [NSLocalizedDescriptionKey: "No handler set"])
             client?.urlProtocol(self, didFailWithError: error)
             return
@@ -50,16 +70,63 @@ final class MockURLProtocol: URLProtocol {
     }
 
     /// Reset all mock state
-    static func reset() {
-        requestHandler = nil
-        recordedRequests = []
+    static func reset(sessionID: String? = nil) {
+        stateQueue.sync {
+            if let sessionID {
+                sessionRequestHandlers[sessionID] = nil
+                sessionRecordedRequests[sessionID] = nil
+                return
+            }
+
+            globalRequestHandler = nil
+            globalRecordedRequests = []
+            sessionRequestHandlers = [:]
+            sessionRecordedRequests = [:]
+        }
+    }
+
+    /// Generates a unique session ID for isolating handlers between tests.
+    static func makeSessionID() -> String {
+        UUID().uuidString
+    }
+
+    /// Set a handler scoped to a specific mock URLSession.
+    static func setRequestHandler(for sessionID: String, _ handler: @escaping RequestHandler) {
+        stateQueue.sync {
+            sessionRequestHandlers[sessionID] = handler
+        }
+    }
+
+    /// Get requests recorded for a specific mock URLSession.
+    static func recordedRequests(for sessionID: String) -> [URLRequest] {
+        stateQueue.sync {
+            sessionRecordedRequests[sessionID] ?? []
+        }
     }
 
     /// Create a mock URLSession configured to use this protocol
-    static func mockSession() -> URLSession {
+    static func mockSession(sessionID: String = UUID().uuidString) -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
+        var headers = config.httpAdditionalHeaders ?? [:]
+        headers[sessionIDHeader] = sessionID
+        config.httpAdditionalHeaders = headers
         return URLSession(configuration: config)
+    }
+
+    private static func handler(for sessionID: String?) -> RequestHandler? {
+        guard let sessionID else { return nil }
+        return stateQueue.sync { sessionRequestHandlers[sessionID] }
+    }
+
+    private static func recordRequest(_ request: URLRequest, for sessionID: String?) {
+        stateQueue.sync {
+            if let sessionID {
+                sessionRecordedRequests[sessionID, default: []].append(request)
+            } else {
+                globalRecordedRequests.append(request)
+            }
+        }
     }
 }
 

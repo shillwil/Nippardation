@@ -116,8 +116,9 @@ final class ProgramEditorViewModel: ObservableObject {
         // Watch for daysPerWeek changes
         $daysPerWeek
             .dropFirst()
-            .sink { [weak self] _ in
-                self?.updateWorkoutCount()
+            .sink { [weak self] newDaysPerWeek in
+                // @Published emits during willSet; use the published value instead of reading self.daysPerWeek.
+                self?.updateWorkoutCount(targetCount: newDaysPerWeek)
             }
             .store(in: &cancellables)
 
@@ -217,14 +218,15 @@ final class ProgramEditorViewModel: ObservableObject {
         }
     }
 
-    /// Updates the workout count to match daysPerWeek
-    func updateWorkoutCount() {
+    /// Updates the workout count to match the target day count.
+    func updateWorkoutCount(targetCount: Int? = nil) {
+        let targetCount = targetCount ?? daysPerWeek
         let currentCount = workouts.count
-        guard daysPerWeek != currentCount else { return }
+        guard targetCount != currentCount else { return }
 
-        if daysPerWeek > currentCount {
+        if targetCount > currentCount {
             // Add workouts
-            for i in currentCount..<daysPerWeek {
+            for i in currentCount..<targetCount {
                 workouts.append(EditableWorkout(
                     dayNumber: i,
                     dayLabel: "Day \(i + 1)",
@@ -232,11 +234,11 @@ final class ProgramEditorViewModel: ObservableObject {
                     templateName: nil
                 ))
             }
-        } else if daysPerWeek < currentCount {
+        } else if targetCount < currentCount {
             // Remove workouts
-            workouts = Array(workouts.prefix(daysPerWeek))
+            workouts = Array(workouts.prefix(targetCount))
             // Remove stale rest day indices that are now out of range
-            restDays = restDays.filter { $0 < daysPerWeek }
+            restDays = restDays.filter { $0 < targetCount }
         }
 
         // Renumber

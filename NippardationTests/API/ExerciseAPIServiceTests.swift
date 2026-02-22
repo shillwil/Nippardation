@@ -13,22 +13,23 @@ import Foundation
 struct ExerciseAPIServiceTests {
 
     // Note: These tests use MockURLProtocol to intercept network requests.
-    // Tests are serialized because MockURLProtocol.requestHandler is shared state.
+    // Tests are serialized and use session-scoped MockURLProtocol handlers.
     // MockAuthTokenProvider is used to provide a valid token so requests reach the network layer.
 
     // MARK: - Setup
 
-    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> ExerciseAPIService {
-        MockURLProtocol.reset()
-        return ExerciseAPIService(session: MockURLProtocol.mockSession(), authProvider: authProvider)
+    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> (ExerciseAPIService, String) {
+        let sessionID = MockURLProtocol.makeSessionID()
+        MockURLProtocol.reset(sessionID: sessionID)
+        return (ExerciseAPIService(session: MockURLProtocol.mockSession(sessionID: sessionID), authProvider: authProvider), sessionID)
     }
 
     // MARK: - fetchExercises Tests
 
     @Test func fetchExercisesBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             // Verify URL structure
             #expect(request.url?.path.contains("api/exercises") == true)
             #expect(request.httpMethod == "GET")
@@ -64,14 +65,14 @@ struct ExerciseAPIServiceTests {
     }
 
     @Test func fetchExercisesWithFiltersAddsQueryItems() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
         let filters = ExerciseFilters(
             muscleGroups: ["chest"],
             equipment: ["barbell"],
             searchQuery: "bench"
         )
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
             let queryItems = components?.queryItems ?? []
 
@@ -98,9 +99,9 @@ struct ExerciseAPIServiceTests {
     }
 
     @Test func fetchExercisesWithCursorSetsCorrectPage() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
             let queryItems = components?.queryItems ?? []
             let pageItem = queryItems.first { $0.name == "page" }
@@ -120,9 +121,9 @@ struct ExerciseAPIServiceTests {
     // MARK: - fetchExercise Tests
 
     @Test func fetchExerciseBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/exercises/ex_001") == true)
             #expect(request.httpMethod == "GET")
 
@@ -139,9 +140,9 @@ struct ExerciseAPIServiceTests {
     // MARK: - fetchFilterOptions Tests
 
     @Test func fetchFilterOptionsBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/exercises/filters") == true)
             #expect(request.httpMethod == "GET")
 
@@ -158,9 +159,9 @@ struct ExerciseAPIServiceTests {
     // MARK: - recordUsage Tests
 
     @Test func recordUsageBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/exercises/ex_001/usage") == true)
             #expect(request.httpMethod == "POST")
 
@@ -177,9 +178,9 @@ struct ExerciseAPIServiceTests {
     // MARK: - Error Handling Tests
 
     @Test func handlesUnauthorizedError() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -196,9 +197,9 @@ struct ExerciseAPIServiceTests {
     }
 
     @Test func requestIncludesAuthorizationHeader() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             // Verify auth header is set with the mock token
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer mock-test-token")
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 200)
@@ -212,9 +213,9 @@ struct ExerciseAPIServiceTests {
     }
 
     @Test func requestIncludesContentTypeHeader() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             // Verify Content-Type header
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 200)
@@ -229,7 +230,7 @@ struct ExerciseAPIServiceTests {
 
     @Test func throwsUnauthorizedWhenNoToken() async throws {
         let noTokenProvider = MockAuthTokenProvider(token: nil)
-        let service = createService(authProvider: noTokenProvider)
+        let (service, _) = createService(authProvider: noTokenProvider)
 
         do {
             _ = try await service.fetchExercises(filters: nil, cursor: nil, limit: 20)

@@ -12,22 +12,23 @@ import Foundation
 @Suite(.serialized)
 struct UserAPIServiceTests {
 
-    // Note: Tests are serialized because MockURLProtocol.requestHandler is shared state.
+    // Note: Tests are serialized and use session-scoped MockURLProtocol handlers.
     // MockAuthTokenProvider is used to provide a valid token so requests reach the network layer.
 
     // MARK: - Setup
 
-    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> UserAPIService {
-        MockURLProtocol.reset()
-        return UserAPIService(session: MockURLProtocol.mockSession(), authProvider: authProvider)
+    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> (UserAPIService, String) {
+        let sessionID = MockURLProtocol.makeSessionID()
+        MockURLProtocol.reset(sessionID: sessionID)
+        return (UserAPIService(session: MockURLProtocol.mockSession(sessionID: sessionID), authProvider: authProvider), sessionID)
     }
 
     // MARK: - login Tests
 
     @Test func loginBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/auth/login") == true)
             #expect(request.httpMethod == "POST")
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
@@ -45,9 +46,9 @@ struct UserAPIServiceTests {
     // MARK: - fetchProfile Tests
 
     @Test func fetchProfileBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/me") == true)
             #expect(request.httpMethod == "GET")
 
@@ -64,9 +65,9 @@ struct UserAPIServiceTests {
     // MARK: - updateProfile Tests
 
     @Test func updateProfileBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/me") == true)
             #expect(request.httpMethod == "PUT")
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
@@ -94,9 +95,9 @@ struct UserAPIServiceTests {
     }
 
     @Test func updateProfileWithAllFieldsIncludesAllInBody() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             if let body = request.httpBody,
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
                 #expect(json["displayName"] as? String == "Full Update")
@@ -133,9 +134,9 @@ struct UserAPIServiceTests {
     }
 
     @Test func updateProfileWithNilFieldsOmitsThem() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             if let body = request.httpBody,
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
                 // Only displayName should be present
@@ -163,9 +164,9 @@ struct UserAPIServiceTests {
     // happens before the network request. The following tests verify auth-related behavior.
 
     @Test func handlesUnauthorized() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -182,9 +183,9 @@ struct UserAPIServiceTests {
     }
 
     @Test func fetchProfileRequiresAuth() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -201,9 +202,9 @@ struct UserAPIServiceTests {
     }
 
     @Test func updateProfileRequiresAuth() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -224,9 +225,9 @@ struct UserAPIServiceTests {
     // MARK: - Path Validation Tests
 
     @Test func fetchProfileUsesApiMeNotApiUsersMe() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             let path = request.url?.path ?? ""
             #expect(!path.contains("api/users/me"), "Path should use api/me, not api/users/me")
             #expect(path.contains("api/me"))
@@ -242,9 +243,9 @@ struct UserAPIServiceTests {
     }
 
     @Test func updateProfileUsesApiMeNotApiUsersMe() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             let path = request.url?.path ?? ""
             #expect(!path.contains("api/users/me"), "Path should use api/me, not api/users/me")
             #expect(path.contains("api/me"))
