@@ -35,7 +35,6 @@ struct ProgramWizardStep2: View {
                         let isRest = viewModel.restDays.contains(index)
                         DayScheduleCard(
                             dayNumber: dayNumberForWorkout(index),
-                            dayLabel: workout.dayLabel,
                             templateName: workout.templateName,
                             exerciseCount: exerciseCount(for: workout),
                             isRest: isRest,

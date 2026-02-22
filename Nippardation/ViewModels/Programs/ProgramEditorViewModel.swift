@@ -67,13 +67,15 @@ final class ProgramEditorViewModel: ObservableObject {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && !selectedDays.isEmpty
     }
 
-    /// Validates Step 2 of the wizard (all non-rest days have templates)
+    /// Validates Step 2 of the wizard (all non-rest days have templates, at least one training day)
     var isStep2Valid: Bool {
+        var hasTrainingDay = false
         for (index, workout) in workouts.enumerated() {
             if restDays.contains(index) { continue }
             if workout.templateServerId == nil { return false }
+            hasTrainingDay = true
         }
-        return !workouts.isEmpty
+        return hasTrainingDay
     }
 
     // MARK: - Initialization
@@ -264,6 +266,16 @@ final class ProgramEditorViewModel: ObservableObject {
                             dayLabel: workout.dayLabel.isEmpty ? nil : workout.dayLabel,
                             templateServerId: templateServerId,
                             template: template
+                        )
+                    }.enumerated().map { index, workout in
+                        // Renumber after filtering rest days to avoid gaps
+                        ProgramWorkout(
+                            id: workout.id,
+                            serverId: workout.serverId,
+                            dayNumber: index,
+                            dayLabel: workout.dayLabel,
+                            templateServerId: workout.templateServerId,
+                            template: workout.template
                         )
                     }
 

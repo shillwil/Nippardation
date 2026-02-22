@@ -9,7 +9,6 @@ import SwiftUI
 
 struct DayScheduleCard: View {
     let dayNumber: Int
-    let dayLabel: String
     let templateName: String?
     let exerciseCount: Int?
     let isRest: Bool
@@ -98,17 +97,17 @@ struct DayScheduleCard: View {
 #Preview {
     VStack(spacing: AppSpacing.sm) {
         DayScheduleCard(
-            dayNumber: 0, dayLabel: "Day 1", templateName: "Push Day",
+            dayNumber: 0, templateName: "Push Day",
             exerciseCount: 7, isRest: false,
             onSelectTemplate: {}, onToggleRest: {}
         )
         DayScheduleCard(
-            dayNumber: 1, dayLabel: "Day 2", templateName: nil,
+            dayNumber: 1, templateName: nil,
             exerciseCount: nil, isRest: false,
             onSelectTemplate: {}, onToggleRest: {}
         )
         DayScheduleCard(
-            dayNumber: 2, dayLabel: "Day 3", templateName: nil,
+            dayNumber: 2, templateName: nil,
             exerciseCount: nil, isRest: true,
             onSelectTemplate: {}, onToggleRest: {}
         )
