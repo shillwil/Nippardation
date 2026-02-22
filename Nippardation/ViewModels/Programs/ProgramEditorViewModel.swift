@@ -49,6 +49,7 @@ final class ProgramEditorViewModel: ObservableObject {
     // MARK: - State
 
     private var existingProgram: Program?
+    private var previousSelectedDays: Set<Int> = []
     var isEditing: Bool { existingProgram != nil }
 
     // MARK: - Computed Properties
@@ -116,13 +117,14 @@ final class ProgramEditorViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Sync selectedDays count with daysPerWeek
+        // Rebuild workouts when selectedDays changes, preserving day-of-week associations
         $selectedDays
             .dropFirst()
-            .sink { [weak self] days in
+            .sink { [weak self] newDays in
                 guard let self = self else { return }
-                if days.count != self.daysPerWeek {
-                    self.daysPerWeek = days.count
+                self.rebuildWorkouts(for: newDays)
+                if newDays.count != self.daysPerWeek {
+                    self.daysPerWeek = newDays.count
                 }
             }
             .store(in: &cancellables)
@@ -168,6 +170,44 @@ final class ProgramEditorViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Rebuilds workouts when selectedDays changes, preserving day-of-week template associations
+    private func rebuildWorkouts(for newDays: Set<Int>) {
+        let oldSorted = previousSelectedDays.sorted()
+        let newSorted = newDays.sorted()
+
+        // Map old day-of-week → (workout, isRest) from current state
+        var dayWorkoutMap: [Int: EditableWorkout] = [:]
+        var dayIsRest: [Int: Bool] = [:]
+        for (index, dayOfWeek) in oldSorted.enumerated() where index < workouts.count {
+            dayWorkoutMap[dayOfWeek] = workouts[index]
+            dayIsRest[dayOfWeek] = restDays.contains(index)
+        }
+
+        // Rebuild for new selection, preserving day-of-week associations
+        var newWorkouts: [EditableWorkout] = []
+        var newRestDays: Set<Int> = []
+        for (newIndex, dayOfWeek) in newSorted.enumerated() {
+            if var existing = dayWorkoutMap[dayOfWeek] {
+                existing.dayNumber = newIndex
+                newWorkouts.append(existing)
+                if dayIsRest[dayOfWeek] == true {
+                    newRestDays.insert(newIndex)
+                }
+            } else {
+                newWorkouts.append(EditableWorkout(
+                    dayNumber: newIndex,
+                    dayLabel: "Day \(newIndex + 1)",
+                    templateServerId: nil,
+                    templateName: nil
+                ))
+            }
+        }
+
+        workouts = newWorkouts
+        restDays = newRestDays
+        previousSelectedDays = newDays
     }
 
     /// Updates the workout count to match daysPerWeek
