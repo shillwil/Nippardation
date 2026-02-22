@@ -19,7 +19,11 @@ final class ProgramEditorViewModel: ObservableObject {
     @Published var durationWeeks: Int? = nil
     @Published var workouts: [EditableWorkout] = []
     @Published var isIndefinite: Bool = true
-    @Published var selectedDays: Set<Int> = []
+    @Published var selectedDays: Set<Int> = [] {
+        didSet {
+            handleSelectedDaysChange(from: oldValue)
+        }
+    }
     @Published var restDays: Set<Int> = []
 
     @Published var isSaving = false
@@ -117,18 +121,6 @@ final class ProgramEditorViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Rebuild workouts when selectedDays changes, preserving day-of-week associations
-        $selectedDays
-            .dropFirst()
-            .sink { [weak self] newDays in
-                guard let self = self else { return }
-                self.rebuildWorkouts(for: newDays)
-                if newDays.count != self.daysPerWeek {
-                    self.daysPerWeek = newDays.count
-                }
-            }
-            .store(in: &cancellables)
-
         // Watch for isIndefinite changes
         $isIndefinite
             .dropFirst()
@@ -190,7 +182,13 @@ final class ProgramEditorViewModel: ObservableObject {
         var newRestDays: Set<Int> = []
         for (newIndex, dayOfWeek) in newSorted.enumerated() {
             if var existing = dayWorkoutMap[dayOfWeek] {
+                let oldDayNumber = existing.dayNumber
                 existing.dayNumber = newIndex
+                existing.dayLabel = renumberedEditableDayLabel(
+                    existing.dayLabel,
+                    from: oldDayNumber,
+                    to: newIndex
+                )
                 newWorkouts.append(existing)
                 if dayIsRest[dayOfWeek] == true {
                     newRestDays.insert(newIndex)
@@ -208,6 +206,15 @@ final class ProgramEditorViewModel: ObservableObject {
         workouts = newWorkouts
         restDays = newRestDays
         previousSelectedDays = newDays
+    }
+
+    /// Keeps workout rows synchronized with selected calendar days in the wizard.
+    private func handleSelectedDaysChange(from oldDays: Set<Int>) {
+        guard selectedDays != oldDays else { return }
+        rebuildWorkouts(for: selectedDays)
+        if selectedDays.count != daysPerWeek {
+            daysPerWeek = selectedDays.count
+        }
     }
 
     /// Updates the workout count to match daysPerWeek
@@ -234,7 +241,13 @@ final class ProgramEditorViewModel: ObservableObject {
 
         // Renumber
         for i in 0..<workouts.count {
+            let oldDayNumber = workouts[i].dayNumber
             workouts[i].dayNumber = i
+            workouts[i].dayLabel = renumberedEditableDayLabel(
+                workouts[i].dayLabel,
+                from: oldDayNumber,
+                to: i
+            )
         }
     }
 
@@ -277,7 +290,7 @@ final class ProgramEditorViewModel: ObservableObject {
 
     /// Saves the program (creates new or updates existing)
     func save() {
-        guard isValid else { return }
+        guard isValid && isStep2Valid else { return }
 
         // Capture @MainActor properties before entering async context
         let capturedName = name
@@ -314,7 +327,11 @@ final class ProgramEditorViewModel: ObservableObject {
                             id: workout.id,
                             serverId: workout.serverId,
                             dayNumber: index,
-                            dayLabel: workout.dayLabel,
+                            dayLabel: self.renumberedProgramWorkoutLabel(
+                                workout.dayLabel,
+                                from: workout.dayNumber,
+                                to: index
+                            ),
                             templateServerId: workout.templateServerId,
                             template: workout.template
                         )
@@ -381,5 +398,21 @@ final class ProgramEditorViewModel: ObservableObject {
     /// Clears the current error message
     func clearError() {
         error = nil
+    }
+
+    // MARK: - Label Helpers
+
+    nonisolated private func defaultDayLabel(for dayNumber: Int) -> String {
+        "Day \(dayNumber + 1)"
+    }
+
+    /// Keep auto-generated "Day N" labels aligned with day-number changes while preserving custom labels.
+    nonisolated private func renumberedEditableDayLabel(_ label: String, from oldDayNumber: Int, to newDayNumber: Int) -> String {
+        label == defaultDayLabel(for: oldDayNumber) ? defaultDayLabel(for: newDayNumber) : label
+    }
+
+    nonisolated private func renumberedProgramWorkoutLabel(_ label: String?, from oldDayNumber: Int, to newDayNumber: Int) -> String? {
+        guard let label else { return nil }
+        return label == defaultDayLabel(for: oldDayNumber) ? defaultDayLabel(for: newDayNumber) : label
     }
 }
