@@ -12,22 +12,23 @@ import Foundation
 @Suite(.serialized)
 struct ProgramAPIServiceTests {
 
-    // Note: Tests are serialized because MockURLProtocol.requestHandler is shared state.
+    // Note: Tests are serialized and use session-scoped MockURLProtocol handlers.
     // MockAuthTokenProvider is used to provide a valid token so requests reach the network layer.
 
     // MARK: - Setup
 
-    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> ProgramAPIService {
-        MockURLProtocol.reset()
-        return ProgramAPIService(session: MockURLProtocol.mockSession(), authProvider: authProvider)
+    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> (ProgramAPIService, String) {
+        let sessionID = MockURLProtocol.makeSessionID()
+        MockURLProtocol.reset(sessionID: sessionID)
+        return (ProgramAPIService(session: MockURLProtocol.mockSession(sessionID: sessionID), authProvider: authProvider), sessionID)
     }
 
     // MARK: - fetchPrograms Tests
 
     @Test func fetchProgramsBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs") == true)
             #expect(request.httpMethod == "GET")
 
@@ -53,9 +54,9 @@ struct ProgramAPIServiceTests {
     // MARK: - fetchProgram Tests
 
     @Test func fetchProgramBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/prog_001") == true)
             #expect(request.httpMethod == "GET")
 
@@ -72,9 +73,9 @@ struct ProgramAPIServiceTests {
     // MARK: - fetchActiveProgram Tests
 
     @Test func fetchActiveProgramBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/active") == true)
             #expect(request.httpMethod == "GET")
 
@@ -94,9 +95,9 @@ struct ProgramAPIServiceTests {
     // MARK: - createProgram Tests
 
     @Test func createProgramBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs") == true)
             #expect(request.httpMethod == "POST")
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
@@ -129,9 +130,9 @@ struct ProgramAPIServiceTests {
     // MARK: - updateProgram Tests
 
     @Test func updateProgramBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/prog_001") == true)
             #expect(request.httpMethod == "PUT")
 
@@ -150,9 +151,9 @@ struct ProgramAPIServiceTests {
     // MARK: - updateProgramWorkouts Tests
 
     @Test func updateProgramWorkoutsBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/prog_001/workouts") == true)
             #expect(request.httpMethod == "PUT")
 
@@ -173,9 +174,9 @@ struct ProgramAPIServiceTests {
     // MARK: - deleteProgram Tests
 
     @Test func deleteProgramBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/prog_001") == true)
             #expect(request.httpMethod == "DELETE")
 
@@ -192,9 +193,9 @@ struct ProgramAPIServiceTests {
     // MARK: - State Management Tests
 
     @Test func activateProgramBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/prog_001/activate") == true)
             #expect(request.httpMethod == "POST")
 
@@ -209,9 +210,9 @@ struct ProgramAPIServiceTests {
     }
 
     @Test func deactivateProgramBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/prog_001/deactivate") == true)
             #expect(request.httpMethod == "POST")
 
@@ -226,9 +227,9 @@ struct ProgramAPIServiceTests {
     }
 
     @Test func advanceProgramBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/prog_001/advance") == true)
             #expect(request.httpMethod == "POST")
 
@@ -243,9 +244,9 @@ struct ProgramAPIServiceTests {
     }
 
     @Test func resetProgramBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/programs/prog_001/reset") == true)
             #expect(request.httpMethod == "POST")
 
@@ -266,9 +267,9 @@ struct ProgramAPIServiceTests {
     // the network request. The following tests verify auth-related behavior.
 
     @Test func handlesUnauthorized() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -285,9 +286,9 @@ struct ProgramAPIServiceTests {
     }
 
     @Test func fetchProgramRequiresAuth() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -304,9 +305,9 @@ struct ProgramAPIServiceTests {
     }
 
     @Test func createProgramRequiresAuth() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 

@@ -14,10 +14,10 @@ struct NextWorkoutCard: View {
     let onStart: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             // Header
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: AppSpacing.xxs) {
                     Text("Next Workout")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -29,22 +29,15 @@ struct NextWorkoutCard: View {
 
                 Spacer()
 
-                Text(workout.dayIndicator)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.blue)
-                    .cornerRadius(8)
+                PillBadge(text: workout.dayIndicator, color: .appTheme)
             }
 
             // Exercise list preview
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 ForEach(template.exercises.prefix(4)) { exercise in
-                    HStack(spacing: 8) {
+                    HStack(spacing: AppSpacing.xs) {
                         Circle()
-                            .fill(Color.blue.opacity(0.3))
+                            .fill(Color.appTheme.opacity(0.3))
                             .frame(width: 8, height: 8)
 
                         Text(exercise.exerciseLibraryItem?.name ?? "Exercise")
@@ -66,7 +59,7 @@ struct NextWorkoutCard: View {
             }
 
             // Stats row
-            HStack(spacing: 16) {
+            HStack(spacing: AppSpacing.md) {
                 Label("\(template.exerciseCount) exercises", systemImage: "figure.strengthtraining.traditional")
                 Label("\(template.totalWorkingSets) sets", systemImage: "number")
                 Label("~\(template.estimatedDurationMinutes) min", systemImage: "clock")
@@ -83,19 +76,8 @@ struct NextWorkoutCard: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
         }
-        .padding()
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [Color.blue.opacity(0.15), Color.blue.opacity(0.05)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-        )
+        .padding(AppSpacing.md)
+        .gradientCardStyle()
     }
 }
 

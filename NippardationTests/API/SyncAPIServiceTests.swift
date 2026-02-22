@@ -12,22 +12,23 @@ import Foundation
 @Suite(.serialized)
 struct SyncAPIServiceTests {
 
-    // Note: Tests are serialized because MockURLProtocol.requestHandler is shared state.
+    // Note: Tests are serialized and use session-scoped MockURLProtocol handlers.
     // MockAuthTokenProvider is used to provide a valid token so requests reach the network layer.
 
     // MARK: - Setup
 
-    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> SyncAPIService {
-        MockURLProtocol.reset()
-        return SyncAPIService(session: MockURLProtocol.mockSession(), authProvider: authProvider)
+    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> (SyncAPIService, String) {
+        let sessionID = MockURLProtocol.makeSessionID()
+        MockURLProtocol.reset(sessionID: sessionID)
+        return (SyncAPIService(session: MockURLProtocol.mockSession(sessionID: sessionID), authProvider: authProvider), sessionID)
     }
 
     // MARK: - sync Tests
 
     @Test func syncBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/sync") == true)
             #expect(request.httpMethod == "POST")
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
@@ -60,9 +61,9 @@ struct SyncAPIServiceTests {
     }
 
     @Test func syncIncludesWorkoutsInPayload() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             if let body = request.httpBody,
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
                let workouts = json["workouts"] as? [[String: Any]] {
@@ -104,9 +105,9 @@ struct SyncAPIServiceTests {
     }
 
     @Test func syncHasExtendedTimeout() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             // The service sets a 60 second timeout for sync operations
             #expect(request.timeoutInterval == 60)
 
@@ -129,9 +130,9 @@ struct SyncAPIServiceTests {
     // happens before the network request. The following tests verify auth-related behavior.
 
     @Test func handlesUnauthorized() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -150,9 +151,9 @@ struct SyncAPIServiceTests {
     }
 
     @Test func syncRequiresAuth() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 

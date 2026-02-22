@@ -28,7 +28,7 @@ struct ProgramListView: View {
             }
             .sheet(isPresented: $showCreateProgram) {
                 NavigationStack {
-                    ProgramEditorView()
+                    ProgramWizardView()
                 }
             }
             .alert("Delete Program", isPresented: $showDeleteConfirmation) {

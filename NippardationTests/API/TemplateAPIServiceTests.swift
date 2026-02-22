@@ -12,22 +12,23 @@ import Foundation
 @Suite(.serialized)
 struct TemplateAPIServiceTests {
 
-    // Note: Tests are serialized because MockURLProtocol.requestHandler is shared state.
+    // Note: Tests are serialized and use session-scoped MockURLProtocol handlers.
     // MockAuthTokenProvider is used to provide a valid token so requests reach the network layer.
 
     // MARK: - Setup
 
-    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> TemplateAPIService {
-        MockURLProtocol.reset()
-        return TemplateAPIService(session: MockURLProtocol.mockSession(), authProvider: authProvider)
+    private func createService(authProvider: AuthTokenProviding = MockAuthTokenProvider()) -> (TemplateAPIService, String) {
+        let sessionID = MockURLProtocol.makeSessionID()
+        MockURLProtocol.reset(sessionID: sessionID)
+        return (TemplateAPIService(session: MockURLProtocol.mockSession(sessionID: sessionID), authProvider: authProvider), sessionID)
     }
 
     // MARK: - fetchTemplates Tests
 
     @Test func fetchTemplatesBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/templates") == true)
             #expect(request.httpMethod == "GET")
 
@@ -51,9 +52,9 @@ struct TemplateAPIServiceTests {
     }
 
     @Test func fetchTemplatesWithCursorSetsCorrectPage() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
             let pageItem = components?.queryItems?.first { $0.name == "page" }
 
@@ -72,9 +73,9 @@ struct TemplateAPIServiceTests {
     // MARK: - fetchTemplate Tests
 
     @Test func fetchTemplateBuildsCorrectURL() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/templates/tmpl_001") == true)
             #expect(request.httpMethod == "GET")
 
@@ -91,9 +92,9 @@ struct TemplateAPIServiceTests {
     // MARK: - createTemplate Tests
 
     @Test func createTemplateBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/templates") == true)
             #expect(request.httpMethod == "POST")
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
@@ -124,9 +125,9 @@ struct TemplateAPIServiceTests {
     // MARK: - updateTemplate Tests
 
     @Test func updateTemplateBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/templates/tmpl_001") == true)
             #expect(request.httpMethod == "PUT")
 
@@ -150,9 +151,9 @@ struct TemplateAPIServiceTests {
     // MARK: - updateTemplateExercises Tests
 
     @Test func updateTemplateExercisesBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/templates/tmpl_001/exercises") == true)
             #expect(request.httpMethod == "PUT")
 
@@ -181,9 +182,9 @@ struct TemplateAPIServiceTests {
     // MARK: - cloneTemplate Tests
 
     @Test func cloneTemplateBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/templates/tmpl_001/clone") == true)
             #expect(request.httpMethod == "POST")
 
@@ -198,9 +199,9 @@ struct TemplateAPIServiceTests {
     }
 
     @Test func cloneTemplateWithoutNameOmitsBody() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/templates/tmpl_001/clone") == true)
             // When no name provided, body should be nil or empty
             #expect(request.httpBody == nil || request.httpBody?.isEmpty == true)
@@ -218,9 +219,9 @@ struct TemplateAPIServiceTests {
     // MARK: - deleteTemplate Tests
 
     @Test func deleteTemplateBuildsCorrectRequest() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             #expect(request.url?.path.contains("api/templates/tmpl_001") == true)
             #expect(request.httpMethod == "DELETE")
 
@@ -244,9 +245,9 @@ struct TemplateAPIServiceTests {
     // before the network request. The following tests verify auth-related behavior.
 
     @Test func handlesUnauthorized() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -263,9 +264,9 @@ struct TemplateAPIServiceTests {
     }
 
     @Test func fetchTemplateRequiresAuth() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -282,9 +283,9 @@ struct TemplateAPIServiceTests {
     }
 
     @Test func createTemplateRequiresAuth() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
@@ -308,9 +309,9 @@ struct TemplateAPIServiceTests {
     }
 
     @Test func deleteTemplateRequiresAuth() async throws {
-        let service = createService()
+        let (service, sessionID) = createService()
 
-        MockURLProtocol.requestHandler = { request in
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 

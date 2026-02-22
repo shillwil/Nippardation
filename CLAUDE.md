@@ -32,9 +32,6 @@ open Nippardation.xcodeproj
 ```bash
 # Run unit tests
 xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 15'
-
-# Run UI tests
-xcodebuild test -project Nippardation.xcodeproj -scheme NippardationUITests -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
 ### Running
@@ -204,7 +201,8 @@ HomeView → HomeViewModel → WorkoutManager → CoreDataManager → Core Data 
 
 The project uses Swift Testing framework (not XCTest). Tests are minimal and located in:
 - `NippardationTests/` - Unit tests
-- `NippardationUITests/` - UI tests
+
+UI tests are not set up in this project. Do not run or reference UI tests.
 
 Use `#expect` syntax for assertions in new tests.
 
@@ -212,16 +210,20 @@ Use `#expect` syntax for assertions in new tests.
 
 ### Testing Requirements
 
-**ALWAYS run and update tests after making any code changes:**
-1. Run the relevant test suite after completing changes
-2. Update existing tests if the changes affect their behavior
-3. Add new tests for new functionality
-4. Ensure all tests pass before offering to commit or push
-5. If tests fail, fix the issues before proceeding
+**ALWAYS verify the build and run unit tests after making any code changes:**
+1. Build the project to verify it compiles successfully
+2. Run unit tests after completing changes
+3. Update existing tests if the changes affect their behavior
+4. Add new tests for new functionality
+5. Ensure the build succeeds and all unit tests pass before offering to commit or push
+6. If tests fail, fix the issues before proceeding
 
 ```bash
-# Run all tests
-xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5'
+# Build the project
+xcodebuild -project Nippardation.xcodeproj -scheme Nippardation -sdk iphonesimulator build
+
+# Run unit tests
+xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5' -only-testing:NippardationTests
 
 # Run specific test file
 xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5' -only-testing:NippardationTests/TestClassName
