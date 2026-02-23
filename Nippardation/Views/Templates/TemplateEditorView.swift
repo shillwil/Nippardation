@@ -231,7 +231,12 @@ private struct ExercisePickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ExerciseBrowserContent(viewModel: browserViewModel)
+            ExerciseBrowserContent(
+                viewModel: browserViewModel,
+                onConfirmSelection: { selected in
+                    onConfirm(selected)
+                }
+            )
                 .navigationTitle("Select Exercises")
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {

@@ -51,6 +51,28 @@ struct TemplateAPIServiceTests {
         }
     }
 
+    @Test func fetchTemplatesDecodesWrappedResponse() async throws {
+        let (service, sessionID) = createService()
+
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let body = """
+            {"success":true,"data":{"templates":[],"pagination":{"nextCursor":null,"hasMore":false}},"correlationId":"req_test"}
+            """
+            return (response, body.data(using: .utf8))
+        }
+
+        let result = try await service.fetchTemplates(cursor: nil, limit: 10)
+        #expect(result.templates.isEmpty)
+        #expect(result.pagination.hasMore == false)
+        #expect(result.pagination.nextCursor == nil)
+    }
+
     @Test func fetchTemplatesWithCursorSetsCorrectPage() async throws {
         let (service, sessionID) = createService()
 

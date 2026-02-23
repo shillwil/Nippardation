@@ -51,6 +51,28 @@ struct ProgramAPIServiceTests {
         }
     }
 
+    @Test func fetchProgramsDecodesWrappedResponse() async throws {
+        let (service, sessionID) = createService()
+
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let body = """
+            {"success":true,"data":{"programs":[],"pagination":{"nextCursor":null,"hasMore":false}},"correlationId":"req_test"}
+            """
+            return (response, body.data(using: .utf8))
+        }
+
+        let result = try await service.fetchPrograms(cursor: nil, limit: 10)
+        #expect(result.programs.isEmpty)
+        #expect(result.pagination.hasMore == false)
+        #expect(result.pagination.nextCursor == nil)
+    }
+
     // MARK: - fetchProgram Tests
 
     @Test func fetchProgramBuildsCorrectURL() async throws {

@@ -12,21 +12,28 @@ struct ExerciseBrowserView: View {
     @StateObject private var viewModel: ExerciseBrowserViewModel
 
     let onSelect: ((ExerciseLibraryItem) -> Void)?
+    let onConfirmSelection: (([ExerciseLibraryItem]) -> Void)?
 
     init(
         isPickerMode: Bool = false,
         maxSelections: Int? = nil,
-        onSelect: ((ExerciseLibraryItem) -> Void)? = nil
+        onSelect: ((ExerciseLibraryItem) -> Void)? = nil,
+        onConfirmSelection: (([ExerciseLibraryItem]) -> Void)? = nil
     ) {
         self._viewModel = StateObject(wrappedValue: ExerciseBrowserViewModel(
             isPickerMode: isPickerMode,
             maxSelections: maxSelections
         ))
         self.onSelect = onSelect
+        self.onConfirmSelection = onConfirmSelection
     }
 
     var body: some View {
-        ExerciseBrowserContent(viewModel: viewModel, onSelect: onSelect)
+        ExerciseBrowserContent(
+            viewModel: viewModel,
+            onSelect: onSelect,
+            onConfirmSelection: onConfirmSelection
+        )
     }
 }
 
@@ -37,13 +44,16 @@ struct ExerciseBrowserContent: View {
     @State private var showFilters = false
 
     let onSelect: ((ExerciseLibraryItem) -> Void)?
+    let onConfirmSelection: (([ExerciseLibraryItem]) -> Void)?
 
     init(
         viewModel: ExerciseBrowserViewModel,
-        onSelect: ((ExerciseLibraryItem) -> Void)? = nil
+        onSelect: ((ExerciseLibraryItem) -> Void)? = nil,
+        onConfirmSelection: (([ExerciseLibraryItem]) -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.onSelect = onSelect
+        self.onConfirmSelection = onConfirmSelection
     }
 
     /// Returns the currently selected exercises (for use with toolbar buttons)
@@ -89,10 +99,14 @@ struct ExerciseBrowserContent: View {
             }
 
             // Floating selection button
-            if viewModel.isPickerMode && !viewModel.selectedExercises.isEmpty {
+            if viewModel.isPickerMode,
+               !viewModel.selectedExercises.isEmpty,
+               let onConfirmSelection {
                 FloatingSelectionButton(
                     count: viewModel.selectedExercises.count,
-                    action: {}
+                    action: {
+                        onConfirmSelection(viewModel.selectedExercisesList)
+                    }
                 )
                 .padding(.bottom, AppSpacing.lg)
             }
