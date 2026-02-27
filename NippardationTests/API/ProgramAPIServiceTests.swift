@@ -149,6 +149,38 @@ struct ProgramAPIServiceTests {
         }
     }
 
+    @Test func createProgramDecodesWrappedResponseWithTemplateSummary() async throws {
+        let (service, sessionID) = createService()
+
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let body = """
+            {"success":true,"data":{"program":{"id":"prog_123","name":"YOLO Swag","description":null,"daysPerWeek":5,"durationWeeks":null,"isActive":false,"currentDayIndex":0,"timesCompleted":0,"isPublic":false,"isAiGenerated":false,"workouts":[{"id":"w_1","dayNumber":0,"dayLabel":"Day 1","templateId":"tmpl_1","template":{"id":"tmpl_1","name":"Upper","description":null,"exerciseCount":8}}],"createdAt":"2026-02-23T17:33:13.533Z","updatedAt":"2026-02-23T17:33:13.533Z"}},"correlationId":"req_test"}
+            """
+            return (response, body.data(using: .utf8))
+        }
+
+        let createRequest = CreateProgramRequest(
+            name: "YOLO Swag",
+            description: nil,
+            daysPerWeek: 5,
+            durationWeeks: nil,
+            workouts: [],
+            isPublic: false
+        )
+
+        let dto = try await service.createProgram(createRequest)
+        #expect(dto.id == "prog_123")
+        #expect(dto.workouts.count == 1)
+        #expect(dto.workouts.first?.template?.id == "tmpl_1")
+        #expect(dto.workouts.first?.template?.name == "Upper")
+    }
+
     // MARK: - updateProgram Tests
 
     @Test func updateProgramBuildsCorrectRequest() async throws {
