@@ -57,7 +57,7 @@ struct Program: Identifiable, Hashable {
 
     /// Human-readable duration string
     var durationString: String {
-        guard let weeks = durationWeeks, weeks > 0 else { return "Ongoing" }
+        guard let weeks = durationWeeks, weeks > 0 else { return "\u{221E}" }
         return weeks == 1 ? "1 week" : "\(weeks) weeks"
     }
 
