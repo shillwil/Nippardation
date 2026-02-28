@@ -48,7 +48,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         if let activeProgram = programDTOs.first(where: { $0.isActive == true }) {
             activeProgramDTO = ActiveProgramDTO(
                 program: activeProgram,
-                nextWorkout: activeProgram.workouts.first { $0.dayNumber == (activeProgram.currentDayIndex ?? 0) },
+                nextWorkout: activeProgram.workouts?.first { $0.dayNumber == (activeProgram.currentDayIndex ?? 0) },
                 isCompleted: false
             )
         }
@@ -305,7 +305,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         // Update active program response
         activeProgramDTO = ActiveProgramDTO(
             program: activated,
-            nextWorkout: activated.workouts.first { $0.dayNumber == (activated.currentDayIndex ?? 0) },
+            nextWorkout: activated.workouts?.first { $0.dayNumber == (activated.currentDayIndex ?? 0) },
             isCompleted: false
         )
 
@@ -365,7 +365,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         let existing = programDTOs[index]
         let currentDay = existing.currentDayIndex ?? 0
         // Use workouts.count (matching domain model) with guard against zero
-        let workoutCount = max(existing.workouts.count, 1)
+        let workoutCount = max(existing.workouts?.count ?? 0, 1)
         let nextDayIndex = (currentDay + 1) % workoutCount
         let cycleCompleted = nextDayIndex == 0
 
@@ -392,7 +392,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         if activeProgramDTO?.program.id == id {
             activeProgramDTO = ActiveProgramDTO(
                 program: advanced,
-                nextWorkout: advanced.workouts.first { $0.dayNumber == nextDayIndex },
+                nextWorkout: advanced.workouts?.first { $0.dayNumber == nextDayIndex },
                 isCompleted: false
             )
         }
@@ -435,7 +435,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         if activeProgramDTO?.program.id == id {
             activeProgramDTO = ActiveProgramDTO(
                 program: reset,
-                nextWorkout: reset.workouts.first { $0.dayNumber == 0 },
+                nextWorkout: reset.workouts?.first { $0.dayNumber == 0 },
                 isCompleted: false
             )
         }

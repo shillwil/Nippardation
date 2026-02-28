@@ -35,11 +35,11 @@ struct TemplateAPIServiceTests {
             let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
             let queryItems = components?.queryItems ?? []
 
-            let pageItem = queryItems.first { $0.name == "page" }
-            let perPageItem = queryItems.first { $0.name == "per_page" }
+            let limitItem = queryItems.first { $0.name == "limit" }
+            let cursorItem = queryItems.first { $0.name == "cursor" }
 
-            #expect(pageItem?.value == "1")
-            #expect(perPageItem?.value == "10")
+            #expect(limitItem?.value == "10")
+            #expect(cursorItem == nil)
 
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
@@ -73,23 +73,46 @@ struct TemplateAPIServiceTests {
         #expect(result.pagination.nextCursor == nil)
     }
 
-    @Test func fetchTemplatesWithCursorSetsCorrectPage() async throws {
+    @Test func fetchTemplatesWithCursorSetsCorrectParam() async throws {
         let (service, sessionID) = createService()
 
         MockURLProtocol.setRequestHandler(for: sessionID) { request in
             let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
-            let pageItem = components?.queryItems?.first { $0.name == "page" }
+            let cursorItem = components?.queryItems?.first { $0.name == "cursor" }
 
-            #expect(pageItem?.value == "5")
+            #expect(cursorItem?.value == "abc123")
 
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
 
         do {
-            _ = try await service.fetchTemplates(cursor: "5", limit: 10)
+            _ = try await service.fetchTemplates(cursor: "abc123", limit: 10)
         } catch {
             // Expected
         }
+    }
+
+    @Test func fetchTemplatesDecodesListWithExerciseCount() async throws {
+        let (service, sessionID) = createService()
+
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let body = """
+            {"success":true,"data":{"templates":[{"id":"tmpl_1","name":"Upper Body","exerciseCount":7,"isPublic":false,"createdAt":"2026-02-20T10:00:00.000Z","updatedAt":"2026-02-20T10:00:00.000Z"}],"pagination":{"nextCursor":null,"hasMore":false}},"correlationId":"req_test"}
+            """
+            return (response, body.data(using: .utf8))
+        }
+
+        let result = try await service.fetchTemplates(cursor: nil, limit: 10)
+        #expect(result.templates.count == 1)
+        #expect(result.templates[0].id == "tmpl_1")
+        #expect(result.templates[0].name == "Upper Body")
+        #expect(result.pagination.hasMore == false)
     }
 
     // MARK: - fetchTemplate Tests

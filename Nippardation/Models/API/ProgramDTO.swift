@@ -25,7 +25,7 @@ struct ProgramDTO: Codable, Identifiable {
     let description: String?
     let daysPerWeek: Int
     let durationWeeks: Int?
-    let workouts: [ProgramWorkoutDTO]
+    let workouts: [ProgramWorkoutDTO]?
     let isActive: Bool?
     let currentDayIndex: Int?
     let timesCompleted: Int?

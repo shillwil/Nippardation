@@ -21,7 +21,7 @@ enum ProgramMapper {
             description: dto.description,
             daysPerWeek: dto.daysPerWeek,
             durationWeeks: dto.durationWeeks,
-            workouts: dto.workouts.map { ProgramWorkoutMapper.toDomain($0) },
+            workouts: (dto.workouts ?? []).map { ProgramWorkoutMapper.toDomain($0) },
             isActive: dto.isActive ?? false,
             currentDayIndex: dto.currentDayIndex ?? 0,
             timesCompleted: dto.timesCompleted ?? 0,

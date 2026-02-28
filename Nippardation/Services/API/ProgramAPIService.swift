@@ -24,11 +24,11 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
             resolvingAgainstBaseURL: false
         )!
 
-        let page = cursor.flatMap { Int($0) } ?? 1
-        components.queryItems = [
-            URLQueryItem(name: "page", value: String(page)),
-            URLQueryItem(name: "per_page", value: String(limit))
-        ]
+        var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor = cursor {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components.queryItems = queryItems
 
         guard let url = components.url else {
             throw RepositoryError.unknown(nil)
