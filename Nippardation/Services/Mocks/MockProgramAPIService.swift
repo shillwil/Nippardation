@@ -70,7 +70,12 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
             throw errorToThrow
         }
 
-        let startIndex = cursor != nil ? min(Int(cursor!) ?? 0, programDTOs.count) : 0
+        let startIndex: Int
+        if let cursor, let parsed = Int(cursor) {
+            startIndex = min(parsed, programDTOs.count)
+        } else {
+            startIndex = 0
+        }
         let endIndex = min(startIndex + limit, programDTOs.count)
         let page = startIndex < programDTOs.count ? Array(programDTOs[startIndex..<endIndex]) : []
         let hasMore = endIndex < programDTOs.count

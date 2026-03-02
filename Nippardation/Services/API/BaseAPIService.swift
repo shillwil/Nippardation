@@ -110,4 +110,45 @@ class BaseAPIService: @unchecked Sendable {
             throw RepositoryError.unknown(nil)
         }
     }
+
+    // MARK: - Shared Decoding Helpers
+
+    func decodeFailure(_ error: Error, data: Data) -> RepositoryError {
+        #if DEBUG
+        print("Decoding error: \(error)")
+        if let json = String(data: data, encoding: .utf8) {
+            print("Response: \(json)")
+        }
+        #endif
+        return .unknown(error)
+    }
+}
+
+// MARK: - Shared API Response Models
+
+struct APIEnvelope<T: Decodable>: Decodable {
+    let success: Bool?
+    let data: T?
+    let correlationId: String?
+}
+
+struct CursorPaginationPayload: Decodable {
+    let nextCursor: String?
+    let hasMore: Bool?
+    let page: Int?
+    let totalPages: Int?
+
+    var paginationInfo: PaginationInfo {
+        if let hasMore {
+            return PaginationInfo(nextCursor: nextCursor, hasMore: hasMore)
+        }
+
+        if let page, let totalPages {
+            let hasMoreFromPage = page < totalPages
+            let nextCursorFromPage = hasMoreFromPage ? String(page + 1) : nil
+            return PaginationInfo(nextCursor: nextCursor ?? nextCursorFromPage, hasMore: hasMoreFromPage)
+        }
+
+        return PaginationInfo(nextCursor: nextCursor, hasMore: nextCursor != nil)
+    }
 }

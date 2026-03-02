@@ -101,7 +101,7 @@ struct TemplateEditorView: View {
             if viewModel.isSaving {
                 ProgressView("Saving...")
                     .padding()
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppCornerRadius.medium))
             }
         }
         .alert("Error", isPresented: .init(

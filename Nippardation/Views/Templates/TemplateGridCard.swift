@@ -67,14 +67,18 @@ struct TemplateGridCard: View {
 
     private var colorForTemplate: Color {
         let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .teal]
-        let hash = abs(template.name.hashValue)
-        return colors[hash % colors.count]
+        let hash = template.name.utf8.reduce(0) { $0 &+ Int($1) }
+        return colors[abs(hash) % colors.count]
     }
 
-    private var formattedDate: String {
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: template.updatedAt, relativeTo: Date())
+        return formatter
+    }()
+
+    private var formattedDate: String {
+        Self.relativeDateFormatter.localizedString(for: template.updatedAt, relativeTo: Date())
     }
 }
 

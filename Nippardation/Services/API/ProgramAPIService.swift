@@ -19,10 +19,12 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         cursor: String?,
         limit: Int
     ) async throws -> (programs: [ProgramDTO], pagination: PaginationInfo) {
-        var components = URLComponents(
+        guard var components = URLComponents(
             url: AppConfiguration.shared.baseURL.appendingPathComponent("api/programs"),
             resolvingAgainstBaseURL: false
-        )!
+        ) else {
+            throw RepositoryError.unknown(nil)
+        }
 
         var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
         if let cursor = cursor {
@@ -249,8 +251,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
     }
 
     private func decodeActiveProgram(from data: Data) throws -> ActiveProgramDTO? {
-        if let wrappedActive = try? decoder.decode(APIEnvelope<ActiveProgramDTO>.self, from: data) {
-            return wrappedActive.data
+        if let wrappedActive = try? decoder.decode(APIEnvelope<ActiveProgramDTO>.self, from: data),
+           let payload = wrappedActive.data {
+            return payload
         }
 
         if let wrappedProgram = try? decoder.decode(APIEnvelope<ProgramDTO>.self, from: data),
@@ -270,45 +273,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         }
     }
 
-    private func decodeFailure(_ error: Error, data: Data) -> RepositoryError {
-        #if DEBUG
-        print("Decoding error: \(error)")
-        if let json = String(data: data, encoding: .utf8) {
-            print("Response: \(json)")
-        }
-        #endif
-        return .unknown(error)
-    }
 }
 
 // MARK: - Private Response Models
-
-private struct APIEnvelope<T: Decodable>: Decodable {
-    let success: Bool?
-    let data: T?
-    let correlationId: String?
-}
-
-private struct CursorPaginationPayload: Decodable {
-    let nextCursor: String?
-    let hasMore: Bool?
-    let page: Int?
-    let totalPages: Int?
-
-    var paginationInfo: PaginationInfo {
-        if let hasMore {
-            return PaginationInfo(nextCursor: nextCursor, hasMore: hasMore)
-        }
-
-        if let page, let totalPages {
-            let hasMoreFromPage = page < totalPages
-            let nextCursorFromPage = hasMoreFromPage ? String(page + 1) : nil
-            return PaginationInfo(nextCursor: nextCursor ?? nextCursorFromPage, hasMore: hasMoreFromPage)
-        }
-
-        return PaginationInfo(nextCursor: nextCursor, hasMore: nextCursor != nil)
-    }
-}
 
 private struct ProgramListCursorPayload: Decodable {
     let programs: [ProgramDTO]

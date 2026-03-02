@@ -109,8 +109,10 @@ struct HomeView: View {
             }
             .padding()
             .sheet(isPresented: $startNewWorkout) {
-                WorkoutSelectionView { workout in
-                    self.showActiveWorkout = true
+                NavigationStack {
+                    WorkoutSelectionView { workout in
+                        self.showActiveWorkout = true
+                    }
                 }
             }
             .fullScreenCover(isPresented: $showActiveWorkout) {
@@ -118,6 +120,9 @@ struct HomeView: View {
                     NavigationStack {
                         ActiveWorkoutView(workout: activeWorkout)
                     }
+                } else {
+                    // Fallback: dismiss if no active workout (race condition guard)
+                    Color.clear.onAppear { showActiveWorkout = false }
                 }
             }
         }

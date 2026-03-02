@@ -18,7 +18,12 @@ struct WorkoutSelectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {            
             List {
-                if let program = dashboardViewModel.activeProgram {
+                if dashboardViewModel.isLoading && dashboardViewModel.activeProgram == nil {
+                    Section("Active Program") {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                } else if let program = dashboardViewModel.activeProgram {
                     Section("From Active Program: \(program.name)") {
                         ForEach(program.workouts.sorted(by: { $0.dayNumber < $1.dayNumber })) { workout in
                             if let template = dashboardViewModel.templateFor(workout: workout) {

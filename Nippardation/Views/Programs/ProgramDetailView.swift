@@ -42,7 +42,9 @@ struct ProgramDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showEditSheet) {
+        .sheet(isPresented: $showEditSheet, onDismiss: {
+            viewModel.loadProgram()
+        }) {
             if let program = viewModel.program {
                 NavigationStack {
                     ProgramEditorView(existingProgram: program)

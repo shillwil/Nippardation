@@ -21,7 +21,7 @@ struct DayScheduleCard: View {
         HStack(spacing: AppSpacing.sm) {
             // Day circle
             VStack(spacing: AppSpacing.xxs) {
-                Text(dayNumber < dayNames.count ? dayNames[dayNumber] : "Day")
+                Text(dayNumber >= 0 && dayNumber < dayNames.count ? dayNames[dayNumber] : "Day")
                     .font(.caption2)
                     .foregroundColor(.secondary)
 

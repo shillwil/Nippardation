@@ -19,10 +19,12 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         cursor: String?,
         limit: Int
     ) async throws -> (templates: [TemplateDTO], pagination: PaginationInfo) {
-        var components = URLComponents(
+        guard var components = URLComponents(
             url: AppConfiguration.shared.baseURL.appendingPathComponent("api/templates"),
             resolvingAgainstBaseURL: false
-        )!
+        ) else {
+            throw RepositoryError.unknown(nil)
+        }
 
         var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
         if let cursor = cursor {
@@ -152,12 +154,12 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
     // MARK: - Response Decoding
 
     private func decodeTemplateList(from data: Data) throws -> (templates: [TemplateDTO], pagination: PaginationInfo) {
-        if let wrappedCursor = try? decoder.decode(TemplateAPIEnvelope<TemplateListCursorPayload>.self, from: data),
+        if let wrappedCursor = try? decoder.decode(APIEnvelope<TemplateListCursorPayload>.self, from: data),
            let payload = wrappedCursor.data {
             return (payload.templates, payload.pagination.paginationInfo)
         }
 
-        if let wrappedLegacy = try? decoder.decode(TemplateAPIEnvelope<TemplateListResponse>.self, from: data),
+        if let wrappedLegacy = try? decoder.decode(APIEnvelope<TemplateListResponse>.self, from: data),
            let payload = wrappedLegacy.data {
             let hasMore = payload.pagination.page < payload.pagination.totalPages
             let nextCursor = hasMore ? String(payload.pagination.page + 1) : nil
@@ -175,12 +177,12 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
     }
 
     private func decodeTemplateDetail(from data: Data) throws -> TemplateDTO {
-        if let wrappedDetail = try? decoder.decode(TemplateAPIEnvelope<TemplateDetailResponse>.self, from: data),
+        if let wrappedDetail = try? decoder.decode(APIEnvelope<TemplateDetailResponse>.self, from: data),
            let payload = wrappedDetail.data {
             return payload.template
         }
 
-        if let wrappedTemplate = try? decoder.decode(TemplateAPIEnvelope<TemplateDTO>.self, from: data),
+        if let wrappedTemplate = try? decoder.decode(APIEnvelope<TemplateDTO>.self, from: data),
            let payload = wrappedTemplate.data {
             return payload
         }
@@ -195,48 +197,11 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
             }
         }
     }
-
-    private func decodeFailure(_ error: Error, data: Data) -> RepositoryError {
-        #if DEBUG
-        print("Decoding error: \(error)")
-        if let json = String(data: data, encoding: .utf8) {
-            print("Response: \(json)")
-        }
-        #endif
-        return .unknown(error)
-    }
 }
 
 // MARK: - Private Response Models
 
-private struct TemplateAPIEnvelope<T: Decodable>: Decodable {
-    let success: Bool?
-    let data: T?
-    let correlationId: String?
-}
-
-private struct TemplateCursorPaginationPayload: Decodable {
-    let nextCursor: String?
-    let hasMore: Bool?
-    let page: Int?
-    let totalPages: Int?
-
-    var paginationInfo: PaginationInfo {
-        if let hasMore {
-            return PaginationInfo(nextCursor: nextCursor, hasMore: hasMore)
-        }
-
-        if let page, let totalPages {
-            let hasMoreFromPage = page < totalPages
-            let nextCursorFromPage = hasMoreFromPage ? String(page + 1) : nil
-            return PaginationInfo(nextCursor: nextCursor ?? nextCursorFromPage, hasMore: hasMoreFromPage)
-        }
-
-        return PaginationInfo(nextCursor: nextCursor, hasMore: nextCursor != nil)
-    }
-}
-
 private struct TemplateListCursorPayload: Decodable {
     let templates: [TemplateDTO]
-    let pagination: TemplateCursorPaginationPayload
+    let pagination: CursorPaginationPayload
 }
