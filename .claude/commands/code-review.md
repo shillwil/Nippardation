@@ -1,544 +1,197 @@
-# iOS Pre-PR Submission Checklist
+# Deep Code Audit — Pre-PR Submission
 
 ## Purpose
-Ruthlessly thorough verification that code is production-ready before opening a PR. This is the FINAL gate before submission. If ANY check fails, DO NOT open the PR.
+Automated deep-dive code review that catches real bugs before they hit PR review. This replaces surface-level checklists with the same exhaustive file-by-file analysis that catches nil guard bugs, force unwraps, race conditions, and code smell.
 
-## Execution Order
-
-This checklist MUST be executed in order. Do not skip steps. Do not proceed if any step fails.
+**This is NOT a checklist to skim. This is an execution plan. Run it.**
 
 ---
 
-## 1. Branch Verification
+## Phase 1: Scope the Diff
 
-**Check current branch state**
+Identify every file changed in this PR against the base branch.
+
 ```bash
-# Verify you're not on main
-current_branch=$(git branch --show-current)
-if [ "$current_branch" = "main" ]; then
-    echo "ERROR: Cannot submit PR from main branch"
-    exit 1
-fi
+# Get the base branch (usually develop)
+git diff develop...HEAD --stat
 
-# Verify branch is up to date with remote
-git fetch origin
-LOCAL=$(git rev-parse @)
-REMOTE=$(git rev-parse @{u})
-if [ $LOCAL != $REMOTE ]; then
-    echo "ERROR: Branch out of sync with remote. Push or pull required."
-    exit 1
-fi
+# Get the full list of changed files
+git diff develop...HEAD --name-only
 ```
 
-**Verify commit messages**
-- All commits have descriptive messages (not "wip", "fix", "update")
-- Commits are logical units of work
-- No merge commits (should be rebased)
+Categorize changed files into two groups:
+- **View files**: Any file in `Views/`, `Home/HomeView.swift`, `Exercise/` that contains SwiftUI views
+- **Non-view files**: Services, ViewModels, Models, Mappers, Extensions, DesignSystem, Tests, Mocks
 
 ---
 
-## 2. Code Compilation
+## Phase 2: Deep Audit (Parallel Agents)
 
-**Full clean build**
-```bash
-# Clean build folder
-xcodebuild clean -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 15'
+Launch TWO parallel audit agents. Each agent must READ EVERY changed file in its group — no skipping, no sampling. Each agent produces a ranked list of every issue found.
 
-# Build for simulator
-xcodebuild build -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 15' -quiet
+### Agent 1: View Files Audit
 
-# Build for device (if applicable)
-xcodebuild build -scheme Nippardation -destination 'generic/platform=iOS' -quiet
-```
+Read every changed view file. For EACH file, check for ALL of the following:
 
-**Build verification**
-- [ ] No compilation errors
-- [ ] No warnings (zero-warning policy)
-- [ ] No deprecated API usage
-- [ ] All asset references resolve
-- [ ] All string localizations exist
+**Crash Vectors**
+- Force unwraps (`!`) — every single one, even in previews
+- Unsafe array indexing without bounds checks (including negative index checks)
+- Missing nil guards that lead to incorrect behavior
+
+**Loading State Bugs**
+- Views that show "no data" / empty state messages BEFORE data has loaded (must check `isLoading` before showing empty state)
+- Views that check `.isEmpty` on `onAppear` without a `hasLoaded` flag (causes redundant fetches when data is genuinely empty)
+- Missing `ProgressView` for initial load states
+
+**SwiftUI Antipatterns**
+- Views presented in `.sheet()` or `.fullScreenCover()` that use `.navigationTitle` / `.toolbar` without being wrapped in `NavigationStack`
+- `.fullScreenCover` / `.sheet` that can show blank content if the bound data is nil (race condition)
+- `@ObservedObject` used with singleton default values (should be `@EnvironmentObject` or `let`)
+- Sheet/cover modifiers attached to inner views instead of the outermost container
+- Potential double-dismiss issues in nested navigation/sheet flows
+- Missing data reload after edit sheet dismissal (`onDismiss` handler)
+
+**Design System Compliance**
+- Magic numbers for spacing instead of `AppSpacing` constants
+- Magic numbers for corner radius instead of `AppCornerRadius` constants
+- Hardcoded colors that should use design tokens
+- `RelativeDateTimeFormatter` or other expensive formatters created inside computed properties (should be `static let`)
+
+**Code Smell**
+- Business logic in View structs (belongs in ViewModel)
+- Duplicated view builders across multiple files (should be extracted to reusable components)
+- Duplicated error alert boilerplate (should be a view modifier)
+- Free functions in global scope (should be extensions or static methods)
+- Non-deterministic `String.hashValue` used for visual elements (not stable across launches)
+
+**Data Integrity**
+- Silent fallback defaults that mask missing data (e.g., defaulting to `.chest` muscle group, defaulting `nil` notes to "Failure")
+- Optional chaining that silently drops important information
+
+### Agent 2: Non-View Files Audit
+
+Read every changed non-view file. For EACH file, check for ALL of the following:
+
+**Crash Vectors**
+- Force unwraps (`!`) in production code — `URLComponents(...)!`, `as!`, `cursor!`
+- Missing nil guards in decode chains (e.g., `APIEnvelope` with all-optional fields succeeding decode on any JSON, returning `nil` data without falling through to fallback decoders)
+- Force unwraps in test helpers (`MockURLProtocol`, etc.) that crash entire test suite on failure
+
+**Code Duplication**
+- Identical private types across files (e.g., `APIEnvelope` duplicated in two services)
+- Identical helper methods across files (e.g., `decodeFailure`, `parseDate`)
+- Identical structural patterns that should be generic helpers
+- `ISO8601DateFormatter()` or other formatters created repeatedly instead of shared
+
+**Thread Safety**
+- `@MainActor`-isolated properties read from `@Sendable` closures without capturing first
+- `@unchecked Sendable` on classes with mutable `var` properties and no synchronization
+- `withCheckedContinuation` that can hang if the task is cancelled before `resume()` is called
+- Redundant `await MainActor.run {}` inside already-`@MainActor` classes (use `TaskManager.runOnMain` if available)
+
+**Decoding Safety**
+- `try?` decode chains that silently discard the actual error from the correct format, making debugging impossible
+- Optional DTO fields (e.g., `exercises: [DTO]?`) that silently become empty arrays in domain models — consumers can't distinguish "not loaded" from "actually empty"
+- Date parsing that silently defaults to `Date()` on malformed input
+
+**Error Handling Consistency**
+- ViewModels that swallow errors silently vs. ones that set `self.error` — should be consistent
+- Template/data loading failures silently ignored via `try?` without any user indication
+- Error types that wrap decode errors as `.unknown` (loses error specificity)
+
+**Model Safety**
+- `Equatable`/`Hashable` that only compare `id` — SwiftUI won't detect property changes for re-render
+- Computed properties (e.g., `progress`) that don't guard against empty collections before doing math
+- Missing `final class` on ViewModels (inconsistent, allows unintended subclassing)
+
+**Memory**
+- `TaskManager` or similar that stores completed tasks indefinitely without cleanup
+- Retain cycle potential in closures (verify `[weak self]` usage)
 
 ---
 
-## 3. Code Quality & Style
+## Phase 3: Triage and Fix
 
-**SwiftLint**
-```bash
-# Run SwiftLint with strict rules
-swiftlint lint --strict --quiet
+After both agents report, consolidate all issues into a single ranked list:
 
-# If violations exist, show them
-swiftlint lint
-```
+**Severity Levels:**
+- **HIGH**: Will crash, hang, or show blank/broken UI in production
+- **MEDIUM**: Incorrect behavior, stale data, misleading UI, thread safety risk
+- **LOW**: Code smell, duplication, inconsistency, performance (non-blocking)
 
-**Manual code quality checks**
-- [ ] No force-unwraps without explicit documented reason
-- [ ] No force-try without proper justification
-- [ ] No force casts (as! operator)
-- [ ] No hardcoded strings (use localization)
-- [ ] No magic numbers (use named constants)
-- [ ] No commented-out code blocks
-- [ ] No `print()` statements (use proper logging)
-- [ ] No TODO/FIXME comments (create issues instead)
-- [ ] Proper access control (internal by default, public only when needed)
-- [ ] No retain cycles (check weak/unowned references)
+**Fix order:**
+1. ALL HIGH issues — no exceptions
+2. ALL MEDIUM issues — these are what external reviewers flag
+3. LOW issues — fix what's reasonable without scope creep
 
-**Architecture compliance**
-- [ ] MVVM structure maintained (no business logic in views)
-- [ ] Single Responsibility Principle followed
-- [ ] Dependencies properly injected (no singletons unless justified)
-- [ ] Protocols used for abstraction where appropriate
-- [ ] No massive view controllers (>300 lines)
-- [ ] No massive view models (>400 lines)
+For each fix:
+- State the exact file, line number, and what's wrong
+- Apply the fix
+- Move to the next issue
+
+Do NOT batch-read files you've already read. Do NOT re-audit after fixes. Fix everything in one pass.
 
 ---
 
-## 4. Test Suite Execution
+## Phase 4: Build and Test
 
-**Run the testing skill first**
 ```bash
-# If tests don't exist or fail, invoke the testing skill
-# This should add/update tests and verify they pass
-```
+# Build
+xcodebuild -project Nippardation.xcodeproj -scheme Nippardation -sdk iphonesimulator build
 
-**Full test suite**
-```bash
 # Run all unit tests
-xcodebuild test -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 15' -only-testing:NippardationTests
+xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5' \
+  -only-testing:NippardationTests
 ```
 
-**Test verification**
-- [ ] All tests pass
-- [ ] No skipped tests
-- [ ] No flaky tests (run twice if suspicious)
-- [ ] Test coverage meets minimums:
-  - New ViewModels: 90%+
-  - New Services/Repositories: 85%+
-  - New Models: 80%+
-- [ ] No tests with sleep() or arbitrary delays
-- [ ] All async tests properly use expectations or async/await
+Both MUST pass. If build fails, fix and rebuild. If tests fail, fix and rerun.
 
 ---
 
-## 5. Security Audit
-
-**API Keys & Secrets**
-```bash
-# Check for exposed secrets
-grep -r "API_KEY" --include="*.swift" .
-grep -r "api_key" --include="*.swift" .
-grep -r "secret" --include="*.swift" .
-grep -r "password" --include="*.swift" .
-grep -r "token" --include="*.swift" .
-```
-
-**Security checklist**
-- [ ] No API keys hardcoded in source
-- [ ] No secrets in git history
-- [ ] Keychain used for sensitive data
-- [ ] HTTPS enforced for all network calls
-- [ ] Certificate pinning implemented (if required)
-- [ ] User input properly validated/sanitized
-- [ ] SQL injection prevented (parameterized queries)
-- [ ] XSS prevention in web views
-
-**Data protection**
-- [ ] User data encrypted at rest
-- [ ] Sensitive data not logged
-- [ ] Proper error messages (no internal details exposed)
-- [ ] Authentication tokens refreshed properly
-- [ ] Biometric authentication working correctly
-
----
-
-## 6. Memory & Performance
-
-**Memory leaks**
-```bash
-# Run with Instruments if significant memory changes
-# Manually verify in Xcode Memory Graph Debugger
-```
-
-**Performance checks**
-- [ ] No synchronous operations on main thread
-- [ ] Images properly sized/optimized
-- [ ] Large lists use lazy loading
-- [ ] Network requests properly cancelled on view dismissal
-- [ ] No memory leaks in view controllers
-- [ ] Combine subscriptions properly cancelled
-
-**Startup performance**
-- [ ] App launch time < 2 seconds
-- [ ] Initial view appears quickly
-- [ ] No blocking operations in application:didFinishLaunching
-
----
-
-## 7. UI/UX Verification
-
-**Build and run manually**
-```bash
-# Launch app on simulator
-xcodebuild build -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 15'
-# Then manually open simulator and run app
-```
-
-**Visual verification**
-- [ ] UI renders correctly on iPhone SE (smallest screen)
-- [ ] UI renders correctly on iPhone 15 Pro Max (largest screen)
-- [ ] Dark mode works correctly
-- [ ] Safe area insets respected
-- [ ] Navigation flows work as expected
-- [ ] All animations smooth (60fps)
-- [ ] No visual glitches or layout issues
-- [ ] Loading states display properly
-- [ ] Error states display properly
-- [ ] Empty states display properly
-
-**Accessibility (manual verification)**
-- [ ] VoiceOver labels present and accurate
-- [ ] Dynamic Type support
-- [ ] Sufficient color contrast
-- [ ] Interactive elements minimum 44pt tap target
-- [ ] Focus order logical
-
----
-
-## 8. Data & State Management
-
-**Persistence verification**
-- [ ] Data saves correctly
-- [ ] Data loads correctly
-- [ ] Database migrations work (test fresh install + upgrade)
-- [ ] Core Data relationships intact
-- [ ] No data loss scenarios
-
-**State management**
-- [ ] App state persists across backgrounds
-- [ ] Navigation state properly managed
-- [ ] No inconsistent states possible
-- [ ] Race conditions handled
-- [ ] Optimistic updates work correctly
-
----
-
-## 9. Error Handling
-
-**Error scenarios**
-- [ ] Network failures handled gracefully
-- [ ] Offline mode works (if applicable)
-- [ ] Invalid data handled without crashes
-- [ ] User-facing error messages are clear and actionable
-- [ ] Errors logged appropriately for debugging
-- [ ] Recovery actions provided where possible
-- [ ] Errors in ViewModels are displayed to users (via alerts, toasts, etc.)
-- [ ] Async operation failures don't leave UI in broken state
-
-**Edge cases**
-- [ ] Empty data sets handled
-- [ ] Maximum data sets handled
-- [ ] Rapid user interactions handled
-- [ ] Interrupted operations handled
-- [ ] Background/foreground transitions handled
-
----
-
-## 9.5. Crash Prevention (CRITICAL)
-
-**This section catches crashes that would take down the app in production. Review CAREFULLY.**
-
-**Forbidden crash-inducing patterns**
-```bash
-# Search for preconditions and assertions (should be removed or have fallbacks)
-grep -rn "precondition\(" --include="*.swift" .
-grep -rn "preconditionFailure\(" --include="*.swift" .
-grep -rn "fatalError\(" --include="*.swift" .
-grep -rn "assert\(" --include="*.swift" .
-grep -rn "assertionFailure\(" --include="*.swift" .
-```
-
-**Precondition and assertion checklist**
-- [ ] NO `precondition()` calls in production code (crashes in release builds)
-- [ ] NO `preconditionFailure()` calls in production code
-- [ ] `fatalError()` only used in truly unrecoverable situations (Core Data model init, required init)
-- [ ] `assert()` only used for debug-time invariant checking (safe in release)
-- [ ] `assertionFailure()` only used for debug-time impossible states
-
-**Force unwrap safety**
-```bash
-# Find force unwraps (! operator)
-grep -rn "!\." --include="*.swift" .
-grep -rn "!\[" --include="*.swift" .
-grep -rn "as!" --include="*.swift" .
-```
-
-- [ ] NO force unwraps (the ! operator) without documented safety guarantee
-- [ ] NO force casts (as! operator) without proven type safety
-- [ ] All force unwraps on constants (URLs, UUIDs) are verified at compile-time
-- [ ] Optional binding (`if let`, `guard let`) used instead of force unwrap
-
-**Array bounds safety**
-```bash
-# Find array subscript access patterns
-grep -rn "\[index\]" --include="*.swift" .
-grep -rn "\[i\]" --include="*.swift" .
-```
-
-- [ ] All array access has bounds checking (or uses safe methods like `.first`, `.last`)
-- [ ] `indices.contains(index)` or `guard index >= 0 && index < array.count` before access
-- [ ] ForEach with indices uses enumerated() pattern safely
-- [ ] SwiftUI Bindings to arrays check bounds before access (especially when array can shrink)
-- [ ] No array access after potential modification without re-validation
-
-**Empty collection edge cases**
-- [ ] .first force unwrap never used (use .first with optional handling)
-- [ ] .last force unwrap never used (use .last with optional handling)
-- [ ] Empty arrays handled gracefully (show empty state, not crash)
-- [ ] Division by `count` checks for zero first
-- [ ] randomElement() force unwrap not used (returns optional)
-
-**Optional chaining patterns**
-- [ ] Computed properties return optionals when data may not exist
-- [ ] Callers handle nil cases from optional-returning methods
-- [ ] No assumption that optional will "always" have a value
-
-**SwiftUI-specific crash vectors**
-- [ ] Binding getters/setters have bounds checks for array indices
-- [ ] State mutations don't happen during view body evaluation
-- [ ] Sheet/NavigationLink destinations don't assume data exists
-- [ ] ForEach with dynamic data uses stable identifiers
-
-**Concurrency safety**
-- [ ] No race conditions between array modifications and reads
-- [ ] MainActor isolation for UI state mutations
-- [ ] Task cancellation doesn't leave state in inconsistent condition
-
-**Example fixes for common issues:**
-
-```swift
-// BAD: Will crash if array is empty
-var currentItem: Item {
-    precondition(!items.isEmpty, "Items should not be empty")
-    return items[currentIndex]
-}
-
-// GOOD: Returns optional, callers handle nil
-var currentItem: Item? {
-    guard currentIndex >= 0 && currentIndex < items.count else { return nil }
-    return items[currentIndex]
-}
-
-// BAD: Binding can crash if array shrinks
-Binding(
-    get: { viewModel.items[index] },
-    set: { viewModel.items[index] = $0 }
-)
-
-// GOOD: Safe binding with bounds check
-Binding(
-    get: { index < viewModel.items.count ? viewModel.items[index] : defaultValue },
-    set: { if index < viewModel.items.count { viewModel.items[index] = $0 } }
-)
-```
-
----
-
-## 10. Dependencies & Integrations
-
-**Third-party libraries**
-- [ ] All dependencies up to date (or explicitly pinned for reason)
-- [ ] No deprecated dependencies
-- [ ] License compliance verified
-- [ ] No unused dependencies
-
-**API integration**
-- [ ] API endpoints correct
-- [ ] Request/response models match API spec
-- [ ] Error codes properly mapped
-- [ ] Rate limiting handled
-- [ ] Pagination implemented correctly
-
----
-
-## 11. Documentation
-
-**Code documentation**
-- [ ] Public APIs documented
-- [ ] Complex algorithms explained
-- [ ] Architecture decisions documented (if new patterns introduced)
-- [ ] README updated if user-facing changes
-- [ ] CHANGELOG updated
-
-**Comments quality**
-- [ ] No obvious comments (code is self-explanatory)
-- [ ] Why not what (explain reasoning, not mechanics)
-- [ ] Complex business logic explained
-- [ ] Workarounds documented with reasons
-
----
-
-## 12. Git Hygiene
-
-**Commit cleanliness**
-```bash
-# Review diff one more time
-git diff main...HEAD
-
-# Check commit history
-git log --oneline main..HEAD
-```
-
-**Final git checks**
-- [ ] No merge commits (rebase if needed)
-- [ ] Logical commit groupings
-- [ ] Descriptive commit messages
-- [ ] No "fix typo" or "oops" commits (squash if needed)
-- [ ] No unintended files committed
-- [ ] No large binary files added
-- [ ] .gitignore properly configured
-
----
-
-## 13. PR Size Validation
-
-**Line count check**
-```bash
-# Count total lines changed
-git diff --stat main...HEAD | tail -1
-```
-
-**Size requirements**
-- [ ] PR is < 1000 lines changed (HARD LIMIT)
-- [ ] If > 1000 lines, STOP and break into smaller PRs
-- [ ] Each PR is a logical, deployable unit
-- [ ] PR can be reviewed in < 30 minutes
-
-**If PR too large:**
-1. STOP immediately
-2. Analyze commits for logical break points
-3. Create feature branch for continuation
-4. Rebase/cherry-pick commits into smaller PRs
-5. Submit smaller PRs sequentially
-
----
-
-## 14. Final Manual Review
-
-**Self code review**
-- [ ] Read every line as if reviewing someone else's code
-- [ ] Question every decision
-- [ ] Look for simpler solutions
-- [ ] Check for over-engineering
-- [ ] Verify error messages are user-friendly
-- [ ] Ensure naming is clear and consistent
-
-**Pre-submit questions**
-- Would I approve this PR if someone else wrote it?
-- Is this the simplest solution that works?
-- Could a junior developer understand this in 6 months?
-- Does this follow team conventions?
-- Would I be proud to show this to a senior engineer?
-
----
-
-## Failure Protocol
-
-If ANY check fails:
-
-1. **DO NOT OPEN THE PR**
-2. Fix the issue immediately
-3. Re-run the ENTIRE checklist from the start
-4. Document what was fixed
-
-## Success Protocol
-
-Only after ALL checks pass:
-
-1. Generate PR description:
-   - What: Brief summary of changes
-   - Why: Motivation and context
-   - How: Implementation approach
-   - Testing: What was tested and how
-   - Screenshots: If UI changes
-   - Rollout: Any deployment considerations
-
-2. Add appropriate labels
-
-3. Assign reviewers
-
-4. Open PR with confidence
-
----
-
-## Automation Script
+## Phase 5: PR Size Validation
 
 ```bash
-#!/bin/bash
-# pre-pr-check.sh
-
-set -e  # Exit on any error
-
-echo "🔍 Starting comprehensive PR verification..."
-
-# 1. Branch check
-echo "✓ Verifying branch..."
-current_branch=$(git branch --show-current)
-if [ "$current_branch" = "main" ]; then
-    echo "❌ Cannot submit PR from main branch"
-    exit 1
-fi
-
-# 2. Clean build
-echo "✓ Running clean build..."
-xcodebuild clean -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 15' -quiet
-xcodebuild build -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 15' -quiet || {
-    echo "❌ Build failed"
-    exit 1
-}
-
-# 3. SwiftLint
-echo "✓ Running SwiftLint..."
-swiftlint lint --strict || {
-    echo "❌ SwiftLint violations found"
-    swiftlint lint
-    exit 1
-}
-
-# 4. Tests
-echo "✓ Running test suite..."
-xcodebuild test -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 15' -quiet || {
-    echo "❌ Tests failed"
-    exit 1
-}
-
-# 5. Security check
-echo "✓ Checking for secrets..."
-if grep -rE "(API_KEY|api_key|secret|password.*=.*\"|token.*=.*\")" --include="*.swift" . ; then
-    echo "❌ Potential secrets found in code"
-    exit 1
-fi
-
-# 6. PR size check
-lines_changed=$(git diff --stat main...HEAD | tail -1 | awk '{print $4+$6}')
-if [ "$lines_changed" -gt 1000 ]; then
-    echo "❌ PR too large: $lines_changed lines changed (max 1000)"
-    echo "Break this into smaller PRs"
-    exit 1
-fi
-
-echo "✅ All checks passed! Ready to submit PR."
+git diff --stat develop...HEAD | tail -1
 ```
+
+- **Hard limit**: 1000 lines changed
+- If over, split before proceeding — do NOT open an oversized PR
 
 ---
 
-## Notes
+## Phase 6: Summary
 
-- This checklist is NON-NEGOTIABLE
-- Every step must pass
-- No shortcuts
-- No "I'll fix it later"
-- No "it's just a small change"
-- Quality over speed
-- The PR represents your craftsmanship
+Before committing/pushing, produce a summary of every fix applied:
 
-**Remember:** A PR that passes this checklist should sail through human review with minimal comments.
+```
+## Fixes Applied
+
+### HIGH
+- [file:line] Description of what was wrong and what was fixed
+
+### MEDIUM
+- [file:line] Description of what was wrong and what was fixed
+
+### LOW
+- [file:line] Description of what was wrong and what was fixed
+```
+
+This summary goes in the commit message body and can be referenced in PR comments.
+
+---
+
+## What This Catches That Checklists Don't
+
+- Decode methods that return `nil` prematurely because `APIEnvelope` with all-optional fields succeeds on any JSON
+- Views that flash "no data" messages before the first network call completes
+- `NavigationStack` missing from sheet-presented views (invisible toolbar/title)
+- `fullScreenCover` that opens blank when bound state is nil
+- `String.hashValue` used for colors (randomized per launch in Swift 4.2+)
+- Formatters allocated on every SwiftUI render pass
+- `@MainActor` properties read from `@Sendable` closures without capture
+- `withCheckedContinuation` that hangs if the wrapped task is cancelled
+- Struct `Equatable` that only checks `id` (SwiftUI won't re-render on property changes)
+- Duplicated private types across service files that diverge over time
+
+**These are the bugs that slip through checkbox reviews and get flagged by automated PR bots. This audit catches them first.**
