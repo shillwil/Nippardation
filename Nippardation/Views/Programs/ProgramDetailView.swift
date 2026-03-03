@@ -28,6 +28,9 @@ struct ProgramDetailView: View {
                 programContent(program)
             } else if let error = viewModel.error {
                 errorView(error)
+            } else {
+                ProgressView("Loading...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .navigationTitle(viewModel.program?.name ?? "Program")
@@ -39,7 +42,9 @@ struct ProgramDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showEditSheet) {
+        .sheet(isPresented: $showEditSheet, onDismiss: {
+            viewModel.loadProgram()
+        }) {
             if let program = viewModel.program {
                 NavigationStack {
                     ProgramEditorView(existingProgram: program)

@@ -9,7 +9,7 @@ import SwiftUI
 import Combine
 
 @MainActor
-class HomeViewModel: ObservableObject {
+final class HomeViewModel: ObservableObject {
     // Legacy workout templates (kept for backward compatibility)
     @Published var workouts: [Workout] = [
         upperStrength,

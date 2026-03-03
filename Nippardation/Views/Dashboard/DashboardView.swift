@@ -13,10 +13,10 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: AppSpacing.lg) {
                 if viewModel.isLoading && viewModel.activeProgram == nil {
                     ProgressView()
-                        .padding(.top, 50)
+                        .padding(.top, AppSpacing.xxl)
                 } else if let program = viewModel.activeProgram {
                     // Active program content
                     activeProgramContent(program)
@@ -50,7 +50,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func activeProgramContent(_ program: Program) -> some View {
-        VStack(spacing: 20) {
+        VStack(spacing: AppSpacing.lg) {
             // Next workout card
             if let nextWorkout = viewModel.nextWorkout,
                let template = viewModel.nextTemplate {
@@ -75,7 +75,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func programProgressSection(_ program: Program) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text(program.name)
                 .font(.headline)
 
@@ -110,12 +110,12 @@ struct DashboardView: View {
         }
         .padding()
         .background(Color(.secondarySystemBackground))
-        .cornerRadius(16)
+        .cornerRadius(AppCornerRadius.large)
     }
 
     @ViewBuilder
     private func workoutCarouselSection(_ program: Program) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("Program Workouts")
                 .font(.headline)
 

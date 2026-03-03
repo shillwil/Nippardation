@@ -31,6 +31,12 @@ struct ProgramListView: View {
                     ProgramWizardView()
                 }
             }
+            .onChange(of: showCreateProgram) { oldValue, newValue in
+                // Refresh list after create sheet closes so newly created programs appear immediately.
+                if oldValue && !newValue {
+                    viewModel.loadPrograms(refresh: true)
+                }
+            }
             .alert("Delete Program", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {
                     programToDelete = nil
@@ -90,32 +96,52 @@ struct ProgramListView: View {
         ScrollView {
             LazyVStack(spacing: AppSpacing.md) {
                 ForEach(viewModel.programs) { program in
-                    NavigationLink(destination: ProgramDetailView(programServerId: program.serverId)) {
-                        ProgramLibraryCard(program: program)
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        if !program.isActive {
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        NavigationLink(destination: ProgramDetailView(programServerId: program.serverId)) {
+                            ProgramLibraryCard(program: program)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            if !program.isActive {
+                                Button {
+                                    viewModel.activateProgram(program)
+                                } label: {
+                                    Label("Activate", systemImage: "checkmark.circle")
+                                }
+                            }
+
                             Button {
-                                viewModel.activateProgram(program)
+                                viewModel.duplicateProgram(program)
                             } label: {
-                                Label("Activate", systemImage: "checkmark.circle")
+                                Label("Duplicate", systemImage: "doc.on.doc")
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                programToDelete = program
+                                showDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
 
-                        Button {
-                            viewModel.duplicateProgram(program)
-                        } label: {
-                            Label("Duplicate", systemImage: "doc.on.doc")
-                        }
-
-                        Divider()
-
-                        Button(role: .destructive) {
-                            programToDelete = program
-                            showDeleteConfirmation = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if program.isActive {
+                            Label("Current Active Program", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                                .padding(.horizontal, AppSpacing.xs)
+                        } else {
+                            Button {
+                                viewModel.activateProgram(program)
+                            } label: {
+                                Label("Set As Active", systemImage: "checkmark.circle")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
                         }
                     }
                 }

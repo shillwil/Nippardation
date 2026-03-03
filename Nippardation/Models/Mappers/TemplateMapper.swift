@@ -19,7 +19,7 @@ enum TemplateMapper {
             serverId: dto.id,
             name: dto.name,
             description: dto.description,
-            exercises: dto.exercises.map { TemplateExerciseMapper.toDomain($0) },
+            exercises: (dto.exercises ?? []).map { TemplateExerciseMapper.toDomain($0) },
             isPublic: dto.isPublic ?? false,
             isAiGenerated: dto.isAiGenerated ?? false,
             createdAt: parseDate(dto.createdAt) ?? Date(),

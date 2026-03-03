@@ -19,16 +19,18 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         cursor: String?,
         limit: Int
     ) async throws -> (programs: [ProgramDTO], pagination: PaginationInfo) {
-        var components = URLComponents(
+        guard var components = URLComponents(
             url: AppConfiguration.shared.baseURL.appendingPathComponent("api/programs"),
             resolvingAgainstBaseURL: false
-        )!
+        ) else {
+            throw RepositoryError.unknown(nil)
+        }
 
-        let page = cursor.flatMap { Int($0) } ?? 1
-        components.queryItems = [
-            URLQueryItem(name: "page", value: String(page)),
-            URLQueryItem(name: "per_page", value: String(limit))
-        ]
+        var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor = cursor {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components.queryItems = queryItems
 
         guard let url = components.url else {
             throw RepositoryError.unknown(nil)
@@ -38,13 +40,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpMethod = "GET"
         try await addAuthHeader(to: &request)
 
-        let response: ProgramListResponse = try await performRequest(request)
-
-        let hasMore = response.pagination.page < response.pagination.totalPages
-        let nextCursor = hasMore ? String(response.pagination.page + 1) : nil
-        let paginationInfo = PaginationInfo(nextCursor: nextCursor, hasMore: hasMore)
-
-        return (response.programs, paginationInfo)
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramList(from: data)
     }
 
     func fetchProgram(id: String) async throws -> ProgramDTO {
@@ -56,8 +54,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpMethod = "GET"
         try await addAuthHeader(to: &request)
 
-        let response: ProgramDetailResponse = try await performRequest(request)
-        return response.program
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramDetail(from: data)
     }
 
     func fetchActiveProgram() async throws -> ActiveProgramDTO? {
@@ -69,7 +68,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         try await addAuthHeader(to: &request)
 
         do {
-            return try await performRequest(request)
+            let (data, response) = try await performRequestWithoutDecoding(request)
+            try validateResponse(response, data: data)
+            return try decodeActiveProgram(from: data)
         } catch RepositoryError.notFound {
             // No active program is a valid state
             return nil
@@ -84,8 +85,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpBody = try encoder.encode(createRequest)
         try await addAuthHeader(to: &request)
 
-        let response: ProgramDetailResponse = try await performRequest(request)
-        return response.program
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramDetail(from: data)
     }
 
     func updateProgram(id: String, _ updateRequest: UpdateProgramRequest) async throws -> ProgramDTO {
@@ -98,8 +100,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpBody = try encoder.encode(updateRequest)
         try await addAuthHeader(to: &request)
 
-        let response: ProgramDetailResponse = try await performRequest(request)
-        return response.program
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramDetail(from: data)
     }
 
     func updateProgramWorkouts(
@@ -120,8 +123,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpBody = try encoder.encode(WorkoutsWrapper(workouts: workouts))
         try await addAuthHeader(to: &request)
 
-        let response: ProgramDetailResponse = try await performRequest(request)
-        return response.program
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramDetail(from: data)
     }
 
     func deleteProgram(id: String) async throws {
@@ -149,8 +153,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpMethod = "POST"
         try await addAuthHeader(to: &request)
 
-        let response: ProgramDetailResponse = try await performRequest(request)
-        return response.program
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramDetail(from: data)
     }
 
     func deactivateProgram(id: String) async throws -> ProgramDTO {
@@ -163,8 +168,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpMethod = "POST"
         try await addAuthHeader(to: &request)
 
-        let response: ProgramDetailResponse = try await performRequest(request)
-        return response.program
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramDetail(from: data)
     }
 
     func advanceProgram(id: String) async throws -> ProgramDTO {
@@ -177,8 +183,9 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpMethod = "POST"
         try await addAuthHeader(to: &request)
 
-        let response: ProgramDetailResponse = try await performRequest(request)
-        return response.program
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramDetail(from: data)
     }
 
     func resetProgram(id: String) async throws -> ProgramDTO {
@@ -191,8 +198,86 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpMethod = "POST"
         try await addAuthHeader(to: &request)
 
-        let response: ProgramDetailResponse = try await performRequest(request)
-        return response.program
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeProgramDetail(from: data)
     }
 
+    // MARK: - Response Decoding
+
+    private func decodeProgramList(from data: Data) throws -> (programs: [ProgramDTO], pagination: PaginationInfo) {
+        if let wrappedCursor = try? decoder.decode(APIEnvelope<ProgramListCursorPayload>.self, from: data),
+           let payload = wrappedCursor.data {
+            return (payload.programs, payload.pagination.paginationInfo)
+        }
+
+        if let wrappedLegacy = try? decoder.decode(APIEnvelope<ProgramListResponse>.self, from: data),
+           let payload = wrappedLegacy.data {
+            let hasMore = payload.pagination.page < payload.pagination.totalPages
+            let nextCursor = hasMore ? String(payload.pagination.page + 1) : nil
+            return (payload.programs, PaginationInfo(nextCursor: nextCursor, hasMore: hasMore))
+        }
+
+        do {
+            let response = try decoder.decode(ProgramListResponse.self, from: data)
+            let hasMore = response.pagination.page < response.pagination.totalPages
+            let nextCursor = hasMore ? String(response.pagination.page + 1) : nil
+            return (response.programs, PaginationInfo(nextCursor: nextCursor, hasMore: hasMore))
+        } catch {
+            throw decodeFailure(error, data: data)
+        }
+    }
+
+    private func decodeProgramDetail(from data: Data) throws -> ProgramDTO {
+        if let wrappedDetail = try? decoder.decode(APIEnvelope<ProgramDetailResponse>.self, from: data),
+           let payload = wrappedDetail.data {
+            return payload.program
+        }
+
+        if let wrappedProgram = try? decoder.decode(APIEnvelope<ProgramDTO>.self, from: data),
+           let payload = wrappedProgram.data {
+            return payload
+        }
+
+        do {
+            return try decoder.decode(ProgramDetailResponse.self, from: data).program
+        } catch {
+            do {
+                return try decoder.decode(ProgramDTO.self, from: data)
+            } catch {
+                throw decodeFailure(error, data: data)
+            }
+        }
+    }
+
+    private func decodeActiveProgram(from data: Data) throws -> ActiveProgramDTO? {
+        if let wrappedActive = try? decoder.decode(APIEnvelope<ActiveProgramDTO>.self, from: data),
+           let payload = wrappedActive.data {
+            return payload
+        }
+
+        if let wrappedProgram = try? decoder.decode(APIEnvelope<ProgramDTO>.self, from: data),
+           let program = wrappedProgram.data {
+            return ActiveProgramDTO(program: program, nextWorkout: nil, isCompleted: false)
+        }
+
+        do {
+            return try decoder.decode(ActiveProgramDTO.self, from: data)
+        } catch {
+            do {
+                let program = try decoder.decode(ProgramDTO.self, from: data)
+                return ActiveProgramDTO(program: program, nextWorkout: nil, isCompleted: false)
+            } catch {
+                throw decodeFailure(error, data: data)
+            }
+        }
+    }
+
+}
+
+// MARK: - Private Response Models
+
+private struct ProgramListCursorPayload: Decodable {
+    let programs: [ProgramDTO]
+    let pagination: CursorPaginationPayload
 }

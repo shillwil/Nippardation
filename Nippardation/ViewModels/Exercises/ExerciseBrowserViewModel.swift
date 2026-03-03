@@ -98,13 +98,14 @@ final class ExerciseBrowserViewModel: ObservableObject {
             isLoadingMore = true
         }
 
+        let capturedFilter = self.filter
         Task {
             await taskManager.run(id: "loadExercises") { [weak self] in
                 guard let self = self else { return }
 
                 do {
                     let result = try await self.exerciseRepository.fetchExercises(
-                        filter: self.filter.isEmpty ? nil : self.filter,
+                        filter: capturedFilter.isEmpty ? nil : capturedFilter,
                         page: pageToFetch,
                         forceRefresh: refresh
                     )

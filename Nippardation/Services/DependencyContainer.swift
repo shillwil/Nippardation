@@ -114,13 +114,44 @@ final class DependencyContainer: ObservableObject {
     /// Configures the container with production services
     /// Called during app initialization
     func configureForProduction() {
-        // Register real video cache service
-        self.videoCacheService = VideoCacheService()
+        let authProvider = DefaultAuthTokenProvider.shared
 
-        // Register real exercise API service and repository
-        let exerciseAPI = ExerciseAPIService()
+        // API services
+        let exerciseAPI = ExerciseAPIService(authProvider: authProvider)
+        let templateAPI = TemplateAPIService(authProvider: authProvider)
+        let programAPI = ProgramAPIService(authProvider: authProvider)
+        let syncAPI = SyncAPIService(authProvider: authProvider)
+        let userAPI = UserAPIService(authProvider: authProvider)
+
         self.exerciseAPIService = exerciseAPI
-        self.exerciseRepository = ExerciseRepository(apiService: exerciseAPI)
+        self.templateAPIService = templateAPI
+        self.programAPIService = programAPI
+        self.syncAPIService = syncAPI
+        self.userAPIService = userAPI
+
+        // Repositories
+        let workoutRepository = WorkoutRepository(coreDataManager: .shared)
+        let exerciseRepository = ExerciseRepository(apiService: exerciseAPI, coreDataManager: .shared)
+        let templateRepository = TemplateRepository(apiService: templateAPI, coreDataManager: .shared)
+        let programRepository = ProgramRepository(apiService: programAPI, coreDataManager: .shared)
+
+        self.workoutRepository = workoutRepository
+        self.exerciseRepository = exerciseRepository
+        self.templateRepository = templateRepository
+        self.programRepository = programRepository
+
+        // Services
+        self.syncService = SyncService(
+            apiService: syncAPI,
+            workoutRepository: workoutRepository,
+            templateRepository: templateRepository,
+            programRepository: programRepository,
+            coreDataManager: .shared
+        )
+        self.videoCacheService = VideoCacheService(
+            templateRepository: templateRepository,
+            programRepository: programRepository
+        )
     }
 
     /// Configures the container with mock services for testing/previews

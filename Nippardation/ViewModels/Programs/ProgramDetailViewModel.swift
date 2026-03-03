@@ -15,7 +15,7 @@ final class ProgramDetailViewModel: ObservableObject {
 
     @Published var program: Program?
     @Published var templates: [Template] = []
-    @Published var isLoading = false
+    @Published var isLoading = true
     @Published var error: String?
 
     // MARK: - Dependencies
@@ -56,7 +56,7 @@ final class ProgramDetailViewModel: ObservableObject {
                 do {
                     let program = try await self.programRepository.fetchProgram(
                         serverId: serverId,
-                        forceRefresh: false
+                        forceRefresh: true
                     )
 
                     // Load templates for each workout

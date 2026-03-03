@@ -36,6 +36,12 @@ struct TemplateListView: View {
                     TemplateEditorView()
                 }
             }
+            .onChange(of: showCreateTemplate) { oldValue, newValue in
+                // Refresh list after create sheet closes so newly created templates appear immediately.
+                if oldValue && !newValue {
+                    viewModel.loadTemplates(refresh: true)
+                }
+            }
             .alert("Delete Template", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {
                     templateToDelete = nil

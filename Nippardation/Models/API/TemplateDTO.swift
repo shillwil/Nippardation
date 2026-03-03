@@ -23,7 +23,8 @@ struct TemplateDTO: Codable, Identifiable {
     let id: String
     let name: String
     let description: String?
-    let exercises: [TemplateExerciseDTO]
+    /// Present on full template payloads; omitted on summary payloads embedded in program responses
+    let exercises: [TemplateExerciseDTO]?
     let isPublic: Bool?
     let isAiGenerated: Bool?
     let createdAt: String?

@@ -101,7 +101,7 @@ struct TemplateEditorView: View {
             if viewModel.isSaving {
                 ProgressView("Saving...")
                     .padding()
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppCornerRadius.medium))
             }
         }
         .alert("Error", isPresented: .init(
@@ -231,7 +231,12 @@ private struct ExercisePickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ExerciseBrowserContent(viewModel: browserViewModel)
+            ExerciseBrowserContent(
+                viewModel: browserViewModel,
+                onConfirmSelection: { selected in
+                    onConfirm(selected)
+                }
+            )
                 .navigationTitle("Select Exercises")
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {

@@ -35,11 +35,11 @@ struct ProgramAPIServiceTests {
             let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
             let queryItems = components?.queryItems ?? []
 
-            let pageItem = queryItems.first { $0.name == "page" }
-            let perPageItem = queryItems.first { $0.name == "per_page" }
+            let limitItem = queryItems.first { $0.name == "limit" }
+            let cursorItem = queryItems.first { $0.name == "cursor" }
 
-            #expect(pageItem?.value == "1")
-            #expect(perPageItem?.value == "10")
+            #expect(limitItem?.value == "10")
+            #expect(cursorItem == nil)
 
             return MockURLProtocol.errorResponse(for: request.url!, statusCode: 401)
         }
@@ -49,6 +49,52 @@ struct ProgramAPIServiceTests {
         } catch {
             // Expected
         }
+    }
+
+    @Test func fetchProgramsDecodesWrappedResponse() async throws {
+        let (service, sessionID) = createService()
+
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let body = """
+            {"success":true,"data":{"programs":[],"pagination":{"nextCursor":null,"hasMore":false}},"correlationId":"req_test"}
+            """
+            return (response, body.data(using: .utf8))
+        }
+
+        let result = try await service.fetchPrograms(cursor: nil, limit: 10)
+        #expect(result.programs.isEmpty)
+        #expect(result.pagination.hasMore == false)
+        #expect(result.pagination.nextCursor == nil)
+    }
+
+    @Test func fetchProgramsDecodesListWithWorkoutCount() async throws {
+        let (service, sessionID) = createService()
+
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let body = """
+            {"success":true,"data":{"programs":[{"id":"prog_1","name":"PPL","daysPerWeek":6,"workoutCount":6,"isActive":true,"currentDayIndex":2,"timesCompleted":0,"createdAt":"2026-02-20T10:00:00.000Z","updatedAt":"2026-02-20T10:00:00.000Z"}],"pagination":{"nextCursor":null,"hasMore":false}},"correlationId":"req_test"}
+            """
+            return (response, body.data(using: .utf8))
+        }
+
+        let result = try await service.fetchPrograms(cursor: nil, limit: 10)
+        #expect(result.programs.count == 1)
+        #expect(result.programs[0].id == "prog_1")
+        #expect(result.programs[0].name == "PPL")
+        #expect(result.programs[0].workouts == nil)
+        #expect(result.pagination.hasMore == false)
     }
 
     // MARK: - fetchProgram Tests
@@ -125,6 +171,38 @@ struct ProgramAPIServiceTests {
         } catch {
             // Expected
         }
+    }
+
+    @Test func createProgramDecodesWrappedResponseWithTemplateSummary() async throws {
+        let (service, sessionID) = createService()
+
+        MockURLProtocol.setRequestHandler(for: sessionID) { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let body = """
+            {"success":true,"data":{"program":{"id":"prog_123","name":"YOLO Swag","description":null,"daysPerWeek":5,"durationWeeks":null,"isActive":false,"currentDayIndex":0,"timesCompleted":0,"isPublic":false,"isAiGenerated":false,"workouts":[{"id":"w_1","dayNumber":0,"dayLabel":"Day 1","templateId":"tmpl_1","template":{"id":"tmpl_1","name":"Upper","description":null,"exerciseCount":8}}],"createdAt":"2026-02-23T17:33:13.533Z","updatedAt":"2026-02-23T17:33:13.533Z"}},"correlationId":"req_test"}
+            """
+            return (response, body.data(using: .utf8))
+        }
+
+        let createRequest = CreateProgramRequest(
+            name: "YOLO Swag",
+            description: nil,
+            daysPerWeek: 5,
+            durationWeeks: nil,
+            workouts: [],
+            isPublic: false
+        )
+
+        let dto = try await service.createProgram(createRequest)
+        #expect(dto.id == "prog_123")
+        #expect(dto.workouts?.count == 1)
+        #expect(dto.workouts?.first?.template?.id == "tmpl_1")
+        #expect(dto.workouts?.first?.template?.name == "Upper")
     }
 
     // MARK: - updateProgram Tests

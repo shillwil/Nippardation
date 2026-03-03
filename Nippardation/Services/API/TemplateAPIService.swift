@@ -19,16 +19,18 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         cursor: String?,
         limit: Int
     ) async throws -> (templates: [TemplateDTO], pagination: PaginationInfo) {
-        var components = URLComponents(
+        guard var components = URLComponents(
             url: AppConfiguration.shared.baseURL.appendingPathComponent("api/templates"),
             resolvingAgainstBaseURL: false
-        )!
+        ) else {
+            throw RepositoryError.unknown(nil)
+        }
 
-        let page = cursor.flatMap { Int($0) } ?? 1
-        components.queryItems = [
-            URLQueryItem(name: "page", value: String(page)),
-            URLQueryItem(name: "per_page", value: String(limit))
-        ]
+        var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor = cursor {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components.queryItems = queryItems
 
         guard let url = components.url else {
             throw RepositoryError.unknown(nil)
@@ -38,13 +40,9 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         request.httpMethod = "GET"
         try await addAuthHeader(to: &request)
 
-        let response: TemplateListResponse = try await performRequest(request)
-
-        let hasMore = response.pagination.page < response.pagination.totalPages
-        let nextCursor = hasMore ? String(response.pagination.page + 1) : nil
-        let paginationInfo = PaginationInfo(nextCursor: nextCursor, hasMore: hasMore)
-
-        return (response.templates, paginationInfo)
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeTemplateList(from: data)
     }
 
     func fetchTemplate(id: String) async throws -> TemplateDTO {
@@ -56,8 +54,9 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         request.httpMethod = "GET"
         try await addAuthHeader(to: &request)
 
-        let response: TemplateDetailResponse = try await performRequest(request)
-        return response.template
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeTemplateDetail(from: data)
     }
 
     func createTemplate(_ createRequest: CreateTemplateRequest) async throws -> TemplateDTO {
@@ -68,8 +67,9 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         request.httpBody = try encoder.encode(createRequest)
         try await addAuthHeader(to: &request)
 
-        let response: TemplateDetailResponse = try await performRequest(request)
-        return response.template
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeTemplateDetail(from: data)
     }
 
     func updateTemplate(id: String, _ updateRequest: UpdateTemplateRequest) async throws -> TemplateDTO {
@@ -82,8 +82,9 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         request.httpBody = try encoder.encode(updateRequest)
         try await addAuthHeader(to: &request)
 
-        let response: TemplateDetailResponse = try await performRequest(request)
-        return response.template
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeTemplateDetail(from: data)
     }
 
     func updateTemplateExercises(
@@ -104,8 +105,9 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         request.httpBody = try encoder.encode(ExercisesWrapper(exercises: exercises))
         try await addAuthHeader(to: &request)
 
-        let response: TemplateDetailResponse = try await performRequest(request)
-        return response.template
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeTemplateDetail(from: data)
     }
 
     func cloneTemplate(id: String, newName: String?) async throws -> TemplateDTO {
@@ -124,8 +126,9 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         }
         try await addAuthHeader(to: &request)
 
-        let response: TemplateDetailResponse = try await performRequest(request)
-        return response.template
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+        return try decodeTemplateDetail(from: data)
     }
 
     func deleteTemplate(id: String) async throws {
@@ -148,4 +151,57 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         try validateResponse(response, data: data)
     }
 
+    // MARK: - Response Decoding
+
+    private func decodeTemplateList(from data: Data) throws -> (templates: [TemplateDTO], pagination: PaginationInfo) {
+        if let wrappedCursor = try? decoder.decode(APIEnvelope<TemplateListCursorPayload>.self, from: data),
+           let payload = wrappedCursor.data {
+            return (payload.templates, payload.pagination.paginationInfo)
+        }
+
+        if let wrappedLegacy = try? decoder.decode(APIEnvelope<TemplateListResponse>.self, from: data),
+           let payload = wrappedLegacy.data {
+            let hasMore = payload.pagination.page < payload.pagination.totalPages
+            let nextCursor = hasMore ? String(payload.pagination.page + 1) : nil
+            return (payload.templates, PaginationInfo(nextCursor: nextCursor, hasMore: hasMore))
+        }
+
+        do {
+            let response = try decoder.decode(TemplateListResponse.self, from: data)
+            let hasMore = response.pagination.page < response.pagination.totalPages
+            let nextCursor = hasMore ? String(response.pagination.page + 1) : nil
+            return (response.templates, PaginationInfo(nextCursor: nextCursor, hasMore: hasMore))
+        } catch {
+            throw decodeFailure(error, data: data)
+        }
+    }
+
+    private func decodeTemplateDetail(from data: Data) throws -> TemplateDTO {
+        if let wrappedDetail = try? decoder.decode(APIEnvelope<TemplateDetailResponse>.self, from: data),
+           let payload = wrappedDetail.data {
+            return payload.template
+        }
+
+        if let wrappedTemplate = try? decoder.decode(APIEnvelope<TemplateDTO>.self, from: data),
+           let payload = wrappedTemplate.data {
+            return payload
+        }
+
+        do {
+            return try decoder.decode(TemplateDetailResponse.self, from: data).template
+        } catch {
+            do {
+                return try decoder.decode(TemplateDTO.self, from: data)
+            } catch {
+                throw decodeFailure(error, data: data)
+            }
+        }
+    }
+}
+
+// MARK: - Private Response Models
+
+private struct TemplateListCursorPayload: Decodable {
+    let templates: [TemplateDTO]
+    let pagination: CursorPaginationPayload
 }

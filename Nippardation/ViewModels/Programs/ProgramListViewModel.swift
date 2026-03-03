@@ -156,7 +156,7 @@ final class ProgramListViewModel: ObservableObject {
                     await MainActor.run {
                         // Update all programs to reflect new active state
                         self.programs = self.programs.map { p in
-                            if p.id == updated.id {
+                            if p.serverId == updated.serverId {
                                 return updated
                             } else if p.isActive {
                                 // Deactivate previously active program
