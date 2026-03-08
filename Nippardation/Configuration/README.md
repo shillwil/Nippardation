@@ -9,7 +9,7 @@ The app environment (staging vs production) is determined **at compile time** vi
 | Config     | Compiler Flags    | URL        | Used By                          |
 |------------|-------------------|------------|----------------------------------|
 | Debug      | `DEBUG STAGING`   | staging    | Staging scheme Run               |
-| Staging    | `DEBUG STAGING`   | staging    | Staging scheme Archive           |
+| Staging    | `STAGING`         | staging    | Staging scheme Archive           |
 | Release    | `PRODUCTION`      | production | Nippardation scheme Run/Archive  |
 | Production | `PRODUCTION`      | production | Production scheme Run/Archive    |
 
