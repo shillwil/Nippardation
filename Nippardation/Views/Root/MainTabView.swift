@@ -54,6 +54,7 @@ struct MainTabView: View {
             }
         }
         .tint(Color.appTheme)
+        .environmentBanner()
     }
 }
 
