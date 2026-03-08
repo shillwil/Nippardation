@@ -50,18 +50,6 @@
             ReferencedContainer = "container:Nippardation.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <EnvironmentVariables>
-         <EnvironmentVariable
-            key = "API_BASE_URL"
-            value = "https://recess-backend-staging.up.railway.app"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "APP_ENVIRONMENT"
-            value = "Staging"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

@@ -12,14 +12,7 @@ enum AppEnvironment: String {
     case production = "Production"
 
     static var current: AppEnvironment {
-        // Check environment variable first (for debug builds via Xcode)
-        if let env = ProcessInfo.processInfo.environment["APP_ENVIRONMENT"],
-           !env.isEmpty {
-            return env == "Production" ? .production : .staging
-        }
-
-        // Fallback for production/TestFlight builds
-        #if DEBUG
+        #if STAGING
         return .staging
         #else
         return .production
@@ -29,30 +22,21 @@ enum AppEnvironment: String {
 
 struct AppConfiguration {
     static let shared = AppConfiguration()
-    
-    private init() {}
-    
-    var environment: AppEnvironment {
-        return AppEnvironment.current
-    }
-    
-    var baseURL: URL {
-        // Check environment variable first (for debug builds via Xcode)
-        if let urlString = ProcessInfo.processInfo.environment["API_BASE_URL"],
-           !urlString.isEmpty,
-           let url = URL(string: urlString) {
-            return url
-        }
 
-        // Fallback for production/TestFlight builds
-        #if DEBUG
-        fatalError("API_BASE_URL not found. Set it in Xcode Scheme > Run > Arguments > Environment Variables.")
+    private init() {}
+
+    var environment: AppEnvironment {
+        return .current
+    }
+
+    var baseURL: URL {
+        #if STAGING
+        return URL(string: "https://recess-backend-staging.up.railway.app")!
         #else
-        // Production URL for archived builds
         return URL(string: "https://recess-backend-production.up.railway.app")!
         #endif
     }
-    
+
     var firebasePlistName: String {
         switch environment {
         case .staging:
@@ -61,7 +45,7 @@ struct AppConfiguration {
             return "GoogleService-Info-Prod"
         }
     }
-    
+
     var appName: String {
         switch environment {
         case .staging:
@@ -70,7 +54,7 @@ struct AppConfiguration {
             return "Nippardation"
         }
     }
-    
+
     var bundleIdentifier: String {
         switch environment {
         case .staging:
