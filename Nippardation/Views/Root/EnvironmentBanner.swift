@@ -13,11 +13,11 @@ struct EnvironmentBannerModifier: ViewModifier {
                 .font(.caption2)
                 .fontWeight(.bold)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
+                .padding(.horizontal, AppSpacing.xs)
+                .padding(.vertical, AppSpacing.xxs)
                 .background(Color.orange)
                 .clipShape(Capsule())
-                .padding(.top, 2)
+                .padding(.top, AppSpacing.xxs)
                 .allowsHitTesting(false)
         }
         #else

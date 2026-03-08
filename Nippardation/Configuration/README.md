@@ -45,27 +45,10 @@ In staging builds (`#if STAGING`), an orange "STAGING" capsule appears at the to
 
 The app automatically loads the correct GoogleService-Info.plist based on the environment.
 
-## Setup
-
-### 1. Generate Configuration Files from Templates
-
-```bash
-cd /path/to/Nippardation
-./Scripts/setup-config.sh
-```
-
-This creates local xcconfig files from templates:
-- `Staging.xcconfig`
-- `Production.xcconfig`
-- `Debug.xcconfig`
-
-### 2. Configure Your Environment Values
-
-Edit each generated xcconfig file and replace the placeholders with your actual values (bundle ID, team ID, etc.).
-
 ## Important Notes
 
 1. **Do NOT** add `GoogleService-Info.plist` (without suffix) to the project — it will be copied automatically
 2. Keep your Firebase configuration files secure and don't commit sensitive data
 3. URLs are defined in `AppConfiguration.swift` and selected via `#if STAGING` / `#else` compiler directives
-4. Make sure to configure matching apps in Firebase Console for both bundle IDs
+4. Compiler flags are set in the project-level build configs in `project.pbxproj` — not in xcconfig files
+5. Make sure to configure matching apps in Firebase Console for both bundle IDs
