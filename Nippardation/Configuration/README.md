@@ -6,21 +6,19 @@ The app environment (staging vs production) is determined **at compile time** vi
 
 ### Build Configuration Matrix
 
-| Config     | Compiler Flags    | URL        | Used By                     |
-|------------|-------------------|------------|-----------------------------|
-| Debug      | `DEBUG STAGING`   | staging    | All schemes' Run action     |
-| Staging    | `DEBUG STAGING`   | staging    | Staging scheme Archive      |
-| Release    | `PRODUCTION`      | production | Nippardation scheme Archive |
-| Production | `PRODUCTION`      | production | Production scheme Archive   |
+| Config     | Compiler Flags    | URL        | Used By                          |
+|------------|-------------------|------------|----------------------------------|
+| Debug      | `DEBUG STAGING`   | staging    | Staging scheme Run               |
+| Staging    | `DEBUG STAGING`   | staging    | Staging scheme Archive           |
+| Release    | `PRODUCTION`      | production | Nippardation scheme Run/Archive  |
+| Production | `PRODUCTION`      | production | Production scheme Run/Archive    |
 
 ### Switching Environments
 
 Select the appropriate Xcode scheme:
-- **Staging** scheme: Run hits staging (Debug config), Archive hits staging (Staging config)
-- **Production** scheme: Run hits staging (Debug config, safe default), Archive hits production (Production config)
-- **Nippardation** scheme: Run hits staging (Debug config), Archive hits production (Release config)
-
-Local `Run` always uses the Debug build config which has the `STAGING` flag — this is the safest default so developers never accidentally hit production during local testing.
+- **Staging** scheme: Run and Archive both hit **staging**
+- **Production** scheme: Run and Archive both hit **production**
+- **Nippardation** scheme: Run and Archive both hit **production** (Release config)
 
 ### Accessing Configuration in Code
 
