@@ -9,7 +9,9 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject private var authManager: AuthManager
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @State private var selectedTab: AppTab = .home
+    @State private var showSharePreview = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -55,6 +57,20 @@ struct MainTabView: View {
         }
         .tint(Color.appTheme)
         .environmentBanner()
+        .onChange(of: deepLinkRouter.pendingShareToken) { _, token in
+            if token != nil {
+                showSharePreview = true
+            }
+        }
+        .sheet(isPresented: $showSharePreview) {
+            deepLinkRouter.clearPendingToken()
+        } content: {
+            if let token = deepLinkRouter.pendingShareToken {
+                SharePreviewView(token: token) {
+                    showSharePreview = false
+                }
+            }
+        }
     }
 }
 

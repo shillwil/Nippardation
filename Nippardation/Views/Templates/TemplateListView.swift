@@ -13,6 +13,8 @@ struct TemplateListView: View {
     @State private var showCreateTemplate = false
     @State private var templateToDelete: Template?
     @State private var showDeleteConfirmation = false
+    @State private var showShareSheet = false
+    @StateObject private var shareViewModel = ShareViewModel()
 
     private let columns = [
         GridItem(.flexible(), spacing: AppSpacing.sm),
@@ -54,6 +56,24 @@ struct TemplateListView: View {
                 }
             } message: {
                 Text("Are you sure you want to delete this template? This cannot be undone.")
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let url = shareViewModel.shareURL {
+                    ShareActivityView(activityItems: [url])
+                }
+            }
+            .onChange(of: shareViewModel.shareURL) { _, url in
+                if url != nil {
+                    showShareSheet = true
+                }
+            }
+            .alert("Sharing Error", isPresented: .init(
+                get: { shareViewModel.error != nil },
+                set: { if !$0 { shareViewModel.clearError() } }
+            )) {
+                Button("OK") { shareViewModel.clearError() }
+            } message: {
+                Text(shareViewModel.error ?? "")
             }
             .refreshable {
                 await viewModel.refreshAsync()
@@ -118,6 +138,12 @@ struct TemplateListView: View {
                                 viewModel.duplicateTemplate(template)
                             } label: {
                                 Label("Duplicate", systemImage: "doc.on.doc")
+                            }
+
+                            Button {
+                                shareViewModel.createShare(type: "template", itemId: template.serverId)
+                            } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
                             }
 
                             Divider()

@@ -56,6 +56,9 @@ final class DependencyContainer: ObservableObject {
     /// User API service for API-level operations
     @Published private(set) var userAPIService: any UserAPIServiceProtocol
 
+    /// Share API service for sharing programs and templates
+    @Published private(set) var shareAPIService: any ShareAPIServiceProtocol
+
     // MARK: - Initialization
 
     private init() {
@@ -75,6 +78,7 @@ final class DependencyContainer: ObservableObject {
         self.programAPIService = MockProgramAPIService()
         self.syncAPIService = MockSyncAPIService()
         self.userAPIService = MockUserAPIService()
+        self.shareAPIService = MockShareAPIService()
     }
 
     // MARK: - Registration
@@ -122,12 +126,14 @@ final class DependencyContainer: ObservableObject {
         let programAPI = ProgramAPIService(authProvider: authProvider)
         let syncAPI = SyncAPIService(authProvider: authProvider)
         let userAPI = UserAPIService(authProvider: authProvider)
+        let shareAPI = ShareAPIService(authProvider: authProvider)
 
         self.exerciseAPIService = exerciseAPI
         self.templateAPIService = templateAPI
         self.programAPIService = programAPI
         self.syncAPIService = syncAPI
         self.userAPIService = userAPI
+        self.shareAPIService = shareAPI
 
         // Repositories
         let workoutRepository = WorkoutRepository(coreDataManager: .shared)
@@ -169,6 +175,7 @@ final class DependencyContainer: ObservableObject {
         self.programAPIService = MockProgramAPIService()
         self.syncAPIService = MockSyncAPIService()
         self.userAPIService = MockUserAPIService()
+        self.shareAPIService = MockShareAPIService()
     }
 
     // MARK: - API Service Setters (Used by Agent A)
@@ -201,6 +208,11 @@ final class DependencyContainer: ObservableObject {
     /// Called by Agent A after completion
     func setUserAPIService(_ service: any UserAPIServiceProtocol) {
         self.userAPIService = service
+    }
+
+    /// Replace share API service with real implementation
+    func setShareAPIService(_ service: any ShareAPIServiceProtocol) {
+        self.shareAPIService = service
     }
 
     /// Resets all services to their default state

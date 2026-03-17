@@ -13,6 +13,8 @@ struct ProgramDetailView: View {
     @StateObject private var viewModel: ProgramDetailViewModel
     @State private var showEditSheet = false
     @State private var showResetConfirmation = false
+    @State private var showShareSheet = false
+    @StateObject private var shareViewModel = ShareViewModel()
 
     init(programServerId: String) {
         self.programServerId = programServerId
@@ -37,8 +39,22 @@ struct ProgramDetailView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Edit") {
-                    showEditSheet = true
+                HStack(spacing: AppSpacing.sm) {
+                    Button {
+                        shareViewModel.createShare(type: "program", itemId: programServerId)
+                    } label: {
+                        if shareViewModel.isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                    .disabled(shareViewModel.isLoading)
+
+                    Button("Edit") {
+                        showEditSheet = true
+                    }
                 }
             }
         }
@@ -50,6 +66,24 @@ struct ProgramDetailView: View {
                     ProgramEditorView(existingProgram: program)
                 }
             }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = shareViewModel.shareURL {
+                ShareActivityView(activityItems: [url])
+            }
+        }
+        .onChange(of: shareViewModel.shareURL) { _, url in
+            if url != nil {
+                showShareSheet = true
+            }
+        }
+        .alert("Sharing Error", isPresented: .init(
+            get: { shareViewModel.error != nil },
+            set: { if !$0 { shareViewModel.clearError() } }
+        )) {
+            Button("OK") { shareViewModel.clearError() }
+        } message: {
+            Text(shareViewModel.error ?? "")
         }
         .alert("Reset Progress", isPresented: $showResetConfirmation) {
             Button("Cancel", role: .cancel) {}

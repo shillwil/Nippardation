@@ -13,6 +13,7 @@ struct NippardationApp: App {
     private let coreDataManager = CoreDataManager.shared
     @StateObject private var workoutManager = WorkoutManager.shared
     @StateObject private var authManager = AuthManager.shared
+    @StateObject private var deepLinkRouter = DeepLinkRouter.shared
     
     init() {
         StringArrayTransformer.register()
@@ -40,6 +41,10 @@ struct NippardationApp: App {
             if authManager.isAuthenticated {
                 MainTabView()
                     .environmentObject(authManager)
+                    .environmentObject(deepLinkRouter)
+                    .onOpenURL { url in
+                        deepLinkRouter.handleURL(url)
+                    }
                     .onChange(of: UIApplication.shared.applicationState) { oldState, newState in
                         if newState == .background {
                             coreDataManager.saveContext()

@@ -13,6 +13,8 @@ struct ProgramListView: View {
     @State private var showCreateProgram = false
     @State private var programToDelete: Program?
     @State private var showDeleteConfirmation = false
+    @State private var showShareSheet = false
+    @StateObject private var shareViewModel = ShareViewModel()
 
     var body: some View {
         content
@@ -49,6 +51,24 @@ struct ProgramListView: View {
                 }
             } message: {
                 Text("Are you sure you want to delete this program? This cannot be undone.")
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let url = shareViewModel.shareURL {
+                    ShareActivityView(activityItems: [url])
+                }
+            }
+            .onChange(of: shareViewModel.shareURL) { _, url in
+                if url != nil {
+                    showShareSheet = true
+                }
+            }
+            .alert("Sharing Error", isPresented: .init(
+                get: { shareViewModel.error != nil },
+                set: { if !$0 { shareViewModel.clearError() } }
+            )) {
+                Button("OK") { shareViewModel.clearError() }
+            } message: {
+                Text(shareViewModel.error ?? "")
             }
             .refreshable {
                 await viewModel.refreshAsync()
@@ -114,6 +134,12 @@ struct ProgramListView: View {
                                 viewModel.duplicateProgram(program)
                             } label: {
                                 Label("Duplicate", systemImage: "doc.on.doc")
+                            }
+
+                            Button {
+                                shareViewModel.createShare(type: "program", itemId: program.serverId)
+                            } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
                             }
 
                             Divider()
