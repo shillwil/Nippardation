@@ -63,4 +63,8 @@ struct AppConfiguration {
             return "com.shillwil.Nippardation"
         }
     }
+
+    var shareURLScheme: String {
+        "nippardation"
+    }
 }

@@ -49,6 +49,7 @@ final class TemplateEditorViewModel: ObservableObject {
 
     private var existingTemplate: Template?
     var isEditing: Bool { existingTemplate != nil }
+    var existingServerId: String? { existingTemplate?.serverId }
 
     // MARK: - Computed Properties
 
