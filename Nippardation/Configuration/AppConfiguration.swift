@@ -58,9 +58,9 @@ struct AppConfiguration {
     var bundleIdentifier: String {
         switch environment {
         case .staging:
-            return "com.shillwil.Nippardation"
+            return "com.shillwil.recess-fitness"
         case .production:
-            return "com.shillwil.Nippardation"
+            return "com.shillwil.recess-fitness"
         }
     }
 
