@@ -11,6 +11,8 @@ struct ProgramListView: View {
 
     @StateObject private var viewModel = ProgramListViewModel()
     @State private var showCreateProgram = false
+    @State private var showAIWizard = false
+    @State private var showCreateChoice = false
     @State private var programToDelete: Program?
     @State private var showDeleteConfirmation = false
     @State private var showShareSheet = false
@@ -22,19 +24,41 @@ struct ProgramListView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showCreateProgram = true
+                        showCreateChoice = true
                     } label: {
                         Image(systemName: "plus")
                     }
                 }
+            }
+            .confirmationDialog("Create Program", isPresented: $showCreateChoice) {
+                Button {
+                    showCreateProgram = true
+                } label: {
+                    Label("Create Manually", systemImage: "square.and.pencil")
+                }
+
+                Button {
+                    showAIWizard = true
+                } label: {
+                    Label("Generate with AI", systemImage: "sparkles")
+                }
+            } message: {
+                Text("How would you like to create your program?")
             }
             .sheet(isPresented: $showCreateProgram) {
                 NavigationStack {
                     ProgramWizardView()
                 }
             }
+            .fullScreenCover(isPresented: $showAIWizard) {
+                AIWizardView()
+            }
             .onChange(of: showCreateProgram) { oldValue, newValue in
-                // Refresh list after create sheet closes so newly created programs appear immediately.
+                if oldValue && !newValue {
+                    viewModel.loadPrograms(refresh: true)
+                }
+            }
+            .onChange(of: showAIWizard) { oldValue, newValue in
                 if oldValue && !newValue {
                     viewModel.loadPrograms(refresh: true)
                 }
@@ -95,7 +119,10 @@ struct ProgramListView: View {
         if viewModel.isLoading && viewModel.programs.isEmpty {
             loadingView
         } else if viewModel.programs.isEmpty {
-            ProgramEmptyStateView(onCreate: { showCreateProgram = true })
+            ProgramEmptyStateView(
+                onCreate: { showCreateProgram = true },
+                onGenerateWithAI: { showAIWizard = true }
+            )
         } else {
             programList
         }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProgramEmptyStateView: View {
     let onCreate: () -> Void
+    var onGenerateWithAI: (() -> Void)?
 
     var body: some View {
         VStack(spacing: AppSpacing.lg) {
@@ -39,17 +40,26 @@ struct ProgramEmptyStateView: View {
             }
 
             // CTA
-            Button(action: onCreate) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Create Program")
+            VStack(spacing: AppSpacing.sm) {
+                if let onGenerateWithAI {
+                    AIGradientButton("Generate with AI") {
+                        onGenerateWithAI()
+                    }
+                    .padding(.horizontal, AppSpacing.xl)
                 }
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity)
+
+                Button(action: onCreate) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Create Manually")
+                    }
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.horizontal, AppSpacing.xl)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.horizontal, AppSpacing.xl)
 
             Spacer()
         }
