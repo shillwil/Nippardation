@@ -145,7 +145,7 @@ final class TemplateAPIService: BaseAPIService, TemplateAPIServiceProtocol, @unc
         // Check for 409 Conflict (template in use by program)
         if let httpResponse = response as? HTTPURLResponse,
            httpResponse.statusCode == 409 {
-            throw RepositoryError.syncConflict(localId: id, remoteId: nil)
+            throw RepositoryError.validationError("This template is used by a program. Delete the program first, then try again.")
         }
 
         try validateResponse(response, data: data)

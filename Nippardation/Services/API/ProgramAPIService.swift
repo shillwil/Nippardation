@@ -137,7 +137,21 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpMethod = "DELETE"
         try await addAuthHeader(to: &request)
 
+        #if DEBUG
+        print("[ProgramAPI] DELETE \(url.absoluteString)")
+        #endif
+
         let (data, response) = try await performRequestWithoutDecoding(request)
+
+        #if DEBUG
+        if let httpResponse = response as? HTTPURLResponse {
+            print("[ProgramAPI] DELETE status: \(httpResponse.statusCode)")
+            if let body = String(data: data, encoding: .utf8) {
+                print("[ProgramAPI] DELETE response: \(body)")
+            }
+        }
+        #endif
+
         try validateResponse(response, data: data)
     }
 

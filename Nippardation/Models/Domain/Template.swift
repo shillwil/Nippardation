@@ -25,8 +25,11 @@ struct Template: Identifiable, Hashable {
 
     /// Number of exercises in the template
     var exerciseCount: Int {
-        exercises.count
+        exercises.isEmpty ? (_knownExerciseCount ?? 0) : exercises.count
     }
+
+    /// Stored exercise count from API (used when exercises array is empty but count is known from list endpoint)
+    var _knownExerciseCount: Int? = nil
 
     /// Total number of working sets in the template
     var totalWorkingSets: Int {

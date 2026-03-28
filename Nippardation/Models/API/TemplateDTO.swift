@@ -25,11 +25,24 @@ struct TemplateDTO: Codable, Identifiable {
     let description: String?
     /// Present on full template payloads; omitted on summary payloads embedded in program responses
     let exercises: [TemplateExerciseDTO]?
+    /// Exercise count provided by list endpoints that omit the full exercises array
+    let exerciseCount: Int?
     let isPublic: Bool?
     let isAiGenerated: Bool?
     let createdAt: String?
     let updatedAt: String?
 
+    init(id: String, name: String, description: String? = nil, exercises: [TemplateExerciseDTO]? = nil, exerciseCount: Int? = nil, isPublic: Bool? = nil, isAiGenerated: Bool? = nil, createdAt: String? = nil, updatedAt: String? = nil) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.exercises = exercises
+        self.exerciseCount = exerciseCount
+        self.isPublic = isPublic
+        self.isAiGenerated = isAiGenerated
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 }
 
 /// Template exercise data transfer object
