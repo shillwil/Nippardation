@@ -104,26 +104,28 @@ extension CoreDataManager {
                     cdProgram.lastFetchedAt = Date()
                     cdProgram.syncStatus = program.serverId.isEmpty ? 0 : 2 // unsynced if no serverId
 
-                    // Remove existing workouts and add new ones
-                    if let existingWorkouts = cdProgram.workouts {
-                        for case let workout as CDProgramWorkout in existingWorkouts {
-                            context.delete(workout)
+                    // Only replace workouts when the incoming program actually has them.
+                    // List endpoints may omit workouts — preserve cached data.
+                    if !program.workouts.isEmpty {
+                        if let existingWorkouts = cdProgram.workouts {
+                            for case let workout as CDProgramWorkout in existingWorkouts {
+                                context.delete(workout)
+                            }
                         }
-                    }
 
-                    // Add workouts
-                    let orderedWorkouts = NSMutableOrderedSet()
-                    for programWorkout in program.workouts {
-                        let cdWorkout = CDProgramWorkout(context: context)
-                        cdWorkout.id = programWorkout.id
-                        cdWorkout.serverId = programWorkout.serverId
-                        cdWorkout.dayNumber = Int16(programWorkout.dayNumber)
-                        cdWorkout.dayLabel = programWorkout.dayLabel
-                        cdWorkout.templateServerId = programWorkout.templateServerId
-                        cdWorkout.program = cdProgram
-                        orderedWorkouts.add(cdWorkout)
+                        let orderedWorkouts = NSMutableOrderedSet()
+                        for programWorkout in program.workouts {
+                            let cdWorkout = CDProgramWorkout(context: context)
+                            cdWorkout.id = programWorkout.id
+                            cdWorkout.serverId = programWorkout.serverId
+                            cdWorkout.dayNumber = Int16(programWorkout.dayNumber)
+                            cdWorkout.dayLabel = programWorkout.dayLabel
+                            cdWorkout.templateServerId = programWorkout.templateServerId
+                            cdWorkout.program = cdProgram
+                            orderedWorkouts.add(cdWorkout)
+                        }
+                        cdProgram.workouts = orderedWorkouts
                     }
-                    cdProgram.workouts = orderedWorkouts
 
                     try context.save()
                     continuation.resume()

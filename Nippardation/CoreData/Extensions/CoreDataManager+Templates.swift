@@ -82,30 +82,32 @@ extension CoreDataManager {
                     cdTemplate.lastFetchedAt = Date()
                     cdTemplate.syncStatus = template.serverId.isEmpty ? 0 : 2 // unsynced if no serverId
 
-                    // Remove existing exercises and add new ones
-                    if let existingExercises = cdTemplate.exercises {
-                        for case let exercise as CDTemplateExercise in existingExercises {
-                            context.delete(exercise)
+                    // Only replace exercises when the incoming template actually has them.
+                    // List endpoints return templates without exercises — preserve cached data.
+                    if !template.exercises.isEmpty {
+                        if let existingExercises = cdTemplate.exercises {
+                            for case let exercise as CDTemplateExercise in existingExercises {
+                                context.delete(exercise)
+                            }
                         }
-                    }
 
-                    // Add exercises
-                    let orderedExercises = NSMutableOrderedSet()
-                    for templateExercise in template.exercises {
-                        let cdExercise = CDTemplateExercise(context: context)
-                        cdExercise.id = templateExercise.id
-                        cdExercise.serverId = templateExercise.serverId
-                        cdExercise.exerciseServerId = templateExercise.exerciseServerId
-                        cdExercise.orderIndex = Int16(templateExercise.orderIndex)
-                        cdExercise.warmupSets = Int16(templateExercise.warmupSets ?? 0)
-                        cdExercise.workingSets = Int16(templateExercise.workingSets)
-                        cdExercise.targetReps = templateExercise.targetReps
-                        cdExercise.restSeconds = Int16(templateExercise.restSeconds ?? 0)
-                        cdExercise.notes = templateExercise.notes
-                        cdExercise.template = cdTemplate
-                        orderedExercises.add(cdExercise)
+                        let orderedExercises = NSMutableOrderedSet()
+                        for templateExercise in template.exercises {
+                            let cdExercise = CDTemplateExercise(context: context)
+                            cdExercise.id = templateExercise.id
+                            cdExercise.serverId = templateExercise.serverId
+                            cdExercise.exerciseServerId = templateExercise.exerciseServerId
+                            cdExercise.orderIndex = Int16(templateExercise.orderIndex)
+                            cdExercise.warmupSets = Int16(templateExercise.warmupSets ?? 0)
+                            cdExercise.workingSets = Int16(templateExercise.workingSets)
+                            cdExercise.targetReps = templateExercise.targetReps
+                            cdExercise.restSeconds = Int16(templateExercise.restSeconds ?? 0)
+                            cdExercise.notes = templateExercise.notes
+                            cdExercise.template = cdTemplate
+                            orderedExercises.add(cdExercise)
+                        }
+                        cdTemplate.exercises = orderedExercises
                     }
-                    cdTemplate.exercises = orderedExercises
 
                     try context.save()
                     continuation.resume()

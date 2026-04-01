@@ -62,7 +62,27 @@ final class ProgramRepository: ProgramRepositoryProtocol {
                 hasMore = pagination.hasMore
             }
 
-            // Cache all programs
+            // List endpoints may omit workouts. Merge cached workout data so
+            // workout counts remain accurate and cached workouts aren't lost.
+            let cached = getCachedPrograms()
+            if !cached.isEmpty {
+                let cachedByServerId = Dictionary(
+                    cached.map { ($0.serverId, $0) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                allPrograms = allPrograms.map { program in
+                    guard program.workouts.isEmpty,
+                          let cachedProgram = cachedByServerId[program.serverId],
+                          !cachedProgram.workouts.isEmpty else {
+                        return program
+                    }
+                    var merged = program
+                    merged.workouts = cachedProgram.workouts
+                    return merged
+                }
+            }
+
+            // Cache all programs (preserves existing workouts for list-fetched programs)
             for program in allPrograms {
                 try? await coreDataManager.cacheProgram(program)
             }
