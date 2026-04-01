@@ -12,7 +12,6 @@ struct ProgramListView: View {
     @StateObject private var viewModel = ProgramListViewModel()
     @State private var showCreateProgram = false
     @State private var showAIWizard = false
-    @State private var showCreateChoice = false
     @State private var programToDelete: Program?
     @State private var showDeleteConfirmation = false
     @State private var showShareSheet = false
@@ -21,30 +20,6 @@ struct ProgramListView: View {
     var body: some View {
         content
             .navigationTitle("My Programs")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showCreateChoice = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
-            .confirmationDialog("Create Program", isPresented: $showCreateChoice) {
-                Button {
-                    showCreateProgram = true
-                } label: {
-                    Label("Create Manually", systemImage: "square.and.pencil")
-                }
-
-                Button {
-                    showAIWizard = true
-                } label: {
-                    Label("Generate with AI", systemImage: "sparkles")
-                }
-            } message: {
-                Text("How would you like to create your program?")
-            }
             .sheet(isPresented: $showCreateProgram) {
                 NavigationStack {
                     ProgramWizardView()
@@ -140,79 +115,125 @@ struct ProgramListView: View {
     }
 
     private var programList: some View {
-        ScrollView {
-            LazyVStack(spacing: AppSpacing.md) {
-                ForEach(viewModel.programs) { program in
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        NavigationLink(destination: ProgramDetailView(programServerId: program.serverId)) {
-                            ProgramLibraryCard(program: program)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            if !program.isActive {
+        ZStack(alignment: .bottom) {
+            ScrollView {
+                LazyVStack(spacing: AppSpacing.md) {
+                    ForEach(viewModel.programs) { program in
+                        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                            NavigationLink(destination: ProgramDetailView(programServerId: program.serverId)) {
+                                ProgramLibraryCard(program: program)
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                if !program.isActive {
+                                    Button {
+                                        viewModel.activateProgram(program)
+                                    } label: {
+                                        Label("Activate", systemImage: "checkmark.circle")
+                                    }
+                                }
+
                                 Button {
-                                    viewModel.activateProgram(program)
+                                    viewModel.duplicateProgram(program)
                                 } label: {
-                                    Label("Activate", systemImage: "checkmark.circle")
+                                    Label("Duplicate", systemImage: "doc.on.doc")
+                                }
+
+                                Button {
+                                    shareViewModel.createShare(type: "program", itemId: program.serverId)
+                                } label: {
+                                    Label("Share", systemImage: "square.and.arrow.up")
+                                }
+
+                                Divider()
+
+                                Button(role: .destructive) {
+                                    programToDelete = program
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
 
-                            Button {
-                                viewModel.duplicateProgram(program)
-                            } label: {
-                                Label("Duplicate", systemImage: "doc.on.doc")
-                            }
-
-                            Button {
-                                shareViewModel.createShare(type: "program", itemId: program.serverId)
-                            } label: {
-                                Label("Share", systemImage: "square.and.arrow.up")
-                            }
-
-                            Divider()
-
-                            Button(role: .destructive) {
-                                programToDelete = program
-                                showDeleteConfirmation = true
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-
-                        if program.isActive {
-                            Label("Current Active Program", systemImage: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(.green)
-                                .padding(.horizontal, AppSpacing.xs)
-                        } else {
-                            Button {
-                                viewModel.activateProgram(program)
-                            } label: {
-                                Label("Set As Active", systemImage: "checkmark.circle")
+                            if program.isActive {
+                                Label("Current Active Program", systemImage: "checkmark.circle.fill")
                                     .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .frame(maxWidth: .infinity)
+                                    .foregroundColor(.green)
+                                    .padding(.horizontal, AppSpacing.xs)
+                            } else {
+                                Button {
+                                    viewModel.activateProgram(program)
+                                } label: {
+                                    Label("Set As Active", systemImage: "checkmark.circle")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
+                        }
+                    }
+
+                    if viewModel.hasMore {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                        .padding(.vertical, AppSpacing.md)
+                        .onAppear {
+                            viewModel.loadMore()
                         }
                     }
                 }
-
-                if viewModel.hasMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                    .padding(.vertical, AppSpacing.md)
-                    .onAppear {
-                        viewModel.loadMore()
-                    }
-                }
+                .padding(AppSpacing.md)
+                // Extra bottom padding so content isn't hidden behind the pinned buttons
+                .padding(.bottom, 100)
             }
-            .padding(AppSpacing.md)
+
+            pinnedBottomButtons
         }
+    }
+
+    private var pinnedBottomButtons: some View {
+        VStack(spacing: AppSpacing.sm) {
+            AIGradientButton("Generate with AI") {
+                showAIWizard = true
+            }
+
+            Button {
+                showCreateProgram = true
+            } label: {
+                HStack(spacing: AppSpacing.xs) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Create Manually")
+                }
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+        .padding(.horizontal, AppSpacing.md)
+        .padding(.top, AppSpacing.md)
+        .padding(.bottom, AppSpacing.lg)
+        .background(
+            .ultraThinMaterial,
+            in: Rectangle()
+        )
+        .mask(
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [.clear, .black],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 16)
+
+                Color.black
+            }
+        )
     }
 }
 
