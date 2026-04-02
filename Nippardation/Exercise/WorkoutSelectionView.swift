@@ -59,27 +59,6 @@ struct WorkoutSelectionView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-
-                Section("Quick Start Workouts") {
-                    ForEach(fallbackWorkouts, id: \.self) { workout in
-                        Button {
-                            startWorkout(template: workout)
-                        } label: {
-                            HStack {
-                                Text(workout.name)
-                                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.appTheme)
-                                Spacer()
-                                Image(systemName: "play.circle.fill")
-                                    .resizable()
-                                    .frame(width: 32, height: 32)
-                                    .aspectRatio(contentMode: .fit)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .tint(Color.appTheme)
-                        .buttonStyle(.automatic)
-                    }
-                }
             }
             .listStyle(.insetGrouped)
         }
@@ -97,10 +76,6 @@ struct WorkoutSelectionView: View {
         }
     }
 
-    private var fallbackWorkouts: [Workout] {
-        [upperStrength, lowerStrength, pullDay, pushDay, legDay]
-    }
-    
     private func startWorkout(template: Workout) {
         let trackedWorkout = workoutManager.startWorkout(template: template)
         onWorkoutSelected(trackedWorkout)

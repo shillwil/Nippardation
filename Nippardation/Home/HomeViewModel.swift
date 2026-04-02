@@ -10,15 +10,6 @@ import Combine
 
 @MainActor
 final class HomeViewModel: ObservableObject {
-    // Legacy workout templates (kept for backward compatibility)
-    @Published var workouts: [Workout] = [
-        upperStrength,
-        lowerStrength,
-        pullDay,
-        pushDay,
-        legDay
-    ]
-
     // Active program data
     @Published var activeProgram: Program?
     @Published var nextWorkout: ProgramWorkout?
@@ -31,6 +22,8 @@ final class HomeViewModel: ObservableObject {
 
     @Published var isLoading = false
     @Published var error: String?
+    @Published var hasAnyPrograms: Bool?
+    @Published var userTemplates: [Template] = []
 
     private let programRepository: any ProgramRepositoryProtocol
     private let templateRepository: any TemplateRepositoryProtocol
@@ -121,6 +114,25 @@ final class HomeViewModel: ObservableObject {
             }
         }
         weeklyConsistency = weeksWithWorkouts * 25 // out of 100%
+    }
+
+    func checkForPrograms() {
+        Task { @MainActor in
+            do {
+                let programs = try await programRepository.fetchPrograms(forceRefresh: false)
+                self.hasAnyPrograms = !programs.isEmpty
+            } catch {
+                let cached = programRepository.getCachedPrograms()
+                self.hasAnyPrograms = !cached.isEmpty
+            }
+
+            do {
+                let templates = try await templateRepository.fetchTemplates(forceRefresh: false)
+                self.userTemplates = templates
+            } catch {
+                self.userTemplates = templateRepository.getCachedTemplates()
+            }
+        }
     }
 
     func clearError() {
