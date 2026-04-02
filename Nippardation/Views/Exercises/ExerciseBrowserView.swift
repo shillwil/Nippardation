@@ -233,9 +233,21 @@ struct ExerciseBrowserContent: View {
         ContentUnavailableView {
             Label("No Exercises", systemImage: "figure.strengthtraining.traditional")
         } description: {
-            Text(viewModel.filter.isEmpty ? "No exercises found" : "Try adjusting your filters")
+            if let error = viewModel.error {
+                Text(error)
+            } else if viewModel.filter.isEmpty {
+                Text("No exercises found")
+            } else {
+                Text("Try adjusting your filters")
+            }
         } actions: {
-            if !viewModel.filter.isEmpty {
+            if viewModel.error != nil {
+                Button("Retry") {
+                    viewModel.clearError()
+                    viewModel.loadExercises(refresh: true)
+                }
+                .buttonStyle(.borderedProminent)
+            } else if !viewModel.filter.isEmpty {
                 Button("Clear Filters") {
                     viewModel.clearFilters()
                 }

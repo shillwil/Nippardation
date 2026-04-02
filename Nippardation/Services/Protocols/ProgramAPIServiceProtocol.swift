@@ -64,6 +64,14 @@ protocol ProgramAPIServiceProtocol: Sendable {
     /// - Note: Workouts cascade delete, templates are preserved
     func deleteProgram(id: String) async throws
 
+    /// Delete a program with selective template cleanup
+    /// - Parameters:
+    ///   - id: The program's server ID
+    ///   - deleteTemplates: Whether to also delete associated AI templates
+    ///   - keepTemplateIds: Template IDs to preserve
+    /// - Returns: Number of templates removed
+    func deleteProgram(id: String, deleteTemplates: Bool, keepTemplateIds: [String]) async throws -> Int
+
     // MARK: - State Management
 
     /// Set a program as active (deactivates any other active program)

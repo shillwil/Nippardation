@@ -35,13 +35,10 @@ struct TemplateListView: View {
             }
             .sheet(isPresented: $showCreateTemplate) {
                 NavigationStack {
-                    TemplateEditorView()
-                }
-            }
-            .onChange(of: showCreateTemplate) { oldValue, newValue in
-                // Refresh list after create sheet closes so newly created templates appear immediately.
-                if oldValue && !newValue {
-                    viewModel.loadTemplates(refresh: true)
+                    TemplateEditorView(onSave: { template in
+                        viewModel.handleTemplateSaved(template)
+                        showCreateTemplate = false
+                    })
                 }
             }
             .alert("Delete Template", isPresented: $showDeleteConfirmation) {
@@ -81,6 +78,8 @@ struct TemplateListView: View {
             .onAppear {
                 if viewModel.templates.isEmpty {
                     viewModel.loadTemplates()
+                } else {
+                    viewModel.loadIfStale()
                 }
             }
             .alert("Error", isPresented: .init(
@@ -129,7 +128,12 @@ struct TemplateListView: View {
                     NewTemplateCard(onTap: { showCreateTemplate = true })
 
                     ForEach(viewModel.filteredTemplates) { template in
-                        NavigationLink(destination: TemplateEditorView(existingTemplate: template)) {
+                        NavigationLink(destination: TemplateEditorView(
+                            existingTemplate: template,
+                            onSave: { saved in
+                                viewModel.handleTemplateSaved(saved)
+                            }
+                        )) {
                             TemplateGridCard(template: template)
                         }
                         .buttonStyle(.plain)

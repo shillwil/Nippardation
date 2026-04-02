@@ -251,6 +251,22 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         }
     }
 
+    func deleteProgram(id: String, deleteTemplates: Bool, keepTemplateIds: [String]) async throws -> Int {
+        deleteProgramCallCount += 1
+
+        if shouldThrowError {
+            throw errorToThrow
+        }
+
+        programDTOs.removeAll { $0.id == id }
+
+        if activeProgramDTO?.program.id == id {
+            activeProgramDTO = nil
+        }
+
+        return deleteTemplates ? 3 : 0
+    }
+
     // MARK: - State Management
 
     func activateProgram(id: String) async throws -> ProgramDTO {

@@ -94,21 +94,33 @@ class BaseAPIService: @unchecked Sendable {
         case 404:
             throw RepositoryError.notFound
         case 422:
-            let message = data.flatMap { String(data: $0, encoding: .utf8) } ?? "Validation failed"
+            let message = Self.extractErrorMessage(from: data) ?? "Validation failed"
             throw RepositoryError.validationError(message)
         case 429:
             let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After")
                 .flatMap { Double($0) }
             throw RepositoryError.rateLimited(retryAfter: retryAfter)
         case 400...499:
-            let message = data.flatMap { String(data: $0, encoding: .utf8) }
+            let message = Self.extractErrorMessage(from: data)
             throw RepositoryError.serverError(statusCode: httpResponse.statusCode, message: message)
         case 500...599:
-            let message = data.flatMap { String(data: $0, encoding: .utf8) }
+            let message = Self.extractErrorMessage(from: data)
             throw RepositoryError.serverError(statusCode: httpResponse.statusCode, message: message)
         default:
             throw RepositoryError.unknown(nil)
         }
+    }
+
+    /// Extracts a human-readable error message from the backend's JSON response.
+    /// Backend typically returns: {"success":false,"message":"...","correlationId":"..."}
+    /// Falls back to raw string if JSON parsing fails.
+    private static func extractErrorMessage(from data: Data?) -> String? {
+        guard let data else { return nil }
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let message = json["message"] as? String {
+            return message
+        }
+        return String(data: data, encoding: .utf8)
     }
 
     // MARK: - Shared Decoding Helpers

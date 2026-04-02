@@ -157,6 +157,18 @@ struct TemplateSummaryDTO: Codable {
 
 }
 
+// MARK: - Delete Program Response
+
+/// Response data from DELETE /api/programs/:id?deleteTemplates=true
+struct DeleteProgramResponse: Codable {
+    let templatesRemoved: Int
+}
+
+/// Request body for DELETE /api/programs/:id?deleteTemplates=true
+struct DeleteProgramTemplatesBody: Encodable {
+    let keepTemplateIds: [String]
+}
+
 // MARK: - User Types
 
 /// User data transfer object from API

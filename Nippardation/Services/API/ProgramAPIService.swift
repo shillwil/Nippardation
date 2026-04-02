@@ -137,8 +137,59 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         request.httpMethod = "DELETE"
         try await addAuthHeader(to: &request)
 
+        #if DEBUG
+        print("[ProgramAPI] DELETE \(url.absoluteString)")
+        #endif
+
+        let (data, response) = try await performRequestWithoutDecoding(request)
+
+        #if DEBUG
+        if let httpResponse = response as? HTTPURLResponse {
+            print("[ProgramAPI] DELETE status: \(httpResponse.statusCode)")
+            if let body = String(data: data, encoding: .utf8) {
+                print("[ProgramAPI] DELETE response: \(body)")
+            }
+        }
+        #endif
+
+        try validateResponse(response, data: data)
+    }
+
+    func deleteProgram(id: String, deleteTemplates: Bool, keepTemplateIds: [String]) async throws -> Int {
+        guard var components = URLComponents(
+            url: AppConfiguration.shared.baseURL
+                .appendingPathComponent("api/programs")
+                .appendingPathComponent(id),
+            resolvingAgainstBaseURL: false
+        ) else {
+            throw RepositoryError.unknown(nil)
+        }
+
+        if deleteTemplates {
+            components.queryItems = [URLQueryItem(name: "deleteTemplates", value: "true")]
+        }
+
+        guard let url = components.url else {
+            throw RepositoryError.unknown(nil)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        try await addAuthHeader(to: &request)
+
+        if !keepTemplateIds.isEmpty {
+            request.httpBody = try encoder.encode(DeleteProgramTemplatesBody(keepTemplateIds: keepTemplateIds))
+        }
+
         let (data, response) = try await performRequestWithoutDecoding(request)
         try validateResponse(response, data: data)
+
+        // Try to extract templatesRemoved from response
+        if let envelope = try? decoder.decode(APIEnvelope<DeleteProgramResponse>.self, from: data),
+           let payload = envelope.data {
+            return payload.templatesRemoved
+        }
+        return 0
     }
 
     // MARK: - State Management

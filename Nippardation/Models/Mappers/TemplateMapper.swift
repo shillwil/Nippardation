@@ -14,18 +14,24 @@ enum TemplateMapper {
 
     /// Converts a TemplateDTO to a Template domain model
     static func toDomain(_ dto: TemplateDTO) -> Template {
-        Template(
+        let exercises = (dto.exercises ?? []).map { TemplateExerciseMapper.toDomain($0) }
+        var template = Template(
             id: UUID(),
             serverId: dto.id,
             name: dto.name,
             description: dto.description,
-            exercises: (dto.exercises ?? []).map { TemplateExerciseMapper.toDomain($0) },
+            exercises: exercises,
             isPublic: dto.isPublic ?? false,
             isAiGenerated: dto.isAiGenerated ?? false,
             createdAt: parseDate(dto.createdAt) ?? Date(),
             updatedAt: parseDate(dto.updatedAt) ?? Date(),
             lastFetchedAt: Date()
         )
+        // Preserve exercise count from API when exercises array is empty (list endpoints)
+        if exercises.isEmpty, let count = dto.exerciseCount {
+            template._knownExerciseCount = count
+        }
+        return template
     }
 
     /// Converts multiple TemplateDTOs to Templates

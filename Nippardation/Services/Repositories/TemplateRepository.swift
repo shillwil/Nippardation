@@ -62,7 +62,30 @@ final class TemplateRepository: TemplateRepositoryProtocol {
                 hasMore = pagination.hasMore
             }
 
-            // Cache all templates
+            // List endpoints may omit exercises. Merge cached exercise data so
+            // exercise counts remain accurate and cached exercises aren't lost.
+            let cached = getCachedTemplates()
+            if !cached.isEmpty {
+                let cachedByServerId = Dictionary(
+                    cached.map { ($0.serverId, $0) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                allTemplates = allTemplates.map { template in
+                    guard template.exercises.isEmpty,
+                          let cachedTemplate = cachedByServerId[template.serverId] else {
+                        return template
+                    }
+                    var merged = template
+                    if !cachedTemplate.exercises.isEmpty {
+                        merged.exercises = cachedTemplate.exercises
+                    } else if merged._knownExerciseCount == nil {
+                        merged._knownExerciseCount = cachedTemplate._knownExerciseCount
+                    }
+                    return merged
+                }
+            }
+
+            // Cache all templates (preserves existing exercises for list-fetched templates)
             try? await coreDataManager.cacheTemplates(allTemplates)
 
             return allTemplates

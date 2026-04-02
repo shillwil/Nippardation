@@ -19,6 +19,15 @@ final class ProgramListViewModel: ObservableObject {
     @Published var currentPage = 1
     @Published var hasMore = false
 
+    // MARK: - Delete State
+
+    @Published var programToDeleteDetail: Program?
+    @Published var isFetchingDeleteDetail = false
+    @Published var isDeletingProgram = false
+    @Published var showTemplateDeleteSheet = false
+    @Published var showSimpleDeleteAlert = false
+    var programToDelete: Program?
+
     // MARK: - Dependencies
 
     private let programRepository: any ProgramRepositoryProtocol
@@ -121,8 +130,49 @@ final class ProgramListViewModel: ObservableObject {
         loadPublicPrograms(loadingNextPage: true)
     }
 
-    /// Deletes a program
-    /// - Parameter program: The program to delete
+    /// Prepares to delete a program. For AI programs, fetches detail to show template selection.
+    func prepareDeleteProgram(_ program: Program) {
+        programToDelete = program
+        isFetchingDeleteDetail = true
+
+        // Always fetch detail — the list endpoint may not include isAiGenerated
+        // or full workout/template data needed for the template cleanup flow.
+        Task {
+            await taskManager.run(id: "prepareDelete") { [weak self] in
+                guard let self = self else { return }
+
+                do {
+                    let detail = try await self.programRepository.fetchProgram(
+                        serverId: program.serverId,
+                        forceRefresh: true
+                    )
+
+                    // The embedded template summaries in the program detail
+                    // don't include isAiGenerated — so we check the program itself.
+                    // The backend handles safety: only AI templates get deleted.
+                    let hasTemplates = detail.workouts.contains { $0.template != nil }
+
+                    await MainActor.run {
+                        self.isFetchingDeleteDetail = false
+                        if detail.isAiGenerated && hasTemplates {
+                            self.programToDeleteDetail = detail
+                            self.showTemplateDeleteSheet = true
+                        } else {
+                            self.showSimpleDeleteAlert = true
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.isFetchingDeleteDetail = false
+                        // Fall back to simple delete on fetch failure
+                        self.showSimpleDeleteAlert = true
+                    }
+                }
+            }
+        }
+    }
+
+    /// Deletes a program (simple, no template cleanup)
     func deleteProgram(_ program: Program) {
         Task {
             await taskManager.run(id: "delete-\(program.serverId)") { [weak self] in
@@ -141,6 +191,52 @@ final class ProgramListViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Deletes an AI program with selective template cleanup
+    func deleteProgramWithTemplates(keepTemplateIds: [String]) {
+        guard let detail = programToDeleteDetail else { return }
+
+        // Extract all template IDs from the program's workouts NOW (from the detail
+        // we already fetched) — don't rely on reading them back from cache later.
+        let allTemplateIds = Array(Set(detail.workouts.map(\.templateServerId)))
+
+        isDeletingProgram = true
+
+        Task {
+            await taskManager.run(id: "delete-\(detail.serverId)") { [weak self] in
+                guard let self = self else { return }
+
+                do {
+                    try await self.programRepository.deleteProgram(
+                        serverId: detail.serverId,
+                        deleteTemplates: true,
+                        keepTemplateIds: keepTemplateIds,
+                        programTemplateIds: allTemplateIds
+                    )
+
+                    await MainActor.run {
+                        self.programs.removeAll { $0.serverId == detail.serverId }
+                        self.isDeletingProgram = false
+                        self.programToDelete = nil
+                        self.programToDeleteDetail = nil
+                        self.showTemplateDeleteSheet = false
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.isDeletingProgram = false
+                        self.error = "Failed to delete program: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+    }
+
+    func clearDeleteState() {
+        programToDelete = nil
+        programToDeleteDetail = nil
+        showTemplateDeleteSheet = false
+        showSimpleDeleteAlert = false
     }
 
     /// Activates a program, deactivating any currently active program

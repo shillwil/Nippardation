@@ -38,6 +38,18 @@ final class TemplateListViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
+    /// Checks if the cache differs from our in-memory list and triggers a reload.
+    /// Detects both additions (e.g., AI generation) and deletions (e.g., program delete with template cleanup).
+    func loadIfStale() {
+        let cached = templateRepository.getCachedTemplates()
+        let currentIds = Set(templates.map(\.serverId))
+        let cachedIds = Set(cached.map(\.serverId))
+
+        if currentIds != cachedIds {
+            loadTemplates(refresh: false)
+        }
+    }
+
     /// Loads templates from the repository
     /// - Parameter refresh: If true, forces a refresh from the server
     func loadTemplates(refresh: Bool = false) {
@@ -69,6 +81,16 @@ final class TemplateListViewModel: ObservableObject {
 
     // MARK: - Private Methods
 
+    /// Directly updates or inserts a template in the in-memory list.
+    /// Use after a save so the list reflects the change without a full API refresh.
+    func handleTemplateSaved(_ template: Template) {
+        if let index = templates.firstIndex(where: { $0.serverId == template.serverId }) {
+            templates[index] = template
+        } else {
+            templates.insert(template, at: 0)
+        }
+    }
+
     /// Core loading logic shared between loadTemplates and refreshAsync
     /// - Parameter forceRefresh: Whether to force refresh from network
     private func performLoad(forceRefresh: Bool) async {
@@ -78,7 +100,29 @@ final class TemplateListViewModel: ObservableObject {
             let fetchedTemplates = try await templateRepository.fetchTemplates(forceRefresh: forceRefresh)
 
             await MainActor.run {
-                self.templates = fetchedTemplates
+                // Preserve exercise data from existing in-memory templates when
+                // the API list endpoint returns templates without exercises.
+                if !self.templates.isEmpty {
+                    let existingByServerId = Dictionary(
+                        self.templates.map { ($0.serverId, $0) },
+                        uniquingKeysWith: { first, _ in first }
+                    )
+                    self.templates = fetchedTemplates.map { template in
+                        guard template.exercises.isEmpty,
+                              let existing = existingByServerId[template.serverId] else {
+                            return template
+                        }
+                        var merged = template
+                        if !existing.exercises.isEmpty {
+                            merged.exercises = existing.exercises
+                        } else if merged._knownExerciseCount == nil, let count = existing._knownExerciseCount {
+                            merged._knownExerciseCount = count
+                        }
+                        return merged
+                    }
+                } else {
+                    self.templates = fetchedTemplates
+                }
                 self.error = nil
                 self.isLoading = false
             }
