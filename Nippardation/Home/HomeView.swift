@@ -15,9 +15,20 @@ struct HomeView: View {
 
     @State private var startNewWorkout: Bool = false
     @State private var showActiveWorkout: Bool = false
+    @State private var showNoProgramsModal: Bool = false
+    @State private var showCreateProgram: Bool = false
+    @State private var showAIWizard: Bool = false
+    @State private var pendingModalAction: PostModalAction?
 
     // Add state to track if we've done initial loading
     @State private var didCheckForActiveWorkout: Bool = false
+
+    private enum PostModalAction {
+        case createManually
+        case generateWithAI
+        case browsePrograms
+        case startFromTemplate
+    }
 
     var body: some View {
         ZStack {
@@ -91,7 +102,11 @@ struct HomeView: View {
                         }
                     } else {
                         Button {
-                            startNewWorkout = true
+                            if viewModel.hasAnyPrograms == true {
+                                startNewWorkout = true
+                            } else {
+                                showNoProgramsModal = true
+                            }
                         } label: {
                             HStack {
                                 Image(systemName: "play.circle")
@@ -127,11 +142,57 @@ struct HomeView: View {
                     Color.clear.onAppear { showActiveWorkout = false }
                 }
             }
+            .sheet(isPresented: $showNoProgramsModal, onDismiss: {
+                switch pendingModalAction {
+                case .generateWithAI:
+                    showAIWizard = true
+                case .createManually:
+                    showCreateProgram = true
+                case .browsePrograms:
+                    selectedTab = .programs
+                case .startFromTemplate:
+                    showActiveWorkout = true
+                case nil:
+                    break
+                }
+                pendingModalAction = nil
+            }) {
+                NoProgramsModalView(
+                    templates: viewModel.userTemplates,
+                    onCreateManually: {
+                        pendingModalAction = .createManually
+                        showNoProgramsModal = false
+                    },
+                    onGenerateWithAI: {
+                        pendingModalAction = .generateWithAI
+                        showNoProgramsModal = false
+                    },
+                    onBrowsePrograms: {
+                        pendingModalAction = .browsePrograms
+                        showNoProgramsModal = false
+                    },
+                    onSelectTemplate: { template in
+                        startWorkoutFromTemplate(template)
+                        pendingModalAction = .startFromTemplate
+                        showNoProgramsModal = false
+                    }
+                )
+                .presentationDetents(viewModel.userTemplates.isEmpty ? [.medium] : [.medium, .large])
+            }
+            .sheet(isPresented: $showCreateProgram) {
+                NavigationStack {
+                    ProgramWizardView()
+                }
+            }
+            .fullScreenCover(isPresented: $showAIWizard) {
+                AIWizardView()
+            }
         }
         .navigationTitle("Home")
         .onAppear {
             workoutManager.loadCompletedWorkouts()
             viewModel.loadDashboard()
+            viewModel.checkForPrograms()
             viewModel.computeWeeklyStats(from: workoutManager.completedWorkouts)
 
             if !didCheckForActiveWorkout {
@@ -139,9 +200,56 @@ struct HomeView: View {
                 didCheckForActiveWorkout = true
             }
         }
+        .onChange(of: showCreateProgram) { oldValue, newValue in
+            if oldValue && !newValue {
+                viewModel.checkForPrograms()
+            }
+        }
+        .onChange(of: showAIWizard) { oldValue, newValue in
+            if oldValue && !newValue {
+                viewModel.checkForPrograms()
+            }
+        }
         .onChange(of: workoutManager.completedWorkouts.count) {
             viewModel.computeWeeklyStats(from: workoutManager.completedWorkouts)
         }
+    }
+
+    // MARK: - Template → Workout
+
+    private func startWorkoutFromTemplate(_ template: Template) {
+        let exercises = template.exercises
+            .sorted(by: { $0.orderIndex < $1.orderIndex })
+            .map { templateExercise in
+                let libraryItem = templateExercise.exerciseLibraryItem
+                let exerciseName = libraryItem?.name ?? "Exercise"
+                let muscles = libraryItem?.primaryMuscles ?? []
+                let restSeconds = max(30, templateExercise.restSeconds ?? 90)
+                let restMinutes = max(1, Int(round(Double(restSeconds) / 60.0)))
+
+                return Exercise(
+                    type: ExerciseType(name: exerciseName, muscleGroup: muscles),
+                    example: libraryItem?.videoUrl?.absoluteString ?? "",
+                    lastSetIntensityTechnique: templateExercise.notes ?? "Failure",
+                    warmUpSets: templateExercise.warmupSets ?? 0,
+                    workingSets: max(1, templateExercise.workingSets),
+                    reps: parseRepsRange(from: templateExercise.targetReps),
+                    rest: restMinutes...restMinutes
+                )
+            }
+
+        let workoutName = template.name.isEmpty ? "Workout" : template.name
+        let workout = Workout(name: workoutName, exercises: exercises)
+        _ = workoutManager.startWorkout(template: workout)
+    }
+
+    private func parseRepsRange(from targetReps: String?) -> ClosedRange<Int> {
+        guard let targetReps, !targetReps.isEmpty else { return 8...12 }
+        let values = targetReps.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+        guard let first = values.first else { return 8...12 }
+        let lower = max(1, first)
+        let upper = values.count > 1 ? max(lower, values[1]) : lower
+        return lower...upper
     }
 
     // MARK: - Hero Section

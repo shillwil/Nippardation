@@ -10,6 +10,7 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
+    @AppStorage("hasCompletedFirstLaunch") private var hasCompletedFirstLaunch = false
     @State private var selectedTab: AppTab = .home
     @State private var showSharePreview = false
 
@@ -56,6 +57,12 @@ struct MainTabView: View {
             }
         }
         .tint(Color.appTheme)
+        .onAppear {
+            if !hasCompletedFirstLaunch {
+                selectedTab = .programs
+                hasCompletedFirstLaunch = true
+            }
+        }
         .environmentBanner()
         .onChange(of: deepLinkRouter.pendingShareToken) { _, token in
             if token != nil {
