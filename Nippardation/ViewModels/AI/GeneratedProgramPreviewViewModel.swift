@@ -45,21 +45,27 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
 
     let originalProgram: Program
     let metadata: GenerationMetadataDTO?
+    let reusedTemplateIds: Set<String>
 
     // MARK: - Dependencies
 
     private let programRepository: any ProgramRepositoryProtocol
+    private let templateRepository: any TemplateRepositoryProtocol
 
     // MARK: - Initialization
 
     init(
         program: Program,
         metadata: GenerationMetadataDTO?,
-        programRepository: (any ProgramRepositoryProtocol)? = nil
+        reusedTemplateIds: Set<String> = [],
+        programRepository: (any ProgramRepositoryProtocol)? = nil,
+        templateRepository: (any TemplateRepositoryProtocol)? = nil
     ) {
         self.originalProgram = program
         self.metadata = metadata
+        self.reusedTemplateIds = reusedTemplateIds
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
+        self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
 
         self.programName = program.name
         self.programDescription = program.description ?? ""
@@ -141,8 +147,13 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
                     _ = try await self.programRepository.updateProgram(updatedProgram)
                 }
 
-                // Cache the program locally
+                // Cache the program and its templates locally
                 try await self.programRepository.cacheProgram(updatedProgram)
+                for workout in updatedProgram.workouts {
+                    if let template = workout.template {
+                        try? await self.templateRepository.cacheTemplate(template)
+                    }
+                }
 
                 await MainActor.run {
                     self.isSaving = false

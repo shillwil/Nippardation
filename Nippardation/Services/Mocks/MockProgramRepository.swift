@@ -92,6 +92,11 @@ final class MockProgramRepository: ProgramRepositoryProtocol {
         programs.removeAll { $0.serverId == serverId }
     }
 
+    func deleteProgram(serverId: String, deleteTemplates: Bool, keepTemplateIds: [String], programTemplateIds: [String]) async throws {
+        try await simulateNetworkCall()
+        programs.removeAll { $0.serverId == serverId }
+    }
+
     func duplicateProgram(serverId: String) async throws -> Program {
         try await simulateNetworkCall()
         guard let original = programs.first(where: { $0.serverId == serverId }) else {

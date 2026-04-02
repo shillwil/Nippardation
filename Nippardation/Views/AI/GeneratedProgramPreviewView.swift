@@ -17,12 +17,14 @@ struct GeneratedProgramPreviewView: View {
     init(
         program: Program,
         metadata: GenerationMetadataDTO?,
+        reusedTemplateIds: Set<String> = [],
         onSave: @escaping () -> Void,
         onDiscard: @escaping () -> Void
     ) {
         _viewModel = StateObject(wrappedValue: GeneratedProgramPreviewViewModel(
             program: program,
-            metadata: metadata
+            metadata: metadata,
+            reusedTemplateIds: reusedTemplateIds
         ))
         self.onSave = onSave
         self.onDiscard = onDiscard
@@ -149,10 +151,22 @@ struct GeneratedProgramPreviewView: View {
     // MARK: - Workout Section
 
     private func workoutSection(workout: GeneratedProgramPreviewViewModel.EditableWorkout, workoutIndex: Int) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+        let templateServerId = viewModel.originalProgram.workouts
+            .first { $0.serverId == workout.serverId }?.templateServerId
+
+        return VStack(alignment: .leading, spacing: AppSpacing.sm) {
             HStack {
                 Text(workout.dayLabel)
                     .font(.headline)
+
+                if !viewModel.reusedTemplateIds.isEmpty, let tid = templateServerId {
+                    if viewModel.reusedTemplateIds.contains(tid) {
+                        PillBadge(text: "Reused", color: .teal, style: .tinted)
+                    } else {
+                        PillBadge(text: "New", color: .green, style: .tinted)
+                    }
+                }
+
                 Spacer()
                 Text("\(workout.exercises.count) exercises")
                     .font(.caption)

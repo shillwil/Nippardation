@@ -51,7 +51,8 @@ struct AIAPIServiceTests {
             equipment: ["barbell", "dumbbell", "cable"],
             useTrainingHistory: false,
             manualStrengthData: nil,
-            freeTextPreferences: nil
+            freeTextPreferences: nil,
+            reuseTemplateIds: nil
         )
 
         do {
@@ -101,7 +102,8 @@ struct AIAPIServiceTests {
             equipment: ["barbell"],
             useTrainingHistory: false,
             manualStrengthData: nil,
-            freeTextPreferences: nil
+            freeTextPreferences: nil,
+            reuseTemplateIds: nil
         )
 
         let result = try await service.generateProgram(request)
@@ -128,7 +130,8 @@ struct AIAPIServiceTests {
             equipment: ["barbell"],
             useTrainingHistory: false,
             manualStrengthData: nil,
-            freeTextPreferences: nil
+            freeTextPreferences: nil,
+            reuseTemplateIds: nil
         )
 
         do {
@@ -290,7 +293,8 @@ struct AIAPIServiceTests {
             equipment: ["barbell"],
             useTrainingHistory: false,
             manualStrengthData: nil,
-            freeTextPreferences: nil
+            freeTextPreferences: nil,
+            reuseTemplateIds: nil
         )
 
         do {

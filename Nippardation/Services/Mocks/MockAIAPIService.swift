@@ -145,6 +145,7 @@ extension MockAIAPIService {
                         name: "Push Day",
                         description: "Chest, shoulders, and triceps",
                         exerciseCount: 2,
+                        wasReused: true,
                         exercises: [
                             AIGeneratedExerciseDTO(exerciseId: "ex_bench", name: "Bench Press", warmupSets: 2, workingSets: 4, targetReps: "8-10", restSeconds: 120, notes: nil),
                             AIGeneratedExerciseDTO(exerciseId: "ex_ohp", name: "Overhead Press", warmupSets: 1, workingSets: 3, targetReps: "8-12", restSeconds: 90, notes: nil)
@@ -159,6 +160,7 @@ extension MockAIAPIService {
                         name: "Pull Day",
                         description: "Back and biceps",
                         exerciseCount: 1,
+                        wasReused: false,
                         exercises: [
                             AIGeneratedExerciseDTO(exerciseId: "ex_row", name: "Barbell Row", warmupSets: 2, workingSets: 4, targetReps: "6-8", restSeconds: 120, notes: nil)
                         ]

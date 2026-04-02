@@ -12,8 +12,6 @@ struct ProgramListView: View {
     @StateObject private var viewModel = ProgramListViewModel()
     @State private var showCreateProgram = false
     @State private var showAIWizard = false
-    @State private var programToDelete: Program?
-    @State private var showDeleteConfirmation = false
     @State private var showShareSheet = false
     @StateObject private var shareViewModel = ShareViewModel()
 
@@ -38,18 +36,34 @@ struct ProgramListView: View {
                     viewModel.loadPrograms(refresh: true)
                 }
             }
-            .alert("Delete Program", isPresented: $showDeleteConfirmation) {
+            .alert("Delete Program", isPresented: $viewModel.showSimpleDeleteAlert) {
                 Button("Cancel", role: .cancel) {
-                    programToDelete = nil
+                    viewModel.clearDeleteState()
                 }
                 Button("Delete", role: .destructive) {
-                    if let program = programToDelete {
+                    if let program = viewModel.programToDelete {
                         viewModel.deleteProgram(program)
                     }
-                    programToDelete = nil
+                    viewModel.clearDeleteState()
                 }
             } message: {
                 Text("Are you sure you want to delete this program? This cannot be undone.")
+            }
+            .sheet(isPresented: $viewModel.showTemplateDeleteSheet) {
+                if let detail = viewModel.programToDeleteDetail {
+                    ProgramDeleteConfirmationView(
+                        program: detail,
+                        isDeletingProgram: viewModel.isDeletingProgram,
+                        onConfirmDelete: { keepIds in
+                            viewModel.deleteProgramWithTemplates(keepTemplateIds: keepIds)
+                            // Sheet dismisses when ViewModel sets showTemplateDeleteSheet = false
+                            // AFTER the deletion (including cache cleanup) completes.
+                        },
+                        onCancel: {
+                            viewModel.clearDeleteState()
+                        }
+                    )
+                }
             }
             .sheet(isPresented: $showShareSheet) {
                 if let url = shareViewModel.shareURL {
@@ -75,6 +89,17 @@ struct ProgramListView: View {
             .onAppear {
                 if viewModel.programs.isEmpty {
                     viewModel.loadPrograms()
+                }
+            }
+            .overlay {
+                if viewModel.isFetchingDeleteDetail {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+                        .overlay {
+                            ProgressView()
+                                .padding()
+                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+                        }
                 }
             }
             .alert("Error", isPresented: .init(
@@ -148,8 +173,7 @@ struct ProgramListView: View {
                                 Divider()
 
                                 Button(role: .destructive) {
-                                    programToDelete = program
-                                    showDeleteConfirmation = true
+                                    viewModel.prepareDeleteProgram(program)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }

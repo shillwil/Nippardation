@@ -55,6 +55,14 @@ protocol ProgramRepositoryProtocol {
     /// - Parameter serverId: The server ID of the program to delete
     func deleteProgram(serverId: String) async throws
 
+    /// Deletes a program with selective template cleanup
+    /// - Parameters:
+    ///   - serverId: The server ID of the program to delete
+    ///   - deleteTemplates: Whether to also delete associated AI templates
+    ///   - keepTemplateIds: Template IDs to preserve
+    ///   - programTemplateIds: All template IDs belonging to this program (for cache cleanup)
+    func deleteProgram(serverId: String, deleteTemplates: Bool, keepTemplateIds: [String], programTemplateIds: [String]) async throws
+
     /// Duplicates a program (creates a copy)
     /// - Parameter serverId: The server ID of the program to duplicate
     /// - Returns: The new duplicated program

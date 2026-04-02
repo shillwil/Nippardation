@@ -20,6 +20,7 @@ struct GenerateProgramRequest: Codable {
     let useTrainingHistory: Bool
     let manualStrengthData: [StrengthDataEntry]?
     let freeTextPreferences: String?
+    let reuseTemplateIds: [String]?
 }
 
 /// Individual strength data entry used in generation requests and strength profiles
@@ -71,6 +72,7 @@ struct AIGeneratedTemplateDTO: Codable {
     let name: String?
     let description: String?
     let exerciseCount: Int?
+    let wasReused: Bool?
     let exercises: [AIGeneratedExerciseDTO]?
 }
 

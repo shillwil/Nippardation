@@ -78,6 +78,8 @@ struct TemplateListView: View {
             .onAppear {
                 if viewModel.templates.isEmpty {
                     viewModel.loadTemplates()
+                } else {
+                    viewModel.loadIfStale()
                 }
             }
             .alert("Error", isPresented: .init(

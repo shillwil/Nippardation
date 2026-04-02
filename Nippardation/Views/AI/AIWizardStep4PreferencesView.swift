@@ -61,6 +61,53 @@ struct AIWizardStep4PreferencesView: View {
                 Divider()
                     .padding(.vertical, AppSpacing.xs)
 
+                // Template reuse section
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                    Toggle(isOn: $viewModel.reuseTemplates) {
+                        HStack(spacing: AppSpacing.xs) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("Reuse Existing Templates")
+                                .font(.headline)
+                        }
+                    }
+                    .tint(AIColors.accent)
+                    .onChange(of: viewModel.reuseTemplates) { _, isOn in
+                        if isOn && viewModel.availableTemplates.isEmpty {
+                            viewModel.loadTemplates()
+                        }
+                        if !isOn {
+                            viewModel.selectedTemplateIds.removeAll()
+                        }
+                    }
+
+                    if viewModel.reuseTemplates {
+                        Text("Select up to 7 templates for the AI to refresh instead of creating new ones.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        if viewModel.isLoadingTemplates {
+                            HStack(spacing: AppSpacing.xs) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Loading templates...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } else if viewModel.availableTemplates.isEmpty {
+                            Text("No templates found.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(viewModel.availableTemplates) { template in
+                                templateReuseRow(template)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+                    .padding(.vertical, AppSpacing.xs)
+
                 // Strength data section (expandable)
                 VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     Button {
@@ -110,6 +157,46 @@ struct AIWizardStep4PreferencesView: View {
             }
             .padding(AppSpacing.md)
         }
+    }
+
+    // MARK: - Template Reuse Row
+
+    private func templateReuseRow(_ template: Template) -> some View {
+        let isSelected = viewModel.selectedTemplateIds.contains(template.serverId)
+        let atMax = viewModel.selectedTemplateIds.count >= 7
+
+        return Button {
+            viewModel.toggleTemplateSelection(template.serverId)
+        } label: {
+            HStack(spacing: AppSpacing.sm) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? AIColors.accent : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(template.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+
+                    Text("\(template.exerciseCount) exercises")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if template.isAiGenerated {
+                    Image(systemName: "sparkles")
+                        .font(.caption2)
+                        .foregroundColor(.purple)
+                }
+            }
+            .padding(AppSpacing.sm)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+        .disabled(!isSelected && atMax)
+        .opacity(!isSelected && atMax ? 0.5 : 1)
     }
 
     // MARK: - Strength Entry Row

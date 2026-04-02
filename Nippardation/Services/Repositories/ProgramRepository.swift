@@ -215,6 +215,21 @@ final class ProgramRepository: ProgramRepositoryProtocol {
         try? await coreDataManager.deleteCachedProgram(serverId: serverId)
     }
 
+    func deleteProgram(serverId: String, deleteTemplates: Bool, keepTemplateIds: [String], programTemplateIds: [String]) async throws {
+        _ = try await apiService.deleteProgram(id: serverId, deleteTemplates: deleteTemplates, keepTemplateIds: keepTemplateIds)
+
+        // Remove program from cache
+        try? await coreDataManager.deleteCachedProgram(serverId: serverId)
+
+        // Remove templates the server deleted (those in this program but NOT in keepTemplateIds)
+        if deleteTemplates {
+            let keepSet = Set(keepTemplateIds)
+            for templateId in Set(programTemplateIds) where !keepSet.contains(templateId) {
+                try? await coreDataManager.deleteCachedTemplate(serverId: templateId)
+            }
+        }
+    }
+
     func duplicateProgram(serverId: String) async throws -> Program {
         // Fetch original program
         let original = try await fetchProgram(serverId: serverId, forceRefresh: true)

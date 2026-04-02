@@ -38,6 +38,18 @@ final class TemplateListViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
+    /// Checks if the cache differs from our in-memory list and triggers a reload.
+    /// Detects both additions (e.g., AI generation) and deletions (e.g., program delete with template cleanup).
+    func loadIfStale() {
+        let cached = templateRepository.getCachedTemplates()
+        let currentIds = Set(templates.map(\.serverId))
+        let cachedIds = Set(cached.map(\.serverId))
+
+        if currentIds != cachedIds {
+            loadTemplates(refresh: false)
+        }
+    }
+
     /// Loads templates from the repository
     /// - Parameter refresh: If true, forces a refresh from the server
     func loadTemplates(refresh: Bool = false) {

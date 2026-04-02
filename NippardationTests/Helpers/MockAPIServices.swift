@@ -288,6 +288,12 @@ actor MockProgramAPIService: ProgramAPIServiceProtocol {
         programs.removeAll { $0.id == id }
     }
 
+    func deleteProgram(id: String, deleteTemplates: Bool, keepTemplateIds: [String]) async throws -> Int {
+        if shouldFail { throw failureError }
+        programs.removeAll { $0.id == id }
+        return deleteTemplates ? 3 : 0
+    }
+
     func activateProgram(id: String) async throws -> ProgramDTO {
         if shouldFail { throw failureError }
 

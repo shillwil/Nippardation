@@ -33,6 +33,14 @@ final class AIWizardViewModel: ObservableObject {
     @Published var useTrainingHistory: Bool = false
     @Published var strengthEntries: [StrengthDataEntry] = []
 
+    // MARK: - Template Reuse
+
+    @Published var reuseTemplates: Bool = false
+    @Published var selectedTemplateIds: Set<String> = []
+    @Published var availableTemplates: [Template] = []
+    @Published var isLoadingTemplates = false
+    @Published var reusedTemplateIds: Set<String> = []
+
     // MARK: - Generation State
 
     @Published var isGenerating = false
@@ -61,6 +69,7 @@ final class AIWizardViewModel: ObservableObject {
 
     private let aiAPIService: any AIAPIServiceProtocol
     private let programRepository: any ProgramRepositoryProtocol
+    private let templateRepository: any TemplateRepositoryProtocol
     private var generateTask: Task<Void, Never>?
     private var loadingTimer: Timer?
 
@@ -93,10 +102,12 @@ final class AIWizardViewModel: ObservableObject {
 
     init(
         aiAPIService: (any AIAPIServiceProtocol)? = nil,
-        programRepository: (any ProgramRepositoryProtocol)? = nil
+        programRepository: (any ProgramRepositoryProtocol)? = nil,
+        templateRepository: (any TemplateRepositoryProtocol)? = nil
     ) {
         self.aiAPIService = aiAPIService ?? DependencyContainer.shared.aiAPIService
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
+        self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
     }
 
     // MARK: - Public Methods
@@ -166,6 +177,37 @@ final class AIWizardViewModel: ObservableObject {
         strengthEntries.remove(atOffsets: offsets)
     }
 
+    // MARK: - Template Reuse
+
+    func loadTemplates() {
+        guard !isLoadingTemplates else { return }
+        isLoadingTemplates = true
+
+        Task {
+            do {
+                let templates = try await templateRepository.fetchTemplates(forceRefresh: false)
+                await MainActor.run {
+                    self.availableTemplates = templates
+                    self.isLoadingTemplates = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.availableTemplates = []
+                    self.isLoadingTemplates = false
+                }
+            }
+        }
+    }
+
+    func toggleTemplateSelection(_ templateId: String) {
+        if selectedTemplateIds.contains(templateId) {
+            selectedTemplateIds.remove(templateId)
+        } else {
+            guard selectedTemplateIds.count < 7 else { return }
+            selectedTemplateIds.insert(templateId)
+        }
+    }
+
     func generate() {
         guard canGenerate else { return }
 
@@ -184,6 +226,9 @@ final class AIWizardViewModel: ObservableObject {
             // Filter out empty strength entries
             let validStrengthData = self.strengthEntries.filter { !$0.exerciseName.isEmpty && $0.weight > 0 }
 
+            let reuseIds = self.reuseTemplates && !self.selectedTemplateIds.isEmpty
+                ? Array(self.selectedTemplateIds) : nil
+
             let request = GenerateProgramRequest(
                 inspirationSource: finalInspirationSource,
                 daysPerWeek: self.daysPerWeek,
@@ -193,7 +238,8 @@ final class AIWizardViewModel: ObservableObject {
                 equipment: self.selectedEquipment.map(\.rawValue),
                 useTrainingHistory: self.useTrainingHistory,
                 manualStrengthData: validStrengthData.isEmpty ? nil : validStrengthData,
-                freeTextPreferences: self.freeTextPreferences.isEmpty ? nil : self.freeTextPreferences
+                freeTextPreferences: self.freeTextPreferences.isEmpty ? nil : self.freeTextPreferences,
+                reuseTemplateIds: reuseIds
             )
 
             do {
@@ -202,12 +248,26 @@ final class AIWizardViewModel: ObservableObject {
                 // Map the AI-specific DTO to a domain model
                 let program = AIGeneratedProgramMapper.toDomain(response.program)
 
-                // Cache the generated program locally
+                // Extract reused template IDs from the response
+                let reusedIds = Set(
+                    (response.program.workouts ?? [])
+                        .compactMap { $0.template }
+                        .filter { $0.wasReused == true }
+                        .compactMap { $0.id }
+                )
+
+                // Cache the generated program and its templates locally
                 try? await self.programRepository.cacheProgram(program)
+                for workout in program.workouts {
+                    if let template = workout.template {
+                        try? await self.templateRepository.cacheTemplate(template)
+                    }
+                }
 
                 await MainActor.run {
                     self.generatedProgram = program
                     self.generationMetadata = response.generation
+                    self.reusedTemplateIds = reusedIds
                     self.isGenerating = false
                     self.generationComplete = true
                     self.stopLoadingMessages()

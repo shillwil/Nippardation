@@ -155,6 +155,43 @@ final class ProgramAPIService: BaseAPIService, ProgramAPIServiceProtocol, @unche
         try validateResponse(response, data: data)
     }
 
+    func deleteProgram(id: String, deleteTemplates: Bool, keepTemplateIds: [String]) async throws -> Int {
+        guard var components = URLComponents(
+            url: AppConfiguration.shared.baseURL
+                .appendingPathComponent("api/programs")
+                .appendingPathComponent(id),
+            resolvingAgainstBaseURL: false
+        ) else {
+            throw RepositoryError.unknown(nil)
+        }
+
+        if deleteTemplates {
+            components.queryItems = [URLQueryItem(name: "deleteTemplates", value: "true")]
+        }
+
+        guard let url = components.url else {
+            throw RepositoryError.unknown(nil)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        try await addAuthHeader(to: &request)
+
+        if !keepTemplateIds.isEmpty {
+            request.httpBody = try encoder.encode(DeleteProgramTemplatesBody(keepTemplateIds: keepTemplateIds))
+        }
+
+        let (data, response) = try await performRequestWithoutDecoding(request)
+        try validateResponse(response, data: data)
+
+        // Try to extract templatesRemoved from response
+        if let envelope = try? decoder.decode(APIEnvelope<DeleteProgramResponse>.self, from: data),
+           let payload = envelope.data {
+            return payload.templatesRemoved
+        }
+        return 0
+    }
+
     // MARK: - State Management
 
     func activateProgram(id: String) async throws -> ProgramDTO {

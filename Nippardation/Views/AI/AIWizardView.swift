@@ -106,6 +106,7 @@ struct AIWizardView: View {
                         GeneratedProgramPreviewView(
                             program: program,
                             metadata: viewModel.generationMetadata,
+                            reusedTemplateIds: viewModel.reusedTemplateIds,
                             onSave: {
                                 dismiss()
                             },
