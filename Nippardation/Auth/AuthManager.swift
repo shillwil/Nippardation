@@ -135,6 +135,26 @@ class AuthManager: ObservableObject {
         }
     }
     
+    func sendPasswordReset(email: String) async throws {
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+
+        do {
+            try await Auth.auth().sendPasswordReset(withEmail: email)
+            await MainActor.run {
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoading = false
+                errorMessage = error.localizedDescription
+            }
+            throw error
+        }
+    }
+
     func signOut() throws {
         do {
             try Auth.auth().signOut()

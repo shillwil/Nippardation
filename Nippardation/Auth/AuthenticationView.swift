@@ -13,6 +13,9 @@ struct AuthenticationView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var showForgotPassword = false
+    @State private var resetEmail = ""
+    @State private var showResetConfirmation = false
     
     var body: some View {
         NavigationStack {
@@ -52,6 +55,18 @@ struct AuthenticationView: View {
                             SecureField("Confirm Password", text: $confirmPassword)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .textContentType(.newPassword)
+                        }
+
+                        if !isSignUp {
+                            HStack {
+                                Spacer()
+                                Button("Forgot Password?") {
+                                    resetEmail = email
+                                    showForgotPassword = true
+                                }
+                                .font(.caption)
+                                .foregroundColor(.appTheme)
+                            }
                         }
                     }
                     
@@ -96,6 +111,29 @@ struct AuthenticationView: View {
                 Spacer()
             }
             .navigationBarHidden(true)
+            .alert("Reset Password", isPresented: $showForgotPassword) {
+                TextField("Email", text: $resetEmail)
+                    .textContentType(.emailAddress)
+                    .autocapitalization(.none)
+                Button("Send Reset Link") {
+                    Task {
+                        do {
+                            try await authManager.sendPasswordReset(email: resetEmail)
+                            showResetConfirmation = true
+                        } catch {
+                            // errorMessage is already set by AuthManager
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Enter your email address and we'll send you a link to reset your password.")
+            }
+            .alert("Email Sent", isPresented: $showResetConfirmation) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Check your email for a password reset link.")
+            }
         }
     }
     
