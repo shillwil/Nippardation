@@ -17,6 +17,7 @@ final class TemplateRepository: TemplateRepositoryProtocol {
 
     private let apiService: TemplateAPIServiceProtocol
     private let coreDataManager: CoreDataManager
+    private let exerciseAPIService: (any ExerciseAPIServiceProtocol)?
 
     // MARK: - Configuration
 
@@ -26,10 +27,12 @@ final class TemplateRepository: TemplateRepositoryProtocol {
 
     init(
         apiService: TemplateAPIServiceProtocol,
-        coreDataManager: CoreDataManager = .shared
+        coreDataManager: CoreDataManager = .shared,
+        exerciseAPIService: (any ExerciseAPIServiceProtocol)? = nil
     ) {
         self.apiService = apiService
         self.coreDataManager = coreDataManager
+        self.exerciseAPIService = exerciseAPIService
     }
 
     // MARK: - Fetch Operations
@@ -102,12 +105,42 @@ final class TemplateRepository: TemplateRepositoryProtocol {
     func fetchTemplate(serverId: String, forceRefresh: Bool) async throws -> Template {
         // Check cache first if not forcing refresh
         if !forceRefresh, let cached = getCachedTemplate(serverId: serverId) {
-            return cached
+            let hasExercises = !cached.exercises.isEmpty
+            let allResolved = cached.exercises.allSatisfy { $0.exerciseLibraryItem != nil }
+
+            // Cache is fully resolved - use it
+            if hasExercises && allResolved {
+                return cached
+            }
+
+            // Exercises present but some unresolved - try resolving from exercise cache
+            if hasExercises && !allResolved {
+                var resolved = cached
+                resolved.exercises = resolveExerciseLibraryItems(resolved.exercises)
+                if resolved.exercises.allSatisfy({ $0.exerciseLibraryItem != nil }) {
+                    return resolved
+                }
+            }
+
+            // No exercises or still unresolved - fall through to API fetch
         }
 
         do {
             let dto = try await apiService.fetchTemplate(id: serverId)
-            let template = TemplateMapper.toDomain(dto)
+            var template = TemplateMapper.toDomain(dto)
+
+            // Cache exercise library items from the API response so future cache
+            // loads can resolve them via fetchCachedExercise(serverId:)
+            let libraryItems = template.exercises.compactMap { $0.exerciseLibraryItem }
+            if !libraryItems.isEmpty {
+                try? await coreDataManager.cacheExercises(libraryItems)
+            }
+
+            // Resolve any exercises still missing their library item from cache
+            template.exercises = resolveExerciseLibraryItems(template.exercises)
+
+            // For any still missing, fetch individually from exercise API
+            template.exercises = await fetchMissingExerciseLibraryItems(template.exercises)
 
             // Cache the result
             try? await coreDataManager.cacheTemplate(template)
@@ -171,7 +204,14 @@ final class TemplateRepository: TemplateRepositoryProtocol {
         )
 
         let dto = try await apiService.createTemplate(request)
-        let createdTemplate = TemplateMapper.toDomain(dto)
+        var createdTemplate = TemplateMapper.toDomain(dto)
+
+        // Cache exercise library items and resolve missing ones
+        let libraryItems = createdTemplate.exercises.compactMap { $0.exerciseLibraryItem }
+        if !libraryItems.isEmpty {
+            try? await coreDataManager.cacheExercises(libraryItems)
+        }
+        createdTemplate.exercises = resolveExerciseLibraryItems(createdTemplate.exercises)
 
         // Cache the new template
         try? await coreDataManager.cacheTemplate(createdTemplate)
@@ -205,7 +245,14 @@ final class TemplateRepository: TemplateRepositoryProtocol {
             exerciseInputs
         )
 
-        let updatedTemplate = TemplateMapper.toDomain(updatedDto)
+        var updatedTemplate = TemplateMapper.toDomain(updatedDto)
+
+        // Cache exercise library items and resolve missing ones
+        let libraryItems = updatedTemplate.exercises.compactMap { $0.exerciseLibraryItem }
+        if !libraryItems.isEmpty {
+            try? await coreDataManager.cacheExercises(libraryItems)
+        }
+        updatedTemplate.exercises = resolveExerciseLibraryItems(updatedTemplate.exercises)
 
         // Update cache
         try? await coreDataManager.cacheTemplate(updatedTemplate)
@@ -222,7 +269,14 @@ final class TemplateRepository: TemplateRepositoryProtocol {
 
     func duplicateTemplate(serverId: String) async throws -> Template {
         let dto = try await apiService.cloneTemplate(id: serverId, newName: nil)
-        let template = TemplateMapper.toDomain(dto)
+        var template = TemplateMapper.toDomain(dto)
+
+        // Cache exercise library items and resolve missing ones
+        let libraryItems = template.exercises.compactMap { $0.exerciseLibraryItem }
+        if !libraryItems.isEmpty {
+            try? await coreDataManager.cacheExercises(libraryItems)
+        }
+        template.exercises = resolveExerciseLibraryItems(template.exercises)
 
         // Cache the new template
         try? await coreDataManager.cacheTemplate(template)
@@ -234,14 +288,20 @@ final class TemplateRepository: TemplateRepositoryProtocol {
 
     func getCachedTemplates() -> [Template] {
         let cached = coreDataManager.fetchCachedTemplates()
-        return cached.map { coreDataManager.toDomain($0) }
+        return cached.map { template in
+            var domain = coreDataManager.toDomain(template)
+            domain.exercises = resolveExerciseLibraryItems(domain.exercises)
+            return domain
+        }
     }
 
     func getCachedTemplate(serverId: String) -> Template? {
         guard let cached = coreDataManager.fetchCachedTemplate(serverId: serverId) else {
             return nil
         }
-        return coreDataManager.toDomain(cached)
+        var domain = coreDataManager.toDomain(cached)
+        domain.exercises = resolveExerciseLibraryItems(domain.exercises)
+        return domain
     }
 
     func cacheTemplate(_ template: Template) async throws {
@@ -261,5 +321,48 @@ final class TemplateRepository: TemplateRepositoryProtocol {
 
     func markTemplateSynced(serverId: String) async throws {
         try await coreDataManager.markTemplateSynced(serverId: serverId)
+    }
+
+    // MARK: - Exercise Library Item Resolution
+
+    /// Resolves missing exerciseLibraryItem on template exercises from the local exercise cache.
+    private func resolveExerciseLibraryItems(_ exercises: [TemplateExercise]) -> [TemplateExercise] {
+        exercises.map { exercise in
+            guard exercise.exerciseLibraryItem == nil else { return exercise }
+            guard let cdExercise = coreDataManager.fetchCachedExercise(serverId: exercise.exerciseServerId) else {
+                return exercise
+            }
+            var resolved = exercise
+            resolved.exerciseLibraryItem = coreDataManager.toDomain(cdExercise)
+            return resolved
+        }
+    }
+
+    /// Fetches exercise library items individually from the API for any exercises still missing them.
+    private func fetchMissingExerciseLibraryItems(_ exercises: [TemplateExercise]) async -> [TemplateExercise] {
+        guard let exerciseAPI = exerciseAPIService else { return exercises }
+
+        var result = exercises
+        var fetchedItems: [ExerciseLibraryItem] = []
+
+        for i in result.indices {
+            guard result[i].exerciseLibraryItem == nil,
+                  !result[i].exerciseServerId.isEmpty else { continue }
+            do {
+                let dto = try await exerciseAPI.fetchExercise(id: result[i].exerciseServerId)
+                let item = ExerciseMapper.toDomain(dto)
+                result[i].exerciseLibraryItem = item
+                fetchedItems.append(item)
+            } catch {
+                print("Failed to fetch exercise \(result[i].exerciseServerId): \(error)")
+            }
+        }
+
+        // Cache newly fetched items for future lookups
+        if !fetchedItems.isEmpty {
+            try? await coreDataManager.cacheExercises(fetchedItems)
+        }
+
+        return result
     }
 }

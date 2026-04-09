@@ -85,12 +85,12 @@ final class DashboardViewModel: ObservableObject {
     /// - Parameter workout: The program workout
     /// - Returns: The associated template if found
     func templateFor(workout: ProgramWorkout) -> Template? {
-        // Check attached template first
-        if let template = workout.template {
-            return template
+        // Prefer detail-fetched templates (have exercises) over embedded summaries
+        if let detailed = allTemplates.first(where: { $0.serverId == workout.templateServerId }) {
+            return detailed
         }
-        // Otherwise look in loaded templates
-        return allTemplates.first { $0.serverId == workout.templateServerId }
+        // Fall back to embedded summary template
+        return workout.template
     }
 
     /// Refreshes the dashboard data (async version for pull-to-refresh)

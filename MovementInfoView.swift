@@ -52,10 +52,9 @@ struct MovementInfoView: View {
                 NativeVideoPlayer(
                     exerciseServerId: exerciseServerId ?? exercise.type.name,
                     videoUrl: videoUrl,
-                    aspectRatio: 16/9,
                     showControls: true
                 )
-                .frame(height: 220)
+                .frame(maxHeight: 400)
                 .padding(.horizontal)
             }
         } else if !exercise.example.isEmpty {

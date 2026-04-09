@@ -12,13 +12,15 @@ class WorkoutCacheManager {
     static let shared = WorkoutCacheManager()
     
     private let activeWorkoutKey = "activeWorkout"
+    private let activeWorkoutTemplateKey = "activeWorkoutTemplate"
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
-    
+
     private var timer: Timer?
     private let saveInterval: TimeInterval = 10 // Save every 10 seconds (reduced from 30)
-    
+
     @Published var activeWorkout: TrackedWorkout?
+    @Published var activeWorkoutTemplate: Workout?
     
     private init() {
         loadCachedWorkout()
@@ -47,11 +49,12 @@ class WorkoutCacheManager {
         )
         
         activeWorkout = workout
+        activeWorkoutTemplate = template
         startPeriodicSaving()
-        
+
         // Save immediately too
         saveWorkoutCache()
-        
+
         return workout
     }
     
@@ -131,12 +134,18 @@ class WorkoutCacheManager {
     
     func saveWorkoutCache() {
         guard let workout = activeWorkout else { return }
-        
+
         do {
             let data = try encoder.encode(workout)
             UserDefaults.standard.set(data, forKey: activeWorkoutKey)
             print("Workout cached successfully")
-            
+
+            // Also cache the workout template
+            if let template = activeWorkoutTemplate {
+                let templateData = try encoder.encode(template)
+                UserDefaults.standard.set(templateData, forKey: activeWorkoutTemplateKey)
+            }
+
             // Force UserDefaults to synchronize immediately to help with app termination
             UserDefaults.standard.synchronize()
         } catch {
@@ -149,14 +158,19 @@ class WorkoutCacheManager {
             print("No workout data found in UserDefaults")
             return
         }
-        
+
         do {
             let workout = try decoder.decode(TrackedWorkout.self, from: data)
-            
+
             // Only consider it active if it's not completed
             if workout.isCompleted == false {
                 activeWorkout = workout
-                
+
+                // Also restore the cached workout template
+                if let templateData = UserDefaults.standard.data(forKey: activeWorkoutTemplateKey) {
+                    activeWorkoutTemplate = try? decoder.decode(Workout.self, from: templateData)
+                }
+
                 // Update the startTime if needed
                 if workout.startTime == nil {
                     var updatedWorkout = workout
@@ -164,10 +178,10 @@ class WorkoutCacheManager {
                     activeWorkout = updatedWorkout
                     saveWorkoutCache()
                 }
-                
+
                 // Restart the timer
                 startPeriodicSaving()
-                
+
                 print("Cached workout loaded successfully: \(workout.workoutTemplate)")
             } else {
                 print("Found completed workout in cache - should have been removed")
@@ -179,10 +193,12 @@ class WorkoutCacheManager {
             clearCache()
         }
     }
-    
+
     private func clearCache() {
         UserDefaults.standard.removeObject(forKey: activeWorkoutKey)
+        UserDefaults.standard.removeObject(forKey: activeWorkoutTemplateKey)
         UserDefaults.standard.synchronize()
         activeWorkout = nil
+        activeWorkoutTemplate = nil
     }
 }

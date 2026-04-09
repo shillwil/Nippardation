@@ -164,7 +164,7 @@ enum SampleData {
 
     static let activeProgramDTO = ActiveProgramDTO(
         program: programDTO,
-        nextWorkout: programWorkoutDTO,
+        nextWorkout: NextWorkoutDTO(from: programWorkoutDTO),
         isCompleted: false
     )
 

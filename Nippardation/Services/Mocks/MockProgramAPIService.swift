@@ -48,7 +48,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         if let activeProgram = programDTOs.first(where: { $0.isActive == true }) {
             activeProgramDTO = ActiveProgramDTO(
                 program: activeProgram,
-                nextWorkout: activeProgram.workouts?.first { $0.dayNumber == (activeProgram.currentDayIndex ?? 0) },
+                nextWorkout: activeProgram.workouts?.first { $0.dayNumber == (activeProgram.currentDayIndex ?? 0) }.map { NextWorkoutDTO(from: $0) },
                 isCompleted: false
             )
         }
@@ -326,7 +326,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         // Update active program response
         activeProgramDTO = ActiveProgramDTO(
             program: activated,
-            nextWorkout: activated.workouts?.first { $0.dayNumber == (activated.currentDayIndex ?? 0) },
+            nextWorkout: activated.workouts?.first { $0.dayNumber == (activated.currentDayIndex ?? 0) }.map { NextWorkoutDTO(from: $0) },
             isCompleted: false
         )
 
@@ -413,7 +413,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         if activeProgramDTO?.program.id == id {
             activeProgramDTO = ActiveProgramDTO(
                 program: advanced,
-                nextWorkout: advanced.workouts?.first { $0.dayNumber == nextDayIndex },
+                nextWorkout: advanced.workouts?.first { $0.dayNumber == nextDayIndex }.map { NextWorkoutDTO(from: $0) },
                 isCompleted: false
             )
         }
@@ -456,7 +456,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         if activeProgramDTO?.program.id == id {
             activeProgramDTO = ActiveProgramDTO(
                 program: reset,
-                nextWorkout: reset.workouts?.first { $0.dayNumber == 0 },
+                nextWorkout: reset.workouts?.first { $0.dayNumber == 0 }.map { NextWorkoutDTO(from: $0) },
                 isCompleted: false
             )
         }

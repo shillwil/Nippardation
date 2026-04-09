@@ -18,20 +18,24 @@ struct NativeVideoPlayer: View {
 
     let exerciseServerId: String
     let videoUrl: URL?
-    let aspectRatio: CGFloat
+    let overrideAspectRatio: CGFloat?
     let showControls: Bool
+
+    private var effectiveAspectRatio: CGFloat {
+        overrideAspectRatio ?? viewModel.detectedAspectRatio
+    }
 
     // MARK: - Initialization
 
     init(
         exerciseServerId: String,
         videoUrl: URL?,
-        aspectRatio: CGFloat = 16/9,
+        overrideAspectRatio: CGFloat? = nil,
         showControls: Bool = true
     ) {
         self.exerciseServerId = exerciseServerId
         self.videoUrl = videoUrl
-        self.aspectRatio = aspectRatio
+        self.overrideAspectRatio = overrideAspectRatio
         self.showControls = showControls
         self._viewModel = StateObject(wrappedValue: VideoPlayerViewModel())
     }
@@ -42,7 +46,8 @@ struct NativeVideoPlayer: View {
         ZStack {
             // Video layer
             VideoPlayerLayer(player: viewModel.player)
-                .aspectRatio(aspectRatio, contentMode: .fit)
+                .aspectRatio(effectiveAspectRatio, contentMode: .fit)
+                .animation(.easeInOut(duration: 0.25), value: effectiveAspectRatio)
                 .background(Color.black)
                 .cornerRadius(12)
 

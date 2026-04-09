@@ -144,7 +144,7 @@ final class DependencyContainer: ObservableObject {
         // Repositories
         let workoutRepository = WorkoutRepository(coreDataManager: .shared)
         let exerciseRepository = ExerciseRepository(apiService: exerciseAPI, coreDataManager: .shared)
-        let templateRepository = TemplateRepository(apiService: templateAPI, coreDataManager: .shared)
+        let templateRepository = TemplateRepository(apiService: templateAPI, coreDataManager: .shared, exerciseAPIService: exerciseAPI)
         let programRepository = ProgramRepository(apiService: programAPI, coreDataManager: .shared)
 
         self.workoutRepository = workoutRepository

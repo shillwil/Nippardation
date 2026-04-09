@@ -23,6 +23,7 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var duration: Double = 0
     @Published var isLooping = true
     @Published var downloadProgress: Double = 0
+    @Published var detectedAspectRatio: CGFloat = 16/9
 
     // MARK: - Player
 
@@ -81,10 +82,12 @@ final class VideoPlayerViewModel: ObservableObject {
         downloadProgress = 0
         currentTime = 0
         duration = 0
+        detectedAspectRatio = 16/9
 
         // Check if already cached
         if let localURL = videoCacheService.getCachedVideoURL(for: exerciseServerId) {
             setupPlayerItem(with: localURL)
+            await detectVideoOrientation(from: localURL)
             isLoading = false
             await videoCacheService.touchVideo(for: exerciseServerId)
             return
@@ -106,12 +109,14 @@ final class VideoPlayerViewModel: ObservableObject {
 
                 if !Task.isCancelled {
                     setupPlayerItem(with: localURL)
+                    await detectVideoOrientation(from: localURL)
                     isLoading = false
                 }
             } catch {
                 if !Task.isCancelled {
                     // Cache download failed — fall back to direct streaming
                     setupPlayerItem(with: remoteURL)
+                    await detectVideoOrientation(from: remoteURL)
                     isLoading = false
                 }
             }
@@ -206,6 +211,36 @@ final class VideoPlayerViewModel: ObservableObject {
                 self.downloadProgress = progress.fractionComplete
             }
             .store(in: &cancellables)
+    }
+
+    private func detectVideoOrientation(from url: URL) async {
+        let asset = AVAsset(url: url)
+        do {
+            let tracks = try await asset.loadTracks(withMediaType: .video)
+            guard let videoTrack = tracks.first else {
+                print("[VideoOrientation] No video tracks found for \(url.lastPathComponent)")
+                return
+            }
+
+            let naturalSize = try await videoTrack.load(.naturalSize)
+            let preferredTransform = try await videoTrack.load(.preferredTransform)
+
+            print("[VideoOrientation] \(url.lastPathComponent) — naturalSize: \(naturalSize), transform: \(preferredTransform)")
+
+            // Apply transform to get actual rendered dimensions.
+            // Adobe exports typically have an identity transform, so this is a no-op.
+            // Phone-recorded videos may have a 90-degree rotation transform.
+            let transformedSize = naturalSize.applying(preferredTransform)
+            let width = abs(transformedSize.width)
+            let height = abs(transformedSize.height)
+
+            print("[VideoOrientation] \(url.lastPathComponent) — transformed: \(width)x\(height), ratio: \(width/height)")
+
+            guard width > 0, height > 0 else { return }
+            detectedAspectRatio = width / height
+        } catch {
+            print("[VideoOrientation] Detection failed for \(url.lastPathComponent): \(error)")
+        }
     }
 
     private func setupPlayerItem(with url: URL) {

@@ -143,9 +143,37 @@ struct ProgramWorkoutInput: Codable {
 /// Active program response with next workout info
 struct ActiveProgramDTO: Codable {
     let program: ProgramDTO
-    let nextWorkout: ProgramWorkoutDTO?
+    let nextWorkout: NextWorkoutDTO?
     let isCompleted: Bool
 
+}
+
+/// Lenient DTO for the nextWorkout field in active program responses.
+/// The API returns a subset of ProgramWorkoutDTO fields (no id or templateId).
+struct NextWorkoutDTO: Codable {
+    let dayNumber: Int?
+    let dayLabel: String?
+    let template: TemplateDTO?
+    // These may be absent in the active program response
+    let id: String?
+    let templateId: String?
+
+    /// Convenience initializer from a ProgramWorkoutDTO (used in mocks/tests)
+    init(from workout: ProgramWorkoutDTO) {
+        self.dayNumber = workout.dayNumber
+        self.dayLabel = workout.dayLabel
+        self.template = workout.template
+        self.id = workout.id
+        self.templateId = workout.templateId
+    }
+
+    init(dayNumber: Int?, dayLabel: String?, template: TemplateDTO?, id: String?, templateId: String?) {
+        self.dayNumber = dayNumber
+        self.dayLabel = dayLabel
+        self.template = template
+        self.id = id
+        self.templateId = templateId
+    }
 }
 
 /// Summary of a template (used in program workout responses)

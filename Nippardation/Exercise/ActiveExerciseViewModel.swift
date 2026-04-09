@@ -56,19 +56,40 @@ class ActiveExerciseViewModel: ObservableObject {
         updateStats()
     }
 
-    // Find the matching exercise from the workout templates
+    // Find the matching exercise from stored template, hardcoded templates, or construct a fallback
     private func findMatchingExercise() {
         guard isValidExercise else { return }
 
-        let exerciseName = workout.trackedExercises[exerciseIndex].exerciseName
-        let allWorkouts = [upperStrength, lowerStrength, pullDay, pushDay, legDay]
+        let trackedExercise = workout.trackedExercises[exerciseIndex]
+        let exerciseName = trackedExercise.exerciseName
 
+        // 1. Search the stored workout template first (covers program-based workouts)
+        if let storedTemplate = workoutManager.activeWorkoutTemplate,
+           let match = storedTemplate.exercises.first(where: { $0.type.name == exerciseName }) {
+            self.matchingExercise = match
+            return
+        }
+
+        // 2. Fall back to hardcoded templates
+        let allWorkouts = [upperStrength, lowerStrength, pullDay, pushDay, legDay]
         for template in allWorkouts {
             if let match = template.exercises.first(where: { $0.type.name == exerciseName }) {
                 self.matchingExercise = match
-                break
+                return
             }
         }
+
+        // 3. Construct a fallback Exercise from TrackedExercise data so the UI always works
+        let muscleGroups = trackedExercise.muscleGroups.compactMap { MuscleGroup(rawValue: $0) }
+        self.matchingExercise = Exercise(
+            type: ExerciseType(name: exerciseName, muscleGroup: muscleGroups),
+            example: "",
+            lastSetIntensityTechnique: "Failure",
+            warmUpSets: 0,
+            workingSets: 3,
+            reps: 8...12,
+            rest: 2...3
+        )
     }
 
     // MARK: - Video Lookup

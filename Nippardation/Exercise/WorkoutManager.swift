@@ -17,6 +17,7 @@ class WorkoutManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     @Published var activeWorkout: TrackedWorkout?
+    @Published var activeWorkoutTemplate: Workout?
     @Published var completedWorkouts: [TrackedWorkout] = []
     @Published var isWorkoutInProgress: Bool = false
     @Published var workoutStats: WorkoutStats = WorkoutStats()
@@ -33,6 +34,13 @@ class WorkoutManager: ObservableObject {
             .sink { [weak self] workout in
                 self?.activeWorkout = workout
                 self?.isWorkoutInProgress = workout != nil
+            }
+            .store(in: &cancellables)
+
+        // Subscribe to active workout template changes
+        cacheManager.$activeWorkoutTemplate
+            .sink { [weak self] template in
+                self?.activeWorkoutTemplate = template
             }
             .store(in: &cancellables)
         

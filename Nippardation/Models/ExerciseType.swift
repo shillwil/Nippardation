@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct ExerciseType: Hashable {
+struct ExerciseType: Hashable, Codable {
     var name: String
     var muscleGroup: [MuscleGroup]
     
