@@ -98,14 +98,32 @@ final class ImportViewModel: ObservableObject {
                         self.state = .error("No program data found")
                         return
                     }
-                    // For programs, first import all templates, then create the program
-                    // The backend snapshot includes full template data in the program workouts
+                    // Import all templates first and build a mapping of old → new server IDs.
+                    // The backend assigns new IDs to imported templates, so the program's
+                    // workout references must be updated before creating the program.
+                    var templateIdMap: [String: String] = [:]
                     for workout in program.workouts {
                         if let template = workout.template {
-                            _ = try await templateRepository.createTemplate(template)
+                            let created = try await templateRepository.createTemplate(template)
+                            templateIdMap[template.serverId] = created.serverId
                         }
                     }
-                    _ = try await programRepository.createProgram(program)
+
+                    // Rebuild workouts with the new template server IDs
+                    let remappedWorkouts = program.workouts.map { workout in
+                        ProgramWorkout(
+                            id: UUID(),
+                            serverId: "",
+                            dayNumber: workout.dayNumber,
+                            dayLabel: workout.dayLabel,
+                            templateServerId: templateIdMap[workout.templateServerId] ?? workout.templateServerId,
+                            template: workout.template
+                        )
+                    }
+
+                    var updatedProgram = program
+                    updatedProgram.workouts = remappedWorkouts
+                    _ = try await programRepository.createProgram(updatedProgram)
                 }
 
                 self.state = .imported
