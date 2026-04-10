@@ -217,15 +217,18 @@ struct NativeVideoPlayer: View {
 /// UIViewRepresentable wrapper for AVPlayerLayer
 struct VideoPlayerLayer: UIViewRepresentable {
     let player: AVPlayer
+    var videoGravity: AVLayerVideoGravity = .resizeAspect
 
     func makeUIView(context: Context) -> PlayerUIView {
         let view = PlayerUIView()
         view.player = player
+        view.playerLayer.videoGravity = videoGravity
         return view
     }
 
     func updateUIView(_ uiView: PlayerUIView, context: Context) {
         uiView.player = player
+        uiView.playerLayer.videoGravity = videoGravity
     }
 }
 
@@ -242,10 +245,7 @@ class PlayerUIView: UIView {
 
     var player: AVPlayer? {
         get { playerLayer.player }
-        set {
-            playerLayer.player = newValue
-            playerLayer.videoGravity = .resizeAspect
-        }
+        set { playerLayer.player = newValue }
     }
 }
 

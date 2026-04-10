@@ -12,11 +12,12 @@ struct WorkoutSelectionView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @ObservedObject var workoutManager = WorkoutManager.shared
-    
+    @State private var selectedPreviewWorkout: ProgramWorkout?
+
     var onWorkoutSelected: (TrackedWorkout) -> Void
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {            
+        VStack(alignment: .leading, spacing: 16) {
             List {
                 if dashboardViewModel.isLoading && dashboardViewModel.activeProgram == nil {
                     Section("Active Program") {
@@ -27,29 +28,58 @@ struct WorkoutSelectionView: View {
                     Section("From Active Program: \(program.name)") {
                         ForEach(program.workouts.sorted(by: { $0.dayNumber < $1.dayNumber })) { workout in
                             if let template = dashboardViewModel.templateFor(workout: workout) {
-                                Button {
-                                    startWorkout(template: workoutTemplate(from: template, fallbackName: workout.displayName))
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(workout.displayName)
-                                                .foregroundStyle(colorScheme == .dark ? Color.white : Color.appTheme)
-                                            Text("\(template.exerciseCount) exercises")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
+                                HStack {
+                                    // Preview toggle
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            if selectedPreviewWorkout?.id == workout.id {
+                                                selectedPreviewWorkout = nil
+                                            } else {
+                                                selectedPreviewWorkout = workout
+                                            }
                                         }
-                                        Spacer()
-                                        Image(systemName: "play.circle.fill")
-                                            .resizable()
+                                    } label: {
+                                        Image(systemName: selectedPreviewWorkout?.id == workout.id ? "eye.fill" : "eye")
+                                            .foregroundStyle(selectedPreviewWorkout?.id == workout.id ? Color.appTheme : .secondary)
                                             .frame(width: 32, height: 32)
-                                            .aspectRatio(contentMode: .fit)
                                     }
-                                    .contentShape(Rectangle())
+                                    .buttonStyle(.plain)
+
+                                    // Start workout button
+                                    Button {
+                                        startWorkout(template: workoutTemplate(from: template, fallbackName: workout.displayName))
+                                    } label: {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(workout.displayName)
+                                                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.appTheme)
+                                                Text("\(template.exerciseCount) exercises")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "play.circle.fill")
+                                                .resizable()
+                                                .frame(width: 32, height: 32)
+                                                .aspectRatio(contentMode: .fit)
+                                        }
+                                        .contentShape(Rectangle())
+                                    }
+                                    .disabled(template.exercises.isEmpty)
+                                    .tint(Color.appTheme)
+                                    .buttonStyle(.automatic)
                                 }
-                                .disabled(template.exercises.isEmpty)
-                                .tint(Color.appTheme)
-                                .buttonStyle(.automatic)
                             }
+                        }
+                    }
+
+                    // Exercise preview carousel for selected workout
+                    if let previewWorkout = selectedPreviewWorkout,
+                       let template = dashboardViewModel.templateFor(workout: previewWorkout),
+                       !template.exercises.isEmpty {
+                        Section("Preview: \(previewWorkout.displayName)") {
+                            ExerciseVideoCarousel(template: template, title: nil)
+                                .listRowInsets(EdgeInsets())
                         }
                     }
                 } else {
@@ -61,6 +91,12 @@ struct WorkoutSelectionView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .onChange(of: dashboardViewModel.nextWorkout) { _, nextWorkout in
+                // Default to previewing the next workout
+                if selectedPreviewWorkout == nil {
+                    selectedPreviewWorkout = nextWorkout
+                }
+            }
         }
         .navigationTitle("Start Workout")
         .navigationBarTitleDisplayMode(.inline)

@@ -39,6 +39,11 @@ struct HomeView: View {
                         .padding(.horizontal, AppSpacing.md)
                         .padding(.top, AppSpacing.xs)
 
+                    // Exercise video previews for next workout
+                    if let template = viewModel.nextTemplate, !template.exercises.isEmpty {
+                        ExerciseVideoCarousel(template: template, title: "Up Next")
+                    }
+
                     // Activity stats
                     if !workoutManager.completedWorkouts.isEmpty {
                         VStack(alignment: .leading, spacing: AppSpacing.sm) {
