@@ -128,6 +128,7 @@ struct WorkoutSelectionView: View {
 
                 return Exercise(
                     type: ExerciseType(name: exerciseName, muscleGroup: muscles),
+                    exerciseServerId: libraryItem?.serverId,
                     example: libraryItem?.videoUrl?.absoluteString ?? "",
                     lastSetIntensityTechnique: templateExercise.notes ?? "Failure",
                     warmUpSets: templateExercise.warmupSets ?? 0,

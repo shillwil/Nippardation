@@ -94,27 +94,35 @@ class ActiveExerciseViewModel: ObservableObject {
 
     // MARK: - Video Lookup
 
-    /// Looks up the ExerciseLibraryItem from the repository to get the video URL
+    /// Looks up the exercise video URL, preferring the stored serverId from the template
     private func lookupExerciseVideo() {
         guard isValidExercise else { return }
-        let exerciseName = workout.trackedExercises[exerciseIndex].exerciseName
 
-        // Set fallback server ID from template name
+        // If matched exercise has a serverId from the template, use it directly
+        if let serverId = matchingExercise?.exerciseServerId, !serverId.isEmpty {
+            exerciseServerId = serverId
+            if let urlString = matchingExercise?.example, !urlString.isEmpty, let url = URL(string: urlString) {
+                nativeVideoUrl = url
+            }
+            return
+        }
+
+        // Fallback: name-based search (for hardcoded templates / legacy cached workouts)
+        let exerciseName = workout.trackedExercises[exerciseIndex].exerciseName
         exerciseServerId = matchingExercise?.type.name
 
         Task { [weak self] in
-            guard let self = self else { return }
+            guard let self else { return }
             do {
                 let results = try await self.exerciseRepository.searchExercises(query: exerciseName, limit: 5)
-                // Find exact name match first, fall back to first result
                 let match = results.first(where: { $0.name.lowercased() == exerciseName.lowercased() })
                     ?? results.first
-                if let match = match {
+                if let match {
                     self.nativeVideoUrl = match.videoUrl
                     self.exerciseServerId = match.serverId
                 }
             } catch {
-                // Silently fail — video is supplementary, not critical
+                // Video is supplementary — silently fail
             }
         }
     }

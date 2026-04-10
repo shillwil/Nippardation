@@ -10,6 +10,7 @@ import Foundation
 struct Exercise: Identifiable, Codable {
     var id = UUID()
     var type: ExerciseType
+    var exerciseServerId: String?
     var example: String
     var lastSetIntensityTechnique: String
     var warmUpSets: Int
@@ -18,12 +19,13 @@ struct Exercise: Identifiable, Codable {
     var rest: ClosedRange<Int>
 
     enum CodingKeys: String, CodingKey {
-        case id, type, example, lastSetIntensityTechnique, warmUpSets, workingSets
+        case id, type, exerciseServerId, example, lastSetIntensityTechnique, warmUpSets, workingSets
         case repsLower, repsUpper, restLower, restUpper
     }
 
-    init(type: ExerciseType, example: String, lastSetIntensityTechnique: String, warmUpSets: Int, workingSets: Int, reps: ClosedRange<Int>, rest: ClosedRange<Int>) {
+    init(type: ExerciseType, exerciseServerId: String? = nil, example: String, lastSetIntensityTechnique: String, warmUpSets: Int, workingSets: Int, reps: ClosedRange<Int>, rest: ClosedRange<Int>) {
         self.type = type
+        self.exerciseServerId = exerciseServerId
         self.example = example
         self.lastSetIntensityTechnique = lastSetIntensityTechnique
         self.warmUpSets = warmUpSets
@@ -36,6 +38,7 @@ struct Exercise: Identifiable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         type = try container.decode(ExerciseType.self, forKey: .type)
+        exerciseServerId = try container.decodeIfPresent(String.self, forKey: .exerciseServerId)
         example = try container.decode(String.self, forKey: .example)
         lastSetIntensityTechnique = try container.decode(String.self, forKey: .lastSetIntensityTechnique)
         warmUpSets = try container.decode(Int.self, forKey: .warmUpSets)
@@ -52,6 +55,7 @@ struct Exercise: Identifiable, Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(type, forKey: .type)
+        try container.encodeIfPresent(exerciseServerId, forKey: .exerciseServerId)
         try container.encode(example, forKey: .example)
         try container.encode(lastSetIntensityTechnique, forKey: .lastSetIntensityTechnique)
         try container.encode(warmUpSets, forKey: .warmUpSets)
