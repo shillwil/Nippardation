@@ -14,6 +14,7 @@ struct ActiveWorkoutView: View {
     // UI state properties
     @State private var selectedExercise: IdentifiableIndex?
     @State private var selectedDetent: PresentationDetent
+    @State private var swappingExerciseIndex: Int?
     
     init(workout: TrackedWorkout) {
         // Initialize the view model with the workout
@@ -96,7 +97,7 @@ struct ActiveWorkoutView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(exercise.exerciseName)
                                     .foregroundColor(.primary)
-                                
+
                                 if exercise.trackedSets.isEmpty {
                                     Text("No sets recorded")
                                         .font(.caption)
@@ -104,25 +105,33 @@ struct ActiveWorkoutView: View {
                                 } else {
                                     let setInfo = exercise.trackedSets.count == 1 ? "1 set" : "\(exercise.trackedSets.count) sets"
                                     let exerciseVolume = exercise.trackedSets.reduce(0.0) { $0 + (Double($1.reps) * $1.weight) }
-                                    
+
                                     Text("\(setInfo) • \(Int(exerciseVolume)) lbs")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
                             }
-                            
+
                             Spacer()
-                            
+
                             if !exercise.trackedSets.isEmpty {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
                                     .font(.subheadline)
                             }
-                            
+
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                         }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button {
+                            swappingExerciseIndex = index
+                        } label: {
+                            Label("Swap", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        .tint(Color.appTheme)
                     }
                 }
             }
@@ -153,6 +162,24 @@ struct ActiveWorkoutView: View {
             .presentationDragIndicator(.visible)
             .interactiveDismissDisabled()
             .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+        }
+        .sheet(item: Binding(
+            get: { swappingExerciseIndex.map { IdentifiableIndex(id: $0) } },
+            set: { swappingExerciseIndex = $0?.value }
+        )) { identifiableIndex in
+            NavigationStack {
+                ExerciseBrowserView { selected in
+                    viewModel.swapExercise(at: identifiableIndex.value, to: selected)
+                    swappingExerciseIndex = nil
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            swappingExerciseIndex = nil
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle(viewModel.workout.workoutTemplate)
         .navigationBarTitleDisplayMode(.inline)

@@ -93,6 +93,7 @@ class CoreDataManager {
                 cdExercise.id = exercise.id
                 cdExercise.exerciseName = exercise.exerciseName
                 cdExercise.muscleGroups = exercise.muscleGroups.map { $0 }
+                cdExercise.exerciseLibraryServerId = exercise.exerciseLibraryServerId
                 cdExercise.workout = cdWorkout
                 
                 // Create the set entities
@@ -218,6 +219,7 @@ class CoreDataManager {
                         cdExercise.id = exercise.id
                         cdExercise.exerciseName = exercise.exerciseName
                         cdExercise.muscleGroups = exercise.muscleGroups.map { $0 }
+                        cdExercise.exerciseLibraryServerId = exercise.exerciseLibraryServerId
                         cdExercise.workout = cdWorkout
 
                         for set in exercise.trackedSets {
@@ -360,7 +362,8 @@ class CoreDataManager {
                 id: cdExercise.id ?? UUID(),
                 exerciseName: cdExercise.exerciseName ?? "",
                 muscleGroups: muscleGroups,
-                trackedSets: trackedSets
+                trackedSets: trackedSets,
+                exerciseLibraryServerId: cdExercise.exerciseLibraryServerId
             )
         }
         

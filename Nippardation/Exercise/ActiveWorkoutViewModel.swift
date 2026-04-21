@@ -68,15 +68,32 @@ class ActiveWorkoutViewModel: ObservableObject {
     
     func updateExercise(at index: Int, with exercise: TrackedExercise) {
         guard index < workout.trackedExercises.count else { return }
-        
+
         // Update local workout model
         workout.trackedExercises[index] = exercise
-        
+
         // Update in WorkoutManager
         workoutManager.updateExercise(at: index, with: exercise)
-        
+
         // Recalculate stats
         updateWorkoutStats()
+    }
+
+    /// Replaces the exercise at `index` with one selected from the library, preserving the
+    /// existing tracked id and any sets already logged (snapshotted set metadata is intentionally
+    /// left intact so historical rows continue to reflect the exercise they were logged against).
+    func swapExercise(at index: Int, to libraryItem: ExerciseLibraryItem) {
+        guard index < workout.trackedExercises.count else { return }
+
+        let existing = workout.trackedExercises[index]
+        let updated = TrackedExercise(
+            id: existing.id,
+            exerciseName: libraryItem.name,
+            muscleGroups: libraryItem.primaryMuscles.map { $0.rawValue },
+            trackedSets: existing.trackedSets,
+            exerciseLibraryServerId: libraryItem.serverId
+        )
+        updateExercise(at: index, with: updated)
     }
     
     func endWorkout() {

@@ -22,6 +22,7 @@ struct ActiveExerciseDetailView: View {
     @State private var editingSetType: SetType = .working
     @State private var showingCancelAlert = false
     @State private var volumeUnit: VolumeUnit = .pounds
+    @State private var isShowingSwapPicker = false
     
     let exerciseIndex: Int
     let isReadOnly: Bool
@@ -137,8 +138,11 @@ struct ActiveExerciseDetailView: View {
                                 }
                             }
                         }
+
+                        swapMovementButton
+                            .padding(.top, 8)
                     }
-                    
+
                     // Spacer to ensure bottom button doesn't overlap content
                     Spacer(minLength: 100)
                 }
@@ -191,6 +195,25 @@ struct ActiveExerciseDetailView: View {
                 .presentationDetents([.medium])
             }
         }
+        .sheet(isPresented: $isShowingSwapPicker) {
+            NavigationStack {
+                ExerciseBrowserView { selected in
+                    viewModel.swapExercise(to: selected)
+                    if let currentExercise = viewModel.currentExercise,
+                       exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
+                        workout.trackedExercises[exerciseIndex] = currentExercise
+                    }
+                    isShowingSwapPicker = false
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            isShowingSwapPicker = false
+                        }
+                    }
+                }
+            }
+        }
         .onAppear {
             // Synchronize view model with the latest workout data
             viewModel.updateWorkout(workout)
@@ -222,6 +245,18 @@ struct ActiveExerciseDetailView: View {
                 .fill(Color(.systemBackground))
                 .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: -5)
         )
+    }
+
+    private var swapMovementButton: some View {
+        Button {
+            isShowingSwapPicker = true
+        } label: {
+            Label("Swap This Movement", systemImage: "arrow.triangle.2.circlepath")
+                .font(.headline)
+                .foregroundColor(.orange)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal)
     }
     
     private func saveAndClose() {

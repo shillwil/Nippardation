@@ -12,7 +12,8 @@ struct TrackedExercise: Identifiable, Codable {
     var exerciseName: String
     var muscleGroups: [String]  // Store as strings for Codable compliance
     var trackedSets: [TrackedSet]
-    
+    var exerciseLibraryServerId: String? = nil
+
     var isCompleted: Bool {
         return !trackedSets.isEmpty
     }

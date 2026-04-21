@@ -127,6 +127,46 @@ class ActiveExerciseViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Exercise Swap
+
+    /// Replaces the current exercise with one selected from the library, preserving any
+    /// already-logged sets (their snapshotted exerciseType metadata is intentionally left alone
+    /// so historical set rows continue to reflect the exercise they were logged against).
+    func swapExercise(to libraryItem: ExerciseLibraryItem) {
+        guard isValidExercise else { return }
+
+        let existing = workout.trackedExercises[exerciseIndex]
+        let muscleStrings = libraryItem.primaryMuscles.map { $0.rawValue }
+
+        let updated = TrackedExercise(
+            id: existing.id,
+            exerciseName: libraryItem.name,
+            muscleGroups: muscleStrings,
+            trackedSets: existing.trackedSets,
+            exerciseLibraryServerId: libraryItem.serverId
+        )
+
+        workout.trackedExercises[exerciseIndex] = updated
+        workoutManager.updateExercise(at: exerciseIndex, with: updated)
+
+        // Reset cached metadata + video so the UI reflects the new exercise
+        nativeVideoUrl = nil
+        exerciseServerId = libraryItem.serverId
+        matchingExercise = Exercise(
+            type: ExerciseType(name: libraryItem.name, muscleGroup: libraryItem.primaryMuscles),
+            exerciseServerId: libraryItem.serverId,
+            example: libraryItem.videoUrl?.absoluteString ?? "",
+            lastSetIntensityTechnique: "Failure",
+            warmUpSets: 0,
+            workingSets: 3,
+            reps: 8...12,
+            rest: 2...3
+        )
+        if let url = libraryItem.videoUrl {
+            nativeVideoUrl = url
+        }
+    }
+
     // MARK: - Set Management
 
     // Add a set to the current exercise
