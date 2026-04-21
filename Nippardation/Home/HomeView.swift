@@ -23,6 +23,10 @@ struct HomeView: View {
     // Add state to track if we've done initial loading
     @State private var didCheckForActiveWorkout: Bool = false
 
+    // Tracks whether the current active workout was launched from the Hero card,
+    // so we only auto-advance the program for those completions.
+    @State private var startedFromHero: Bool = false
+
     private enum PostModalAction {
         case createManually
         case generateWithAI
@@ -218,6 +222,13 @@ struct HomeView: View {
         .onChange(of: workoutManager.completedWorkouts.count) {
             viewModel.computeWeeklyStats(from: workoutManager.completedWorkouts)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("WorkoutDataUpdated"))) { _ in
+            guard startedFromHero else { return }
+            startedFromHero = false
+            Task { @MainActor in
+                await viewModel.advanceAfterCompletion()
+            }
+        }
     }
 
     // MARK: - Template → Workout
@@ -271,15 +282,61 @@ struct HomeView: View {
                     if workoutManager.isWorkoutInProgress {
                         showActiveWorkout = true
                     } else {
-                        startNewWorkout = true
+                        startWorkoutFromHero()
                     }
-                }
+                },
+                onRotateBackward: program.workouts.count > 1 ? { viewModel.rotatePreviewBackward() } : nil,
+                onRotateForward: program.workouts.count > 1 ? { viewModel.rotatePreviewForward() } : nil
             )
         } else {
             HeroWorkoutFallbackCard(onChooseProgram: {
                 selectedTab = .programs
             })
         }
+    }
+
+    // MARK: - Start from Hero
+
+    private func startWorkoutFromHero() {
+        Task { @MainActor in
+            await viewModel.commitPreviewBeforeStart()
+            guard let template = viewModel.nextTemplate else {
+                // Fallback to selection sheet if we couldn't resolve a template
+                startNewWorkout = true
+                return
+            }
+            let fallbackName = viewModel.nextWorkout?.displayName ?? template.name
+            let workout = buildWorkout(from: template, fallbackName: fallbackName)
+            startedFromHero = true
+            _ = workoutManager.startWorkout(template: workout)
+            showActiveWorkout = true
+        }
+    }
+
+    private func buildWorkout(from template: Template, fallbackName: String) -> Workout {
+        let exercises = template.exercises
+            .sorted(by: { $0.orderIndex < $1.orderIndex })
+            .map { templateExercise in
+                let libraryItem = templateExercise.exerciseLibraryItem
+                let exerciseName = libraryItem?.name ?? "Exercise"
+                let muscles = libraryItem?.primaryMuscles ?? []
+                let restSeconds = max(30, templateExercise.restSeconds ?? 90)
+                let restMinutes = max(1, Int(round(Double(restSeconds) / 60.0)))
+
+                return Exercise(
+                    type: ExerciseType(name: exerciseName, muscleGroup: muscles),
+                    exerciseServerId: libraryItem?.serverId,
+                    example: libraryItem?.videoUrl?.absoluteString ?? "",
+                    lastSetIntensityTechnique: templateExercise.notes ?? "Failure",
+                    warmUpSets: templateExercise.warmupSets ?? 0,
+                    workingSets: max(1, templateExercise.workingSets),
+                    reps: parseRepsRange(from: templateExercise.targetReps),
+                    rest: restMinutes...restMinutes
+                )
+            }
+
+        let workoutName = template.name.isEmpty ? fallbackName : template.name
+        return Workout(name: workoutName, exercises: exercises)
     }
 
     // MARK: - Recent Workouts

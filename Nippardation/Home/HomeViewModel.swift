@@ -14,6 +14,7 @@ final class HomeViewModel: ObservableObject {
     @Published var activeProgram: Program?
     @Published var nextWorkout: ProgramWorkout?
     @Published var nextTemplate: Template?
+    @Published var previewDayIndex: Int = 0
 
     // Stats
     @Published var workoutsThisWeek: Int = 0
@@ -47,23 +48,22 @@ final class HomeViewModel: ObservableObject {
 
                 do {
                     let program = try await self.programRepository.getActiveProgram()
+                    let resolvedIndex = program?.currentDayIndex ?? 0
+                    let resolvedWorkout = program.flatMap { self.workoutAt(resolvedIndex, in: $0) }
                     await MainActor.run {
                         self.activeProgram = program
-                        self.nextWorkout = program?.currentWorkout
-
-                        if let workout = program?.currentWorkout {
-                            self.nextTemplate = workout.template
-                        } else {
-                            self.nextTemplate = nil
-                        }
+                        self.previewDayIndex = resolvedIndex
+                        self.nextWorkout = resolvedWorkout
+                        self.nextTemplate = resolvedWorkout?.template
                     }
 
                     // Load template if not attached to workout
-                    if let workout = program?.currentWorkout,
-                       workout.template == nil {
+                    if let workout = resolvedWorkout, workout.template == nil {
                         let templates = try await self.templateRepository.fetchTemplates()
                         await MainActor.run {
-                            self.nextTemplate = templates.first { $0.serverId == workout.templateServerId }
+                            if self.nextWorkout?.id == workout.id {
+                                self.nextTemplate = templates.first { $0.serverId == workout.templateServerId }
+                            }
                         }
                     }
                 } catch {
@@ -74,6 +74,84 @@ final class HomeViewModel: ObservableObject {
 
                 await MainActor.run { self.isLoading = false }
             }
+        }
+    }
+
+    // MARK: - Preview Rotation
+
+    nonisolated private func sortedWorkouts(_ program: Program) -> [ProgramWorkout] {
+        program.workouts.sorted { $0.dayNumber < $1.dayNumber }
+    }
+
+    nonisolated private func workoutAt(_ index: Int, in program: Program) -> ProgramWorkout? {
+        let list = sortedWorkouts(program)
+        guard !list.isEmpty else { return nil }
+        let count = list.count
+        let wrapped = ((index % count) + count) % count
+        return list[wrapped]
+    }
+
+    func rotatePreviewForward() {
+        guard let program = activeProgram, program.workouts.count > 1 else { return }
+        let count = program.workouts.count
+        previewDayIndex = ((previewDayIndex + 1) % count + count) % count
+        refreshPreviewedWorkout(program: program)
+    }
+
+    func rotatePreviewBackward() {
+        guard let program = activeProgram, program.workouts.count > 1 else { return }
+        let count = program.workouts.count
+        previewDayIndex = ((previewDayIndex - 1) % count + count) % count
+        refreshPreviewedWorkout(program: program)
+    }
+
+    private func refreshPreviewedWorkout(program: Program) {
+        let workout = workoutAt(previewDayIndex, in: program)
+        nextWorkout = workout
+        nextTemplate = workout?.template
+
+        if let workout, workout.template == nil {
+            let currentId = workout.id
+            Task { @MainActor in
+                guard let templates = try? await self.templateRepository.fetchTemplates() else { return }
+                if self.nextWorkout?.id == currentId {
+                    self.nextTemplate = templates.first { $0.serverId == workout.templateServerId }
+                }
+            }
+        }
+    }
+
+    /// Syncs the server's currentDayIndex forward to match previewDayIndex via repeated advance calls.
+    /// No-op when already in sync. On failure, surfaces an error and stops.
+    func commitPreviewBeforeStart() async {
+        guard let program = activeProgram, !program.workouts.isEmpty else { return }
+        let count = program.workouts.count
+        var steps = ((previewDayIndex - program.currentDayIndex) % count + count) % count
+        guard steps > 0 else { return }
+        var latest = program
+        while steps > 0 {
+            do {
+                latest = try await programRepository.advanceToNextWorkout(serverId: latest.serverId)
+                steps -= 1
+            } catch {
+                self.error = "Couldn't update program: \(error.localizedDescription)"
+                return
+            }
+        }
+        self.activeProgram = latest
+        self.previewDayIndex = latest.currentDayIndex
+    }
+
+    /// Advances the program one step (call after a workout finishes from this card).
+    func advanceAfterCompletion() async {
+        guard let program = activeProgram else { return }
+        do {
+            let updated = try await programRepository.advanceToNextWorkout(serverId: program.serverId)
+            self.activeProgram = updated
+            self.previewDayIndex = updated.currentDayIndex
+            refreshPreviewedWorkout(program: updated)
+        } catch {
+            // Non-fatal: next dashboard load will reconcile
         }
     }
 

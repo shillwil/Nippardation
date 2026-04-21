@@ -12,6 +12,18 @@ struct HeroWorkoutCard: View {
     let template: Template?
     let programProgress: Double
     let onStart: () -> Void
+    var onRotateBackward: (() -> Void)? = nil
+    var onRotateForward: (() -> Void)? = nil
+
+    @State private var slideEdge: Edge = .trailing
+
+    private var swapTransition: AnyTransition {
+        let opposite: Edge = slideEdge == .leading ? .trailing : .leading
+        return .asymmetric(
+            insertion: .move(edge: slideEdge).combined(with: .opacity),
+            removal: .move(edge: opposite).combined(with: .opacity)
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
@@ -30,8 +42,38 @@ struct HeroWorkoutCard: View {
                             .foregroundColor(.secondary)
                     }
                 }
+                .id("hero-title-\(workout?.id.uuidString ?? "none")")
+                .transition(swapTransition)
 
                 Spacer()
+
+                if let onRotateBackward, let onRotateForward {
+                    HStack(spacing: AppSpacing.xs) {
+                        Button {
+                            slideEdge = .leading
+                            onRotateBackward()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Previous workout")
+
+                        Button {
+                            slideEdge = .trailing
+                            onRotateForward()
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Next workout")
+                    }
+                }
 
                 CircularProgressView(
                     progress: programProgress,
@@ -49,6 +91,8 @@ struct HeroWorkoutCard: View {
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .id("hero-pills-\(workout?.id.uuidString ?? "none")")
+                .transition(swapTransition)
             }
 
             // Start button
@@ -62,6 +106,8 @@ struct HeroWorkoutCard: View {
         }
         .padding(AppSpacing.md)
         .gradientCardStyle()
+        .clipped()
+        .animation(.easeInOut(duration: 0.28), value: workout?.id)
     }
 
     private func muscleGroupSummary(for template: Template) -> String {
