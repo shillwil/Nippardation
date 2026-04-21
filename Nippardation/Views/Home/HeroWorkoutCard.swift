@@ -16,6 +16,8 @@ struct HeroWorkoutCard: View {
     var onRotateForward: (() -> Void)? = nil
 
     @State private var slideEdge: Edge = .trailing
+    @State private var cardScaleX: CGFloat = 1.0
+    @State private var scaleAnchor: UnitPoint = .center
 
     private var swapTransition: AnyTransition {
         let opposite: Edge = slideEdge == .leading ? .trailing : .leading
@@ -23,6 +25,18 @@ struct HeroWorkoutCard: View {
             insertion: .move(edge: slideEdge).combined(with: .opacity),
             removal: .move(edge: opposite).combined(with: .opacity)
         )
+    }
+
+    private func bounceCard(towards edge: Edge) {
+        scaleAnchor = (edge == .trailing) ? .trailing : .leading
+        withAnimation(.spring(response: 0.18, dampingFraction: 0.55)) {
+            cardScaleX = 1.04
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.55)) {
+                cardScaleX = 1.0
+            }
+        }
     }
 
     var body: some View {
@@ -51,6 +65,7 @@ struct HeroWorkoutCard: View {
                     HStack(spacing: AppSpacing.xs) {
                         Button {
                             slideEdge = .leading
+                            bounceCard(towards: .leading)
                             onRotateBackward()
                         } label: {
                             Image(systemName: "chevron.left")
@@ -63,6 +78,7 @@ struct HeroWorkoutCard: View {
 
                         Button {
                             slideEdge = .trailing
+                            bounceCard(towards: .trailing)
                             onRotateForward()
                         } label: {
                             Image(systemName: "chevron.right")
@@ -107,6 +123,7 @@ struct HeroWorkoutCard: View {
         .padding(AppSpacing.md)
         .gradientCardStyle()
         .clipped()
+        .scaleEffect(x: cardScaleX, y: 1.0, anchor: scaleAnchor)
         .animation(.easeInOut(duration: 0.28), value: workout?.id)
     }
 
