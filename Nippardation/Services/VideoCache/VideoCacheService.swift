@@ -41,6 +41,9 @@ final class VideoCacheService: VideoCacheServiceProtocol {
         let localPath: String
         let fileSize: Int64
         var lastAccessedAt: Date
+        // Optional so entries written by previous app versions still decode.
+        // Treated as a mismatch when validating against a fresh remote URL.
+        var remoteURLString: String?
     }
 
     // MARK: - Protocol Properties
@@ -99,8 +102,17 @@ final class VideoCacheService: VideoCacheServiceProtocol {
 
     // MARK: - Cache Operations
 
-    func getCachedVideoURL(for exerciseServerId: String) -> URL? {
+    func getCachedVideoURL(for exerciseServerId: String, matching remoteURL: URL? = nil) -> URL? {
         guard let entry = cacheIndex[exerciseServerId] else {
+            return nil
+        }
+
+        // If caller provided the expected source URL, only return the cached file
+        // when it matches. Prevents serving a file downloaded from a now-dead URL
+        // (e.g., after an R2 re-upload changed the filename).
+        if let remoteURL,
+           entry.remoteURLString != remoteURL.absoluteString {
+            evictEntry(for: exerciseServerId)
             return nil
         }
 
@@ -123,8 +135,9 @@ final class VideoCacheService: VideoCacheServiceProtocol {
     }
 
     func cacheVideo(for exerciseServerId: String, from remoteURL: URL) async throws -> URL {
-        // Check if already cached
-        if let localURL = getCachedVideoURL(for: exerciseServerId) {
+        // Check if already cached for this specific remote URL. A mismatch
+        // evicts the stale entry inside getCachedVideoURL(for:matching:).
+        if let localURL = getCachedVideoURL(for: exerciseServerId, matching: remoteURL) {
             await touchVideo(for: exerciseServerId)
             return localURL
         }
@@ -145,7 +158,8 @@ final class VideoCacheService: VideoCacheServiceProtocol {
                 exerciseServerId: exerciseServerId,
                 localPath: resultURL.path,
                 fileSize: fileSize,
-                lastAccessedAt: Date()
+                lastAccessedAt: Date(),
+                remoteURLString: remoteURL.absoluteString
             )
             saveCacheIndex()
 
@@ -207,10 +221,12 @@ final class VideoCacheService: VideoCacheServiceProtocol {
                     // Check for cancellation
                     if Task.isCancelled { break }
 
-                    // Get exercise details - use exerciseServerId as cache key
+                    // Get exercise details - use exerciseServerId as cache key.
+                    // Gate on getCachedVideoURL(for:matching:) rather than isVideoCached(for:)
+                    // so a cached file from a stale URL is evicted and redownloaded.
                     if let exerciseItem = templateExercise.exerciseLibraryItem,
                        let videoUrl = exerciseItem.videoUrl,
-                       !isVideoCached(for: templateExercise.exerciseServerId) {
+                       getCachedVideoURL(for: templateExercise.exerciseServerId, matching: videoUrl) == nil {
                         _ = try? await cacheVideo(for: templateExercise.exerciseServerId, from: videoUrl)
                     }
                 }
@@ -247,9 +263,10 @@ final class VideoCacheService: VideoCacheServiceProtocol {
                     for templateExercise in template.exercises {
                         if Task.isCancelled { break }
 
+                        // Same URL-aware gating as prefetchVideos(for:) above.
                         if let exerciseItem = templateExercise.exerciseLibraryItem,
                            let videoUrl = exerciseItem.videoUrl,
-                           !isVideoCached(for: templateExercise.exerciseServerId) {
+                           getCachedVideoURL(for: templateExercise.exerciseServerId, matching: videoUrl) == nil {
                             _ = try? await cacheVideo(for: templateExercise.exerciseServerId, from: videoUrl)
                         }
                     }
@@ -298,6 +315,13 @@ final class VideoCacheService: VideoCacheServiceProtocol {
     }
 
     // MARK: - Private Helpers
+
+    private func evictEntry(for exerciseServerId: String) {
+        guard let entry = cacheIndex.removeValue(forKey: exerciseServerId) else { return }
+        let url = URL(fileURLWithPath: entry.localPath)
+        try? fileManager.removeItem(at: url)
+        saveCacheIndex()
+    }
 
     private func localURLFor(exerciseServerId: String) -> URL {
         // Sanitize the serverId for use as a filename

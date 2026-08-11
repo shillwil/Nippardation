@@ -48,8 +48,14 @@ final class MockVideoCacheService: VideoCacheServiceProtocol {
 
     // MARK: - VideoCacheServiceProtocol
 
-    func getCachedVideoURL(for exerciseServerId: String) -> URL? {
-        cachedVideos[exerciseServerId]?.localURL
+    func getCachedVideoURL(for exerciseServerId: String, matching remoteURL: URL? = nil) -> URL? {
+        guard let cached = cachedVideos[exerciseServerId] else { return nil }
+        if let remoteURL, cached.remoteURL != remoteURL {
+            cachedVideos.removeValue(forKey: exerciseServerId)
+            totalCacheSize -= cached.size
+            return nil
+        }
+        return cached.localURL
     }
 
     func isVideoCached(for exerciseServerId: String) -> Bool {

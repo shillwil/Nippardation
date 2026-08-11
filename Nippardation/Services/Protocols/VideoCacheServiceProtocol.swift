@@ -25,10 +25,14 @@ protocol VideoCacheServiceProtocol {
 
     // MARK: - Cache Operations
 
-    /// Gets the local URL for a cached video
-    /// - Parameter exerciseServerId: The server ID of the exercise
-    /// - Returns: Local file URL if cached, nil otherwise
-    func getCachedVideoURL(for exerciseServerId: String) -> URL?
+    /// Gets the local URL for a cached video.
+    /// - Parameters:
+    ///   - exerciseServerId: The server ID of the exercise
+    ///   - remoteURL: If non-nil, the cached entry is only returned when its recorded
+    ///     source URL matches. Stale entries (from before an R2 re-upload, for example)
+    ///     are evicted on mismatch so the caller will redownload.
+    /// - Returns: Local file URL if cached and URL matches (or no URL provided), nil otherwise.
+    func getCachedVideoURL(for exerciseServerId: String, matching remoteURL: URL?) -> URL?
 
     /// Checks if a video is cached
     /// - Parameter exerciseServerId: The server ID of the exercise

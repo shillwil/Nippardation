@@ -84,8 +84,13 @@ final class VideoPlayerViewModel: ObservableObject {
         duration = 0
         detectedAspectRatio = 16/9
 
-        // Check if already cached
-        if let localURL = videoCacheService.getCachedVideoURL(for: exerciseServerId) {
+        // Check if already cached. Pass the expected remote URL so a stale cache
+        // entry (e.g., downloaded before an R2 re-upload changed filenames) is
+        // evicted rather than played back from a dead reference.
+        if let localURL = videoCacheService.getCachedVideoURL(
+            for: exerciseServerId,
+            matching: videoUrl
+        ) {
             setupPlayerItem(with: localURL)
             await detectVideoOrientation(from: localURL)
             isLoading = false
@@ -270,10 +275,15 @@ final class VideoPlayerViewModel: ObservableObject {
         // Observe status for errors
         item.publisher(for: \.status)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] status in
-                if status == .failed {
-                    self?.error = "Failed to play video"
+            .sink { [weak self, weak item] status in
+                guard status == .failed else { return }
+                let underlying = item?.error
+                let detail = underlying?.localizedDescription ?? "unknown error"
+                print("[VideoPlayer] Playback failed for \(url.absoluteString) — \(detail)")
+                if let nsError = underlying as NSError? {
+                    print("[VideoPlayer]   domain=\(nsError.domain) code=\(nsError.code) userInfo=\(nsError.userInfo)")
                 }
+                self?.error = "Failed to play video: \(detail)"
             }
             .store(in: &playerItemCancellables)
 

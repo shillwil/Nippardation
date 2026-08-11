@@ -42,7 +42,7 @@ struct MovementInfoView: View {
 
     @ViewBuilder
     private var videoSection: some View {
-        if let videoUrl = nativeVideoUrl {
+        if let videoUrl = nativeVideoUrl, let serverId = exerciseServerId {
             // Native video player from backend URL
             VStack(alignment: .leading, spacing: 8) {
                 Text("Example")
@@ -50,7 +50,7 @@ struct MovementInfoView: View {
                     .padding(.horizontal)
 
                 NativeVideoPlayer(
-                    exerciseServerId: exerciseServerId ?? exercise.type.name,
+                    exerciseServerId: serverId,
                     videoUrl: videoUrl,
                     showControls: true
                 )

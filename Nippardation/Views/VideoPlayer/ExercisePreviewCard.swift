@@ -45,6 +45,11 @@ struct ExercisePreviewCard: View {
                     ProgressView()
                         .tint(.white)
                 }
+
+                // Error state
+                if viewModel.error != nil && hasVideo && !viewModel.isLoading {
+                    errorOverlay
+                }
             }
             .frame(width: cardWidth, height: cardWidth)
             .clipped()
@@ -95,6 +100,31 @@ struct ExercisePreviewCard: View {
     }
 
     // MARK: - Subviews
+
+    private var errorOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.5)
+
+            VStack(spacing: AppSpacing.xxs) {
+                Image(systemName: "video.slash")
+                    .font(.title3)
+                    .foregroundColor(.white)
+
+                Text("Tap to retry")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.8))
+            }
+        }
+        .onTapGesture {
+            guard let item = libraryItem else { return }
+            Task {
+                await viewModel.loadVideo(
+                    exerciseServerId: item.serverId,
+                    videoUrl: item.videoUrl
+                )
+            }
+        }
+    }
 
     private var placeholder: some View {
         Rectangle()

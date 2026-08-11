@@ -98,26 +98,36 @@ class ActiveExerciseViewModel: ObservableObject {
     private func lookupExerciseVideo() {
         guard isValidExercise else { return }
 
-        // If matched exercise has a serverId from the template, use it directly
+        // If matched exercise has a serverId from the template, resolve the current
+        // video URL through the repository so renamed videos don't replay stale snapshots
         if let serverId = matchingExercise?.exerciseServerId, !serverId.isEmpty {
             exerciseServerId = serverId
-            if let urlString = matchingExercise?.example, !urlString.isEmpty, let url = URL(string: urlString) {
-                nativeVideoUrl = url
+
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    let exercise = try await self.exerciseRepository.fetchExercise(serverId: serverId, forceRefresh: true)
+                    self.nativeVideoUrl = exercise.videoUrl
+                } catch {
+                    // Last resort: fall back to the URL snapshotted at workout start
+                    if let urlString = self.matchingExercise?.example,
+                       !urlString.isEmpty,
+                       let url = URL(string: urlString) {
+                        self.nativeVideoUrl = url
+                    }
+                }
             }
             return
         }
 
         // Fallback: name-based search (for hardcoded templates / legacy cached workouts)
         let exerciseName = workout.trackedExercises[exerciseIndex].exerciseName
-        exerciseServerId = matchingExercise?.type.name
 
         Task { [weak self] in
             guard let self else { return }
             do {
                 let results = try await self.exerciseRepository.searchExercises(query: exerciseName, limit: 5)
-                let match = results.first(where: { $0.name.lowercased() == exerciseName.lowercased() })
-                    ?? results.first
-                if let match {
+                if let match = results.first(where: { $0.name.lowercased() == exerciseName.lowercased() }) {
                     self.nativeVideoUrl = match.videoUrl
                     self.exerciseServerId = match.serverId
                 }

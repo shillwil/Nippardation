@@ -21,6 +21,9 @@ final class TemplateRepository: TemplateRepositoryProtocol {
 
     // MARK: - Configuration
 
+    /// How long cached exercises are considered fresh (in seconds)
+    private let cacheExpirationSeconds: TimeInterval = 3600 // 1 hour
+
     private let defaultPageSize = 20
 
     // MARK: - Initialization
@@ -63,6 +66,15 @@ final class TemplateRepository: TemplateRepositoryProtocol {
 
                 cursor = pagination.nextCursor
                 hasMore = pagination.hasMore
+            }
+
+            // Refresh the exercise cache with any library items included in the
+            // response so cached fields like videoUrl don't go stale
+            let libraryItems = allTemplates.flatMap { template in
+                template.exercises.compactMap { $0.exerciseLibraryItem }
+            }
+            if !libraryItems.isEmpty {
+                try? await coreDataManager.cacheExercises(libraryItems)
             }
 
             // List endpoints may omit exercises. Merge cached exercise data so
@@ -108,8 +120,8 @@ final class TemplateRepository: TemplateRepositoryProtocol {
             let hasExercises = !cached.exercises.isEmpty
             let allResolved = cached.exercises.allSatisfy { $0.exerciseLibraryItem != nil }
 
-            // Cache is fully resolved - use it
-            if hasExercises && allResolved {
+            // Cache is fully resolved and fresh - use it
+            if hasExercises && allResolved && areCachedExercisesFresh(cached.exercises) {
                 return cached
             }
 
@@ -117,12 +129,13 @@ final class TemplateRepository: TemplateRepositoryProtocol {
             if hasExercises && !allResolved {
                 var resolved = cached
                 resolved.exercises = resolveExerciseLibraryItems(resolved.exercises)
-                if resolved.exercises.allSatisfy({ $0.exerciseLibraryItem != nil }) {
+                if resolved.exercises.allSatisfy({ $0.exerciseLibraryItem != nil }),
+                   areCachedExercisesFresh(resolved.exercises) {
                     return resolved
                 }
             }
 
-            // No exercises or still unresolved - fall through to API fetch
+            // No exercises, unresolved, or stale - fall through to API fetch
         }
 
         do {
@@ -324,6 +337,17 @@ final class TemplateRepository: TemplateRepositoryProtocol {
     }
 
     // MARK: - Exercise Library Item Resolution
+
+    /// Check if every resolved exercise library item is still fresh.
+    /// Items missing a lastFetchedAt timestamp are treated as stale so they re-fetch.
+    private func areCachedExercisesFresh(_ exercises: [TemplateExercise]) -> Bool {
+        exercises.allSatisfy { exercise in
+            guard let lastFetched = exercise.exerciseLibraryItem?.lastFetchedAt else {
+                return false
+            }
+            return Date().timeIntervalSince(lastFetched) < cacheExpirationSeconds
+        }
+    }
 
     /// Resolves missing exerciseLibraryItem on template exercises from the local exercise cache.
     private func resolveExerciseLibraryItems(_ exercises: [TemplateExercise]) -> [TemplateExercise] {

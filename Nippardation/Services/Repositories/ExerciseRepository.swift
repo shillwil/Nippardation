@@ -125,7 +125,8 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
 
     func fetchExercise(serverId: String, forceRefresh: Bool) async throws -> ExerciseLibraryItem {
         // Check cache first if not forcing refresh
-        if !forceRefresh, let cached = getCachedExercise(serverId: serverId) {
+        if !forceRefresh, let cached = getCachedExercise(serverId: serverId),
+           isExerciseFresh(cached) {
             return cached
         }
 
@@ -270,6 +271,15 @@ final class ExerciseRepository: ExerciseRepositoryProtocol {
             return false
         }
 
+        return Date().timeIntervalSince(lastFetched) < cacheExpirationSeconds
+    }
+
+    /// Check if a single cached exercise is still fresh
+    /// Records missing a lastFetchedAt timestamp are treated as stale so they re-fetch
+    private func isExerciseFresh(_ exercise: ExerciseLibraryItem) -> Bool {
+        guard let lastFetched = exercise.lastFetchedAt else {
+            return false
+        }
         return Date().timeIntervalSince(lastFetched) < cacheExpirationSeconds
     }
 
