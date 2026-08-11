@@ -67,4 +67,10 @@ struct AppConfiguration {
     var shareURLScheme: String {
         "nippardation"
     }
+
+    // When false, the AI program wizard hides the equipment selector and sends
+    // every equipment type to the backend so Gemini has no equipment constraint.
+    var sendEquipmentToAI: Bool {
+        false
+    }
 }

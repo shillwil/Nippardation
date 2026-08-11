@@ -10,10 +10,19 @@ import SwiftUI
 struct AIWizardStep3EquipmentView: View {
     @ObservedObject var viewModel: AIWizardViewModel
 
+    private var showEquipment: Bool {
+        AppConfiguration.shared.sendEquipmentToAI
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.lg) {
-                AISectionHeader("Your Setup", subtitle: "Select your experience level and available equipment")
+                AISectionHeader(
+                    "Your Setup",
+                    subtitle: showEquipment
+                        ? "Select your experience level and available equipment"
+                        : "Select your experience level"
+                )
 
                 // Experience level
                 VStack(alignment: .leading, spacing: AppSpacing.sm) {
@@ -28,28 +37,30 @@ struct AIWizardStep3EquipmentView: View {
                     .pickerStyle(.segmented)
                 }
 
-                Divider()
-                    .padding(.vertical, AppSpacing.xs)
+                if showEquipment {
+                    Divider()
+                        .padding(.vertical, AppSpacing.xs)
 
-                // Equipment selection
-                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                    HStack {
-                        Text("Available Equipment")
-                            .font(.headline)
-                        Spacer()
-                        Text("\(viewModel.selectedEquipment.count) selected")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    // Equipment selection
+                    VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                        HStack {
+                            Text("Available Equipment")
+                                .font(.headline)
+                            Spacer()
+                            Text("\(viewModel.selectedEquipment.count) selected")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
 
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: AppSpacing.sm) {
-                        ForEach(AIEquipment.allCases) { equipment in
-                            equipmentCard(equipment)
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible()),
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: AppSpacing.sm) {
+                            ForEach(AIEquipment.allCases) { equipment in
+                                equipmentCard(equipment)
+                            }
                         }
                     }
                 }

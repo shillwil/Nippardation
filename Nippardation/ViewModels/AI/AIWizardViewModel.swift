@@ -24,7 +24,7 @@ final class AIWizardViewModel: ObservableObject {
 
     // MARK: - Step 3: Equipment & Experience
 
-    @Published var selectedEquipment: Set<AIEquipment> = [.barbell, .dumbbell, .cable]
+    @Published var selectedEquipment: Set<AIEquipment> = Set(AIEquipment.allCases)
     @Published var experienceLevel: AIExperienceLevel = .intermediate
 
     // MARK: - Step 4: Preferences
@@ -87,7 +87,8 @@ final class AIWizardViewModel: ObservableObject {
     }
 
     var isStep3Valid: Bool {
-        !selectedEquipment.isEmpty
+        guard AppConfiguration.shared.sendEquipmentToAI else { return true }
+        return !selectedEquipment.isEmpty
     }
 
     var isStep4Valid: Bool {
