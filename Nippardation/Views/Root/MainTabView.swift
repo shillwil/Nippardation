@@ -2,7 +2,8 @@
 //  MainTabView.swift
 //  Nippardation
 //
-//  Root view wrapping the authenticated experience in a 5-tab TabView
+//  Root of the authenticated experience: Today · Plan · Progress behind the floating Void tab bar.
+//  Also lands incoming share links in the Plan received sheet.
 //
 
 import SwiftUI
@@ -10,78 +11,72 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject private var authManager: AuthManager
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
-    @AppStorage("hasCompletedFirstLaunch") private var hasCompletedFirstLaunch = false
-    @State private var selectedTab: AppTab = .home
-    @State private var showSharePreview = false
+    @StateObject private var navigation = AppNavigation()
+    @ObservedObject private var receivedPlans = ReceivedPlansStore.shared
+    @State private var receivedToken: ShareTokenItem?
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $navigation.selectedTab) {
             NavigationStack {
-                HomeView(selectedTab: $selectedTab)
+                TodayView()
             }
-            .tag(AppTab.home)
-            .tabItem {
-                Label(AppTab.home.label, systemImage: AppTab.home.icon)
-            }
+            .voidTabBarClearance()
+            .toolbar(.hidden, for: .tabBar)
+            .tag(AppTab.today)
 
             NavigationStack {
-                ProgramListView()
+                PlanView()
             }
-            .tag(AppTab.programs)
-            .tabItem {
-                Label(AppTab.programs.label, systemImage: AppTab.programs.icon)
-            }
+            .voidTabBarClearance()
+            .toolbar(.hidden, for: .tabBar)
+            .tag(AppTab.plan)
 
             NavigationStack {
-                TemplateListView()
+                ProgressTabView()
             }
-            .tag(AppTab.templates)
-            .tabItem {
-                Label(AppTab.templates.label, systemImage: AppTab.templates.icon)
-            }
-
-            NavigationStack {
-                HistoryPlaceholderView()
-            }
-            .tag(AppTab.history)
-            .tabItem {
-                Label(AppTab.history.label, systemImage: AppTab.history.icon)
-            }
-
-            NavigationStack {
-                ProfilePlaceholderView()
-            }
-            .tag(AppTab.profile)
-            .tabItem {
-                Label(AppTab.profile.label, systemImage: AppTab.profile.icon)
-            }
+            .voidTabBarClearance()
+            .toolbar(.hidden, for: .tabBar)
+            .tag(AppTab.progress)
         }
-        .tint(Color.appTheme)
-        .onAppear {
-            if !hasCompletedFirstLaunch {
-                selectedTab = .programs
-                hasCompletedFirstLaunch = true
-            }
-        }
+        .voidTabBar(selection: $navigation.selectedTab, showsPlanDot: receivedPlans.hasUnread)
+        .background(VoidColor.hull.ignoresSafeArea())
+        .tint(VoidColor.plasma)
+        .preferredColorScheme(nil)
+        .environmentObject(navigation)
         .environmentBanner()
-        .onChange(of: deepLinkRouter.pendingShareToken) { _, token in
-            if token != nil {
-                showSharePreview = true
-            }
+        .onAppear {
+            consumePendingToken()
         }
-        .sheet(isPresented: $showSharePreview) {
-            deepLinkRouter.clearPendingToken()
-        } content: {
-            if let token = deepLinkRouter.pendingShareToken {
-                SharePreviewView(token: token) {
-                    showSharePreview = false
+        .onChange(of: deepLinkRouter.pendingShareToken) { _, _ in
+            consumePendingToken()
+        }
+        .sheet(item: $receivedToken) { item in
+            PlanReceivedSheet(token: item.id) {
+                receivedToken = nil
+            }
+            .environmentObject(navigation)
+            .onDisappear {
+                if deepLinkRouter.pendingShareToken == item.id {
+                    deepLinkRouter.clearPendingToken()
                 }
             }
         }
     }
+
+    private func consumePendingToken() {
+        guard let token = deepLinkRouter.pendingShareToken else { return }
+        receivedToken = ShareTokenItem(id: token)
+    }
+}
+
+/// Identifiable wrapper so a share token can drive `.sheet(item:)`.
+struct ShareTokenItem: Identifiable, Equatable {
+    let id: String
 }
 
 #Preview {
     MainTabView()
         .environmentObject(AuthManager.shared)
+        .environmentObject(DeepLinkRouter.shared)
+        .withDependencies(.preview)
 }

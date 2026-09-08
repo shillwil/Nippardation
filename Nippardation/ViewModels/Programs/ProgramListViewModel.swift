@@ -28,6 +28,10 @@ final class ProgramListViewModel: ObservableObject {
     @Published var showSimpleDeleteAlert = false
     var programToDelete: Program?
 
+    /// Called on the main actor after a program was activated, duplicated or deleted
+    /// so the rest of the app (Today / Plan) can refresh.
+    var onMutation: (() -> Void)?
+
     // MARK: - Dependencies
 
     private let programRepository: any ProgramRepositoryProtocol
@@ -183,10 +187,11 @@ final class ProgramListViewModel: ObservableObject {
 
                     await MainActor.run {
                         self.programs.removeAll { $0.serverId == program.serverId }
+                        self.onMutation?()
                     }
                 } catch {
                     await MainActor.run {
-                        self.error = "Failed to delete program: \(error.localizedDescription)"
+                        self.error = "Couldn't delete the plan: \(error.localizedDescription)"
                     }
                 }
             }
@@ -221,11 +226,12 @@ final class ProgramListViewModel: ObservableObject {
                         self.programToDelete = nil
                         self.programToDeleteDetail = nil
                         self.showTemplateDeleteSheet = false
+                        self.onMutation?()
                     }
                 } catch {
                     await MainActor.run {
                         self.isDeletingProgram = false
-                        self.error = "Failed to delete program: \(error.localizedDescription)"
+                        self.error = "Couldn't delete the plan: \(error.localizedDescription)"
                     }
                 }
             }
@@ -260,10 +266,11 @@ final class ProgramListViewModel: ObservableObject {
                             }
                             return p
                         }
+                        self.onMutation?()
                     }
                 } catch {
                     await MainActor.run {
-                        self.error = "Failed to activate program: \(error.localizedDescription)"
+                        self.error = "Couldn't activate the plan: \(error.localizedDescription)"
                     }
                 }
             }
@@ -282,10 +289,11 @@ final class ProgramListViewModel: ObservableObject {
 
                     await MainActor.run {
                         self.programs.insert(duplicate, at: 0)
+                        self.onMutation?()
                     }
                 } catch {
                     await MainActor.run {
-                        self.error = "Failed to duplicate program: \(error.localizedDescription)"
+                        self.error = "Couldn't duplicate the plan: \(error.localizedDescription)"
                     }
                 }
             }

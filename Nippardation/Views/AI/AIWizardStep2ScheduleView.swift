@@ -2,7 +2,7 @@
 //  AIWizardStep2ScheduleView.swift
 //  Nippardation
 //
-//  Step 2: Training schedule (days per week and session duration)
+//  Step 2: days per week and session length.
 //
 
 import SwiftUI
@@ -14,108 +14,74 @@ struct AIWizardStep2ScheduleView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.lg) {
-                AISectionHeader("Your Schedule", subtitle: "How often and how long can you train?")
+            VStack(alignment: .leading, spacing: VoidSpace.s6) {
+                AISectionHeader("Your schedule", subtitle: "How often and how long you can train.")
+                    .padding(.horizontal, VoidSpace.s1)
 
                 // Days per week
-                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                    Text("Days Per Week")
-                        .font(.headline)
+                VStack(alignment: .leading, spacing: VoidSpace.s2) {
+                    WizardSectionLabel(title: "Days per week")
 
-                    HStack(spacing: AppSpacing.xs) {
+                    HStack(spacing: VoidSpace.s2) {
                         ForEach(1...7, id: \.self) { day in
-                            dayCircle(day)
+                            WizardSquareTile(
+                                label: "\(day)",
+                                isSelected: viewModel.daysPerWeek == day,
+                                style: .number,
+                                accessibilityLabel: "\(day) day\(day == 1 ? "" : "s") per week"
+                            ) {
+                                viewModel.daysPerWeek = day
+                            }
                         }
                     }
 
-                    Text("\(viewModel.daysPerWeek) training day\(viewModel.daysPerWeek == 1 ? "" : "s") per week")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    WizardHelperText(text: "\(viewModel.daysPerWeek) training day\(viewModel.daysPerWeek == 1 ? "" : "s") per week")
                 }
 
-                Divider()
-                    .padding(.vertical, AppSpacing.xs)
-
-                // Session duration
-                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                    Text("Session Duration")
-                        .font(.headline)
+                // Session length
+                VStack(alignment: .leading, spacing: VoidSpace.s2) {
+                    WizardSectionLabel(title: "Session length")
 
                     LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: AppSpacing.sm) {
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ], spacing: 10) {
                         ForEach(durations, id: \.self) { minutes in
                             durationCard(minutes)
                         }
                     }
                 }
             }
-            .padding(AppSpacing.md)
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s2)
         }
     }
 
     // MARK: - Subviews
 
-    private func dayCircle(_ day: Int) -> some View {
-        Button {
-            withAnimation(.spring(duration: 0.2)) {
-                viewModel.daysPerWeek = day
-            }
-        } label: {
-            Text("\(day)")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .frame(width: 44, height: 44)
-                .foregroundColor(viewModel.daysPerWeek == day ? .white : .primary)
-                .background(
-                    viewModel.daysPerWeek == day
-                        ? AnyShapeStyle(AIColors.gradient)
-                        : AnyShapeStyle(Color(.tertiarySystemBackground))
-                )
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
-    }
-
     private func durationCard(_ minutes: Int) -> some View {
-        Button {
-            withAnimation(.spring(duration: 0.2)) {
-                viewModel.sessionDurationMinutes = minutes
-            }
-        } label: {
-            VStack(spacing: AppSpacing.xxs) {
+        WizardOptionCard(isSelected: viewModel.sessionDurationMinutes == minutes, action: {
+            viewModel.sessionDurationMinutes = minutes
+        }) {
+            VStack(spacing: 2) {
                 Text("\(minutes)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                Text("min")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(VoidFont.title)
+                    .monospacedDigit()
+                    .foregroundStyle(VoidColor.text)
+                Text("min").voidEyebrowSm()
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, AppSpacing.sm)
-            .background(
-                viewModel.sessionDurationMinutes == minutes
-                    ? AIColors.subtleGradient
-                    : LinearGradient(colors: [Color(.secondarySystemBackground)], startPoint: .top, endPoint: .bottom)
-            )
-            .cornerRadius(AppCornerRadius.medium)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppCornerRadius.medium)
-                    .stroke(
-                        viewModel.sessionDurationMinutes == minutes ? AIColors.accent.opacity(0.5) : Color.clear,
-                        lineWidth: 2
-                    )
-            )
+            .padding(.vertical, 14)
         }
-        .buttonStyle(.plain)
+        .accessibilityLabel("\(minutes) minutes")
     }
 }
 
 #Preview {
     NavigationStack {
         AIWizardStep2ScheduleView(viewModel: AIWizardViewModel())
+            .voidScreen()
     }
     .withDependencies(.preview)
 }

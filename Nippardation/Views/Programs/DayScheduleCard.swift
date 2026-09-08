@@ -2,115 +2,138 @@
 //  DayScheduleCard.swift
 //  Nippardation
 //
-//  Day card for the weekly schedule builder in the program wizard
+//  One day of the schedule builder: tile, eyebrow, workout name (or a prompt), rest toggle.
 //
 
 import SwiftUI
 
 struct DayScheduleCard: View {
+    /// Day of week, 0 = Monday.
     let dayNumber: Int
+    /// Position in the rotation, 0-based. Shown as DAY 01 when given.
+    var dayIndex: Int? = nil
     let templateName: String?
     let exerciseCount: Int?
     let isRest: Bool
     let onSelectTemplate: () -> Void
     let onToggleRest: () -> Void
 
-    private let dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    private var dayLabel: String {
+        guard dayNumber >= 0 && dayNumber < VoidFormat.weekStripLabels.count else { return "Day" }
+        return VoidFormat.weekStripLabels[dayNumber]
+    }
+
+    private var eyebrow: String {
+        if let dayIndex {
+            return VoidFormat.readout([dayLabel, "DAY \(VoidFormat.pad2(dayIndex + 1))"])
+        }
+        return dayLabel
+    }
+
+    private var tile: some View {
+        Group {
+            if isRest {
+                WorkoutTile(glyph: .rest, ghost: true)
+            } else if let templateName {
+                WorkoutTile(glyph: VoidIcon.workoutGlyph(for: templateName))
+            } else {
+                WorkoutTile(glyph: .plus)
+            }
+        }
+    }
 
     var body: some View {
-        HStack(spacing: AppSpacing.sm) {
-            // Day circle
-            VStack(spacing: AppSpacing.xxs) {
-                Text(dayNumber >= 0 && dayNumber < dayNames.count ? dayNames[dayNumber] : "Day")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+        HStack(spacing: 14) {
+            Button(action: onSelectTemplate) {
+                HStack(spacing: 14) {
+                    tile
 
-                Circle()
-                    .fill(circleColor)
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        Image(systemName: circleIcon)
-                            .font(.caption)
-                            .foregroundColor(.white)
-                    )
-            }
+                    VStack(alignment: .leading, spacing: VoidSpace.s1) {
+                        Text(eyebrow).voidEyebrowSm(isRest ? VoidColor.text3 : VoidColor.text2)
 
-            // Content
-            VStack(alignment: .leading, spacing: AppSpacing.xxs) {
-                if isRest {
-                    Text("Rest Day")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                } else if let name = templateName {
-                    Text(name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-
-                    if let count = exerciseCount {
-                        Text("\(count) exercises")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        if isRest {
+                            Text("Rest day")
+                                .font(VoidFont.bodyStrong)
+                                .foregroundStyle(VoidColor.text2)
+                                .lineLimit(1)
+                        } else if let templateName {
+                            Text(templateName)
+                                .font(VoidFont.bodyStrong)
+                                .foregroundStyle(VoidColor.text)
+                                .lineLimit(1)
+                            if let exerciseCount {
+                                Text(VoidFormat.exercises(exerciseCount)).voidReadout()
+                            }
+                        } else {
+                            Text("Select workout")
+                                .font(VoidFont.bodyStrong)
+                                .foregroundStyle(VoidColor.plasma)
+                                .lineLimit(1)
+                        }
                     }
-                } else {
-                    Button(action: onSelectTemplate) {
-                        Text("Select Template")
-                            .font(.subheadline)
-                            .foregroundColor(.appTheme)
-                    }
+
+                    Spacer(minLength: 0)
                 }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(VoidPlainButtonStyle())
+            .disabled(isRest)
+            .accessibilityLabel(accessibilityText)
+            .accessibilityHint(isRest ? "" : "Choose a workout for this day")
 
-            Spacer()
+            // 32pt control chrome drawn inside a 44pt label: a frame outside a Button only pads layout,
+            // the tappable region is the label, so the hit target has to be the label itself.
+            Button(action: onToggleRest) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous)
+                        .fill(isRest ? VoidColor.panel2 : VoidColor.panel)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous)
+                                .strokeBorder(VoidColor.hairline2, lineWidth: 1)
+                        )
+                        .frame(width: VoidSize.control, height: VoidSize.control)
 
-            // Rest toggle
-            Button {
-                onToggleRest()
-            } label: {
-                Image(systemName: isRest ? "moon.fill" : "moon")
-                    .foregroundColor(isRest ? .purple : .secondary)
+                    Image(systemName: VoidIcon.rest.systemName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(isRest ? VoidColor.text : VoidColor.text2)
+                }
+                .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(VoidPlainButtonStyle())
+            .accessibilityLabel(isRest ? "Make a training day" : "Make a rest day")
         }
-        .padding(AppSpacing.sm)
-        .background(isRest ? Color(.tertiarySystemBackground) : Color(.secondarySystemBackground))
-        .cornerRadius(AppCornerRadius.medium)
-        .onTapGesture {
-            if !isRest && templateName == nil {
-                onSelectTemplate()
-            }
-        }
+        .padding(14)
+        .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2)
     }
 
-    private var circleColor: Color {
-        if isRest { return .gray }
-        if templateName != nil { return .appTheme }
-        return .secondary.opacity(0.5)
-    }
-
-    private var circleIcon: String {
-        if isRest { return "moon.fill" }
-        if templateName != nil { return "checkmark" }
-        return "plus"
+    private var accessibilityText: String {
+        if isRest { return "\(dayLabel), rest day" }
+        if let templateName { return "\(dayLabel), \(templateName)" }
+        return "\(dayLabel), no workout yet"
     }
 }
 
 #Preview {
-    VStack(spacing: AppSpacing.sm) {
-        DayScheduleCard(
-            dayNumber: 0, templateName: "Push Day",
-            exerciseCount: 7, isRest: false,
-            onSelectTemplate: {}, onToggleRest: {}
-        )
-        DayScheduleCard(
-            dayNumber: 1, templateName: nil,
-            exerciseCount: nil, isRest: false,
-            onSelectTemplate: {}, onToggleRest: {}
-        )
-        DayScheduleCard(
-            dayNumber: 2, templateName: nil,
-            exerciseCount: nil, isRest: true,
-            onSelectTemplate: {}, onToggleRest: {}
-        )
+    ZStack {
+        VoidColor.hull.ignoresSafeArea()
+        VStack(spacing: 10) {
+            DayScheduleCard(
+                dayNumber: 0, dayIndex: 0, templateName: "Push Day",
+                exerciseCount: 7, isRest: false,
+                onSelectTemplate: {}, onToggleRest: {}
+            )
+            DayScheduleCard(
+                dayNumber: 2, dayIndex: 1, templateName: nil,
+                exerciseCount: nil, isRest: false,
+                onSelectTemplate: {}, onToggleRest: {}
+            )
+            DayScheduleCard(
+                dayNumber: 4, dayIndex: 2, templateName: nil,
+                exerciseCount: nil, isRest: true,
+                onSelectTemplate: {}, onToggleRest: {}
+            )
+        }
+        .padding(VoidSpace.insetCard)
     }
-    .padding()
 }

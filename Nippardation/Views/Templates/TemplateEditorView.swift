@@ -2,23 +2,18 @@
 //  TemplateEditorView.swift
 //  Nippardation
 //
-//  Form view for creating and editing workout templates
+//  Workout editor — name, split, exercises with sets / reps / rest. Pushed from the
+//  library or a rotation row (Edit workout), or presented in a sheet (New workout).
+//  Workouts that arrive from a list endpoint (exercise count only, no exercises) are
+//  fetched in full before the editor opens so a save can never drop their exercises.
 //
 
 import SwiftUI
 
 struct TemplateEditorView: View {
 
-    @StateObject private var viewModel: TemplateEditorViewModel
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var showExercisePicker = false
-    @State private var editingExercise: ExerciseEditContext?
-    @State private var showShareSheet = false
-    @StateObject private var shareViewModel = ShareViewModel()
-
-    /// Optional callback fired with the newly saved template
-    private var onSave: ((Template) -> Void)?
+    private let existingTemplate: Template?
+    private let onSave: ((Template) -> Void)?
 
     /// Wrapper to make exercise editing state identifiable for sheet presentation
     struct ExerciseEditContext: Identifiable {
@@ -28,62 +23,153 @@ struct TemplateEditorView: View {
     }
 
     init(existingTemplate: Template? = nil, onSave: ((Template) -> Void)? = nil) {
+        self.existingTemplate = existingTemplate
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        if let template = existingTemplate, Self.needsFullRecord(template) {
+            TemplateEditorLoader(template: template, onSave: onSave)
+        } else {
+            TemplateEditorContent(existingTemplate: existingTemplate, onSave: onSave)
+        }
+    }
+
+    /// List endpoints can return a workout with `_knownExerciseCount` set and `exercises == []`.
+    /// Editing that copy and saving would overwrite the server record with only the exercises
+    /// added in the editor, so such a workout is fetched in full first.
+    static func needsFullRecord(_ template: Template) -> Bool {
+        template.exercises.isEmpty && template.exerciseCount > 0
+    }
+}
+
+// MARK: - Full-record loader
+
+/// Fetches the complete workout before handing it to the editor. Shows the library's
+/// loading state, and a retry when the fetch fails or still comes back without exercises.
+private struct TemplateEditorLoader: View {
+    let template: Template
+    let onSave: ((Template) -> Void)?
+
+    @State private var fullTemplate: Template?
+    @State private var loadError: String?
+    @State private var attempt = 0
+
+    private var templateRepository: any TemplateRepositoryProtocol { DependencyContainer.shared.templateRepository }
+
+    var body: some View {
+        if let fullTemplate {
+            TemplateEditorContent(existingTemplate: fullTemplate, onSave: onSave)
+        } else {
+            VStack(spacing: VoidSpace.s4) {
+                if let loadError {
+                    VoidPlaceholder(eyebrow: "Couldn't load workout", caption: loadError)
+                    VoidPillButton(title: "Retry") {
+                        self.loadError = nil
+                        attempt += 1
+                    }
+                } else {
+                    ProgressView()
+                        .tint(VoidColor.text2)
+                    Text("Loading")
+                        .voidEyebrowSm()
+                }
+            }
+            .padding(.horizontal, 60)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle("Edit workout")
+            .navigationBarTitleDisplayMode(.inline)
+            .voidScreen()
+            .task(id: attempt) {
+                await load()
+            }
+        }
+    }
+
+    private func load() async {
+        guard !template.serverId.isEmpty else {
+            loadError = "This workout has not synced yet."
+            return
+        }
+        do {
+            let fetched = try await templateRepository.fetchTemplate(serverId: template.serverId, forceRefresh: false)
+            // The list said this workout has exercises; refuse to open an editor without them.
+            if fetched.exercises.isEmpty {
+                loadError = "The exercises for this workout could not be loaded."
+            } else {
+                fullTemplate = fetched
+            }
+        } catch let error as RepositoryError {
+            loadError = error.errorDescription ?? "The workout could not be loaded."
+        } catch {
+            loadError = "The workout could not be loaded."
+        }
+    }
+}
+
+// MARK: - Editor
+
+private struct TemplateEditorContent: View {
+
+    @StateObject private var viewModel: TemplateEditorViewModel
+    @StateObject private var shareViewModel = ShareViewModel()
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var showExercisePicker = false
+    @State private var editingExercise: TemplateEditorView.ExerciseEditContext?
+    @State private var showShareSheet = false
+    @State private var isReordering = false
+
+    /// Optional callback fired with the newly saved template
+    private var onSave: ((Template) -> Void)?
+
+    init(existingTemplate: Template? = nil, onSave: ((Template) -> Void)? = nil) {
         self._viewModel = StateObject(wrappedValue: TemplateEditorViewModel(existingTemplate: existingTemplate))
         self.onSave = onSave
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: AppSpacing.lg) {
-                // Basic Info
-                basicInfoSection
+            VStack(spacing: VoidSpace.s3) {
+                detailsPanel
 
-                // Summary stats
-                summarySection
+                summaryRow
 
-                // Muscle analysis chart
                 MuscleAnalysisChart(distribution: viewModel.muscleGroupDistribution)
+                    .padding(.horizontal, VoidSpace.insetCard)
 
-                // Exercises
                 exercisesSection
 
-                // Add Exercise Button
-                addExerciseButton
+                VoidCTAButton(title: "Add exercises") {
+                    showExercisePicker = true
+                }
+                .padding(.horizontal, VoidSpace.insetCard)
+                .padding(.top, VoidSpace.s1)
             }
-            .padding(AppSpacing.md)
+            .padding(.top, VoidSpace.s2)
+            .padding(.bottom, VoidSpace.s6)
         }
-        .navigationTitle(viewModel.isEditing ? "Edit Template" : "New Template")
+        .scrollDismissesKeyboard(.interactively)
+        .navigationTitle(viewModel.isEditing ? "Edit workout" : "New workout")
         .navigationBarTitleDisplayMode(.inline)
+        .voidScreen()
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") {
-                    dismiss()
+            if !viewModel.isEditing {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: AppSpacing.sm) {
-                    if viewModel.isEditing {
-                        Button {
-                            if let serverId = viewModel.existingServerId {
-                                shareViewModel.createShare(type: "template", itemId: serverId)
-                            }
-                        } label: {
-                            if shareViewModel.isLoading {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "square.and.arrow.up")
-                            }
-                        }
-                        .disabled(shareViewModel.isLoading)
-                    }
-
-                    Button("Save") {
-                        viewModel.save()
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!viewModel.isValid || viewModel.isSaving)
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                if viewModel.isEditing {
+                    shareButton
                 }
+                Button("Save") {
+                    viewModel.save()
+                }
+                .fontWeight(.semibold)
+                .disabled(!viewModel.isValid || viewModel.isSaving)
             }
         }
         .sheet(isPresented: $showExercisePicker) {
@@ -91,7 +177,9 @@ struct TemplateEditorView: View {
         }
         .sheet(isPresented: $showShareSheet) {
             if let url = shareViewModel.shareURL {
-                ShareActivityView(activityItems: [url])
+                ShareActivityView(activityItems: [
+                    PlanShareItemSource(url: url, title: viewModel.name, subtitle: shareSubtitle)
+                ])
             }
         }
         .onChange(of: shareViewModel.shareURL) { _, url in
@@ -99,7 +187,7 @@ struct TemplateEditorView: View {
                 showShareSheet = true
             }
         }
-        .alert("Sharing Error", isPresented: .init(
+        .alert("Sharing error", isPresented: .init(
             get: { shareViewModel.error != nil },
             set: { if !$0 { shareViewModel.clearError() } }
         )) {
@@ -131,12 +219,22 @@ struct TemplateEditorView: View {
                 dismiss()
             }
         }
+        .onChange(of: viewModel.exercises.count) { _, count in
+            if count < 2 {
+                isReordering = false
+            }
+        }
         .disabled(viewModel.isSaving)
         .overlay {
             if viewModel.isSaving {
-                ProgressView("Saving...")
-                    .padding()
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+                HStack(spacing: VoidSpace.s3) {
+                    ProgressView()
+                        .tint(VoidColor.text2)
+                    Text("Saving")
+                        .voidEyebrowSm()
+                }
+                .padding(VoidSpace.s4)
+                .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2)
             }
         }
         .alert("Error", isPresented: .init(
@@ -151,91 +249,146 @@ struct TemplateEditorView: View {
         }
     }
 
+    // MARK: - Toolbar
+
+    private var shareButton: some View {
+        Button {
+            if let serverId = viewModel.existingServerId {
+                shareViewModel.createShare(type: "template", itemId: serverId)
+            }
+        } label: {
+            if shareViewModel.isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image(systemName: VoidIcon.share.systemName)
+            }
+        }
+        .disabled(shareViewModel.isLoading)
+        .accessibilityLabel("Share workout")
+    }
+
+    /// "6 exercises · 18 sets" for the share preview card.
+    private var shareSubtitle: String {
+        let count = viewModel.exercises.count
+        return "\(count) \(count == 1 ? "exercise" : "exercises")\(VoidFormat.dot)\(viewModel.totalWorkingSets) sets"
+    }
+
     // MARK: - Sections
 
-    private var basicInfoSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("Template Name")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-
-            TextField("e.g., Push Day", text: $viewModel.name)
-                .textFieldStyle(.roundedBorder)
-
-            TextField("Description (optional)", text: $viewModel.description, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(3...6)
+    private var detailsPanel: some View {
+        VStack(spacing: VoidSpace.s2) {
+            VoidTextField(placeholder: "Workout name", text: $viewModel.name, autocapitalization: .words)
+            MultilineTextWell(placeholder: "Description (optional)", text: $viewModel.description)
         }
-        .padding(AppSpacing.md)
-        .cardStyle()
+        .padding(14)
+        .voidPanel()
+        .padding(.horizontal, VoidSpace.insetCard)
     }
 
-    private var summarySection: some View {
-        HStack(spacing: AppSpacing.sm) {
-            summaryItem(value: "\(viewModel.exercises.count)", label: "Exercises")
-            summaryItem(value: "\(viewModel.totalWarmupSets)", label: "Warmup")
-            summaryItem(value: "\(viewModel.totalWorkingSets)", label: "Working")
+    private var summaryRow: some View {
+        HStack(spacing: 10) {
+            statReadout(value: VoidFormat.pad2(viewModel.exercises.count), label: "Exercises")
+            statReadout(value: VoidFormat.pad2(viewModel.totalWarmupSets), label: "Warmup")
+            statReadout(value: VoidFormat.pad2(viewModel.totalWorkingSets), label: "Working")
         }
+        .padding(.horizontal, VoidSpace.insetCard)
     }
 
-    private func summaryItem(value: String, label: String) -> some View {
-        VStack(spacing: AppSpacing.xxs) {
+    private func statReadout(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s1) {
             Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
+                .voidNumber()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .voidEyebrowSm()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .frame(maxWidth: .infinity)
-        .padding(AppSpacing.sm)
-        .cardStyle()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .voidPanel()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 
     private var exercisesSection: some View {
-        VStack(spacing: AppSpacing.sm) {
-            SectionHeader(title: "Exercises (\(viewModel.exercises.count))")
+        VStack(spacing: VoidSpace.s2) {
+            HStack {
+                Text("Exercises\(VoidFormat.dot)\(VoidFormat.pad2(viewModel.exercises.count))")
+                    .voidEyebrowSm()
+                Spacer()
+                if viewModel.exercises.count > 1 {
+                    Button {
+                        isReordering.toggle()
+                    } label: {
+                        Text(isReordering ? "Done" : "Reorder")
+                            .font(VoidFont.buttonSm)
+                            .foregroundStyle(VoidColor.text)
+                            .frame(minWidth: VoidSize.hitMin, minHeight: VoidSize.hitMin)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(VoidPlainButtonStyle())
+                }
+            }
+            .padding(.horizontal, VoidSpace.insetText)
+            .padding(.top, VoidSpace.s3)
 
             if viewModel.exercises.isEmpty {
-                VStack(spacing: AppSpacing.xs) {
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .font(.title)
-                        .foregroundColor(.secondary)
-                    Text("Add exercises to build your template")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                VoidListPanel {
+                    VoidPlaceholder(eyebrow: "No exercises yet", caption: "Add exercises to build the workout.")
                 }
-                .frame(maxWidth: .infinity)
-                .padding(AppSpacing.xl)
             } else {
-                ForEach(Array(viewModel.exercises.enumerated()), id: \.element.id) { index, exercise in
-                    ExerciseEditorCard(
-                        exercise: exercise,
-                        onConfigure: {
-                            editingExercise = ExerciseEditContext(index: index, exercise: exercise)
-                        },
-                        onDelete: {
-                            viewModel.removeExercise(at: index)
-                        }
-                    )
+                VoidListPanel {
+                    exerciseList
                 }
             }
         }
     }
 
-    private var addExerciseButton: some View {
-        Button {
-            showExercisePicker = true
-        } label: {
-            HStack {
-                Image(systemName: "plus.circle.fill")
-                Text("Add Exercises")
+    /// Exercise rows in a `List` so the system reorder handles drive `moveExercises`.
+    /// Scrolling is disabled and the height is fixed so it sits inside the outer ScrollView.
+    private var exerciseList: some View {
+        List {
+            ForEach(Array(viewModel.exercises.enumerated()), id: \.element.id) { index, exercise in
+                ExerciseEditorCard(
+                    index: index,
+                    exercise: exercise,
+                    isLast: index == viewModel.exercises.count - 1,
+                    onConfigure: {
+                        editingExercise = TemplateEditorView.ExerciseEditContext(index: index, exercise: exercise)
+                    },
+                    onDelete: {
+                        viewModel.removeExercise(at: index)
+                    },
+                    onMoveUp: moveUpAction(index),
+                    onMoveDown: moveDownAction(index)
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
-            .fontWeight(.semibold)
-            .frame(maxWidth: .infinity)
+            .onMove { source, destination in
+                viewModel.moveExercises(from: source, to: destination)
+            }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
+        .listStyle(.plain)
+        .scrollDisabled(true)
+        .scrollContentBackground(.hidden)
+        .environment(\.defaultMinListRowHeight, VoidSize.listRow)
+        .environment(\.editMode, .constant(isReordering ? .active : .inactive))
+        .frame(height: CGFloat(viewModel.exercises.count) * VoidSize.listRow)
+    }
+
+    private func moveUpAction(_ index: Int) -> (() -> Void)? {
+        guard index > 0 else { return nil }
+        return { viewModel.moveExercises(from: IndexSet(integer: index), to: index - 1) }
+    }
+
+    private func moveDownAction(_ index: Int) -> (() -> Void)? {
+        guard index < viewModel.exercises.count - 1 else { return nil }
+        return { viewModel.moveExercises(from: IndexSet(integer: index), to: index + 2) }
     }
 
     // MARK: - Exercise Picker Sheet
@@ -250,6 +403,28 @@ struct TemplateEditorView: View {
                 showExercisePicker = false
             }
         )
+    }
+}
+
+// MARK: - Multi-line well
+
+/// Multi-line text well for descriptions and notes: the same panel-2 fill, radius 12 and
+/// SF 15 as `VoidTextField`, but it grows from three to six lines and Return inserts a newline.
+/// Foundation gap: `VoidTextField` is a fixed 44pt single-line well.
+struct MultilineTextWell: View {
+    let placeholder: String
+    @Binding var text: String
+    var lines: ClosedRange<Int> = 3...6
+    var autocapitalization: TextInputAutocapitalization = .sentences
+
+    var body: some View {
+        TextField(placeholder, text: $text, axis: .vertical)
+            .lineLimit(lines)
+            .font(VoidFont.body)
+            .foregroundStyle(VoidColor.text)
+            .textInputAutocapitalization(autocapitalization)
+            .padding(14)
+            .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2, fill: VoidColor.panel2)
     }
 }
 
@@ -272,35 +447,29 @@ private struct ExercisePickerSheet: View {
                     onConfirm(selected)
                 }
             )
-                .navigationTitle("Select Exercises")
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Cancel") {
-                            onCancel()
-                        }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Add (\(browserViewModel.selectedExercises.count))") {
-                            onConfirm(browserViewModel.selectedExercisesList)
-                        }
-                        .fontWeight(.semibold)
-                        .disabled(browserViewModel.selectedExercises.isEmpty)
+            .navigationTitle("Add exercises")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        onCancel()
                     }
                 }
+            }
         }
     }
 }
 
 // MARK: - Previews
 
-#Preview("New Template") {
+#Preview("New workout") {
     NavigationStack {
         TemplateEditorView()
     }
     .withDependencies(.preview)
 }
 
-#Preview("Edit Template") {
+#Preview("Edit workout") {
     NavigationStack {
         TemplateEditorView(existingTemplate: MockTemplateRepository.sampleTemplates[0])
     }

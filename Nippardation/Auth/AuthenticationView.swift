@@ -4,6 +4,9 @@
 //
 //  Created by Alex Shillingford on 7/18/25.
 //
+//  Sign-in screen on the hull: mark, RECESS eyebrow, the one display word, squared fields,
+//  one plasma CTA. Firebase auth calls and the reset-password alert are unchanged.
+//
 
 import SwiftUI
 
@@ -18,123 +21,117 @@ struct AuthenticationView: View {
     @State private var showResetConfirmation = false
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 32) {
-                // Logo/Title Section
-                VStack(spacing: 16) {
-                    Image("WeightIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 200)
-                        .cornerRadius(16)
-                    
-                    Text("Recess Fitness")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                    
-                    Text("Don't just do cardio!")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
+        ScrollView {
+            VStack(spacing: 0) {
+                // Mark + name
+                Image("WeightIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tileHero, style: .continuous))
+                    .accessibilityHidden(true)
+                    .padding(.top, VoidSpace.topContent)
                 
-                // Form Section
-                VStack(spacing: 20) {
-                    VStack(spacing: 16) {
-                        TextField("Email", text: $email)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .textContentType(.emailAddress)
-                            .keyboardType(.emailAddress)
-                            .autocapitalization(.none)
-                        
-                        SecureField("Password", text: $password)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .textContentType(isSignUp ? .newPassword : .password)
-                        
-                        if isSignUp {
-                            SecureField("Confirm Password", text: $confirmPassword)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .textContentType(.newPassword)
-                        }
-
-                        if !isSignUp {
-                            HStack {
-                                Spacer()
-                                Button("Forgot Password?") {
-                                    resetEmail = email
-                                    showForgotPassword = true
-                                }
-                                .font(.caption)
-                                .foregroundColor(.appTheme)
-                            }
-                        }
+                Text("Recess")
+                    .voidEyebrow()
+                    .padding(.top, VoidSpace.s5)
+                
+                Text("Fitness")
+                    .voidDisplay(VoidFont.wordRow, size: 30)
+                    .padding(.top, 6)
+                    .accessibilityLabel("Recess Fitness")
+                
+                // Form
+                VStack(spacing: VoidSpace.s3) {
+                    VoidTextField(placeholder: "Email", text: $email, keyboard: .emailAddress, autocapitalization: .never)
+                        .textContentType(.emailAddress)
+                    
+                    VoidSecureField(placeholder: "Password", text: $password, contentType: isSignUp ? .newPassword : .password)
+                    
+                    if isSignUp {
+                        VoidSecureField(placeholder: "Confirm password", text: $confirmPassword, contentType: .newPassword)
                     }
                     
-                    // Error Message
-                    if let errorMessage = authManager.errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                            .multilineTextAlignment(.center)
-                    }
-                    
-                    // Action Button
-                    Button(action: handleAuthAction) {
+                    if !isSignUp {
                         HStack {
-                            if authManager.isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
+                            Spacer()
+                            linkButton("Forgot password?") {
+                                resetEmail = email
+                                showForgotPassword = true
                             }
-                            Text(isSignUp ? "Sign Up" : "Sign In")
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.appTheme)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                    }
-                    .disabled(authManager.isLoading || !isFormValid)
-                    
-                    // Toggle between Sign In and Sign Up
-                    Button(action: {
-                        isSignUp.toggle()
-                        clearForm()
-                    }) {
-                        Text(isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
-                            .font(.subheadline)
-                            .foregroundColor(.appTheme)
                     }
                 }
-                .padding(.horizontal)
+                .padding(.top, VoidSpace.s6 + VoidSpace.s2)
                 
-                Spacer()
+                // Error message
+                if let errorMessage = authManager.errorMessage, !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(VoidFont.caption)
+                        .foregroundStyle(VoidColor.warning)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, VoidSpace.s4)
+                }
+                
+                // Action
+                VoidCTAButton(
+                    title: isSignUp ? "Create account" : "Sign in",
+                    isEnabled: isFormValid,
+                    isLoading: authManager.isLoading,
+                    action: handleAuthAction
+                )
+                .padding(.top, VoidSpace.s5)
+                
+                // Toggle between sign in and create account
+                linkButton(isSignUp ? "Already have an account? Sign in" : "No account? Create one") {
+                    isSignUp.toggle()
+                    clearForm()
+                }
+                .padding(.top, VoidSpace.s3)
             }
-            .navigationBarHidden(true)
-            .alert("Reset Password", isPresented: $showForgotPassword) {
-                TextField("Email", text: $resetEmail)
-                    .textContentType(.emailAddress)
-                    .autocapitalization(.none)
-                Button("Send Reset Link") {
-                    Task {
-                        do {
-                            try await authManager.sendPasswordReset(email: resetEmail)
-                            showResetConfirmation = true
-                        } catch {
-                            // errorMessage is already set by AuthManager
-                        }
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.bottom, VoidSpace.s6)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(VoidColor.hull.ignoresSafeArea())
+        .tint(VoidColor.plasma)
+        .alert("Reset password", isPresented: $showForgotPassword) {
+            TextField("Email", text: $resetEmail)
+                .textContentType(.emailAddress)
+                .autocapitalization(.none)
+            Button("Send reset link") {
+                Task {
+                    do {
+                        try await authManager.sendPasswordReset(email: resetEmail)
+                        showResetConfirmation = true
+                    } catch {
+                        // errorMessage is already set by AuthManager
                     }
                 }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("Enter your email address and we'll send you a link to reset your password.")
             }
-            .alert("Email Sent", isPresented: $showResetConfirmation) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("Check your email for a password reset link.")
-            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Enter your email address and we'll send you a link to reset your password.")
         }
+        .alert("Email sent", isPresented: $showResetConfirmation) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Check your email for a password reset link.")
+        }
+    }
+    
+    // MARK: - Pieces
+    
+    /// SF 13 plasma text link with a 44pt hit target.
+    private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(VoidFont.buttonLink)
+                .foregroundStyle(VoidColor.plasma)
+                .frame(minHeight: VoidSize.hitMin)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(VoidPlainButtonStyle())
     }
     
     private var isFormValid: Bool {
@@ -180,6 +177,29 @@ struct AuthenticationView: View {
         password = ""
         confirmPassword = ""
         authManager.errorMessage = ""
+    }
+}
+
+// MARK: - Secure field (Void chrome; the foundation only ships `VoidTextField`)
+
+/// Squared secure field well: panel-2 fill, radius 12, Chakra Petch 15.5 — the `SecureField` twin of `VoidTextField`.
+private struct VoidSecureField: View {
+    let placeholder: String
+    @Binding var text: String
+    var contentType: UITextContentType? = nil
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            SecureField(placeholder, text: $text)
+                .font(VoidFont.body)
+                .foregroundStyle(VoidColor.text)
+                .textContentType(contentType)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        }
+        .padding(.horizontal, 14)
+        .frame(height: VoidSize.pill)
+        .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2, fill: VoidColor.panel2)
     }
 }
 

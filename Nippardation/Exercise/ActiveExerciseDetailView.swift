@@ -4,6 +4,10 @@
 //
 //  Created by Alex Shillingford on 5/14/25.
 //
+//  Exercise detail sheet: panel chrome with a grabber, eyebrow position readout over the
+//  exercise name, target panel, the embedded example video, the logged sets as a list panel,
+//  and one plasma CTA (Add set). `isReadOnly` hides every editing control (used by previews).
+//
 
 import SwiftUI
 
@@ -47,122 +51,57 @@ struct ActiveExerciseDetailView: View {
     
     private var workoutView: some View {
         VStack(spacing: 0) {
-            // Navigation bar
-            HStack {
-                if !isReadOnly {
-                    cancelButton
-                } else {
-                    Button("Close") {
-                        showingExerciseDetail = false
-                    }
-                    .foregroundColor(Color.appTheme)
-                }
-                
-                Spacer()
-            }
-            .padding()
-            .background(Color(UIColor.systemBackground))
+            header
             
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Exercise title
-                    if let currentExercise = viewModel.currentExercise {
-                        Text(currentExercise.exerciseName)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
-                            .padding(.top)
-                    } else {
-                        Text("No exercise available")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal)
-                            .padding(.top)
-                    }
+                VStack(alignment: .leading, spacing: VoidSpace.s5) {
+                    titleBlock
                     
-                    // Exercise Information
+                    // Exercise information
                     if let exercise = viewModel.matchingExercise {
-                        MovementInfoView(
-                            exercise: exercise,
-                            nativeVideoUrl: viewModel.nativeVideoUrl,
-                            exerciseServerId: viewModel.exerciseServerId
-                        )
+                        targetPanel(exercise)
+                        videoSection(exercise)
                     } else if isReadOnly {
                         // Fallback for read-only mode when no matching exercise found
                         Text("Exercise details not available")
-                            .foregroundColor(.secondary)
-                            .padding()
+                            .font(VoidFont.caption)
+                            .foregroundStyle(VoidColor.text2)
                             .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, VoidSpace.s4)
                     }
                     
-                    // Tracked Sets Section (only show if not read-only)
+                    // Logged sets (only when not read-only)
                     if !isReadOnly {
                         if viewModel.matchingExercise != nil {
-                            VStack(alignment: .leading, spacing: 16) {
-                                HStack {
-                                    Text("Tracked Sets")
-                                        .font(.headline)
-                                    
-                                    Spacer()
-                                    
-                                    Button {
-                                        isShowingAddSet = true
-                                    } label: {
-                                        Label("Add Set", systemImage: "plus.circle.fill")
-                                            .font(.subheadline)
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-                                .padding(.horizontal)
+                            setsSection
                             
-                            if let currentExercise = viewModel.currentExercise {
-                                if currentExercise.trackedSets.isEmpty {
-                                    Text("No sets tracked yet")
-                                        .foregroundColor(.secondary)
-                                        .italic()
-                                        .frame(maxWidth: .infinity, alignment: .center)
-                                        .padding()
-                                } else {
-                                    trackedSetsView
-                                        .padding(.horizontal)
-                                }
-                            }
-                            
-                                if viewModel.totalVolume > 0 {
-                                    summaryView
-                                        .padding()
-                                        .background(Color(.secondarySystemBackground))
-                                        .cornerRadius(12)
-                                        .padding(.horizontal)
-                                }
+                            if viewModel.totalVolume > 0 {
+                                summaryPanel
                             }
                         }
-
+                        
                         swapMovementButton
-                            .padding(.top, 8)
                     }
-
-                    // Spacer to ensure bottom button doesn't overlap content
-                    Spacer(minLength: 100)
                 }
-                .padding(.bottom, 20)
+                .padding(.top, VoidSpace.s2)
+                .padding(.bottom, VoidSpace.s6)
             }
             
             if !isReadOnly {
-                saveAndCloseButtonSection
+                ctaBar
             }
         }
-        .alert("Cancel Exercise", isPresented: $showingCancelAlert) {
-            Button("Go Back", role: .cancel) {
+        .background(VoidColor.panel.ignoresSafeArea())
+        .alert("Cancel exercise", isPresented: $showingCancelAlert) {
+            Button("Go back", role: .cancel) {
                 // Just dismiss the alert
             }
             
-            Button("Cancel Anyway", role: .destructive) {
+            Button("Close anyway", role: .destructive) {
                 showingExerciseDetail = false
             }
         } message: {
-            Text("You have unsaved sets for this exercise. Are you sure you want to cancel?")
+            Text("You have sets logged for this exercise. Close without finishing?")
         }
         .sheet(isPresented: $isShowingAddSet) {
             if let exercise = viewModel.matchingExercise {
@@ -175,6 +114,7 @@ struct ActiveExerciseDetailView: View {
                     }
                 }
                 .presentationDetents([.fraction(0.75)])
+                .voidSheet()
             }
         }
         .sheet(isPresented: $isEditingSet) {
@@ -192,7 +132,8 @@ struct ActiveExerciseDetailView: View {
                         }
                     }
                 )
-                .presentationDetents([.medium])
+                .presentationDetents([.height(430), .large])
+                .voidSheet()
             }
         }
         .sheet(isPresented: $isShowingSwapPicker) {
@@ -213,50 +154,309 @@ struct ActiveExerciseDetailView: View {
                     }
                 }
             }
+            .tint(VoidColor.plasma)
         }
         .onAppear {
             // Synchronize view model with the latest workout data
             viewModel.updateWorkout(workout)
         }
-        .onChange(of: viewModel.workout) { newValue in
+        .onChange(of: viewModel.workout) { _, newValue in
             // Keep the binding in sync with view model changes
             workout = newValue
         }
     }
     
-    private var saveAndCloseButtonSection: some View {
-        VStack {
-            Button {
-                saveAndClose()
-            } label: {
-                Text("Finish This Movement")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.appTheme)
-                    .cornerRadius(12)
-                    .shadow(radius: 2)
+    // MARK: - Header
+    
+    private var header: some View {
+        VStack(spacing: 0) {
+            VoidGrabber()
+                .padding(.top, 10)
+                .padding(.bottom, 14)
+            
+            HStack {
+                if isReadOnly {
+                    textButton("Close") {
+                        showingExerciseDetail = false
+                    }
+                } else {
+                    cancelButton
+                }
+                
+                Spacer()
+                
+                if !isReadOnly {
+                    textButton("Done") {
+                        saveAndClose()
+                    }
+                }
             }
-            .padding()
+            // The text buttons carry 8pt of extra hit area each side; pull the row in so the labels stay on the 20pt line.
+            .padding(.horizontal, VoidSpace.insetText - VoidSpace.s2)
+            .padding(.bottom, VoidSpace.s2)
         }
-        .background(
-            Rectangle()
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: -5)
-        )
     }
-
-    private var swapMovementButton: some View {
-        Button {
-            isShowingSwapPicker = true
-        } label: {
-            Label("Swap This Movement", systemImage: "arrow.triangle.2.circlepath")
-                .font(.headline)
-                .foregroundColor(.orange)
-                .frame(maxWidth: .infinity)
+    
+    /// SF 15 plasma text control: 44pt tall, hit area reaching 8pt past the label on each side.
+    private func textButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(VoidFont.button)
+                .foregroundStyle(VoidColor.plasma)
+                .padding(.horizontal, VoidSpace.s2)
+                .frame(minHeight: VoidSize.hitMin)
+                .contentShape(Rectangle())
         }
-        .padding(.horizontal)
+        .buttonStyle(VoidPlainButtonStyle())
+    }
+    
+    private var cancelButton: some View {
+        textButton("Cancel") {
+            if let currentExercise = viewModel.currentExercise, !currentExercise.trackedSets.isEmpty {
+                showingCancelAlert = true
+            } else {
+                showingExerciseDetail = false
+            }
+        }
+    }
+    
+    // MARK: - Title
+    
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(positionReadout).voidEyebrowSm()
+            
+            if let currentExercise = viewModel.currentExercise {
+                Text(currentExercise.exerciseName)
+                    .font(VoidFont.title)
+                    .foregroundStyle(VoidColor.text)
+            } else {
+                Text("No exercise available")
+                    .font(VoidFont.title)
+                    .foregroundStyle(VoidColor.text2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, VoidSpace.insetText)
+    }
+    
+    private var positionReadout: String {
+        let total = viewModel.workout.trackedExercises.count
+        guard total > 0 else { return "Exercise" }
+        return "Exercise \(VoidFormat.ratio(viewModel.exerciseIndex + 1, total))"
+    }
+    
+    // MARK: - Target info
+    
+    private func targetPanel(_ exercise: Exercise) -> some View {
+        VStack(spacing: 0) {
+            targetRow("Target sets", "\(exercise.warmUpSets) warm-up + \(exercise.workingSets) working")
+            VoidHairline()
+            targetRow("Target reps", "\(exercise.reps.lowerBound)–\(exercise.reps.upperBound)")
+            VoidHairline()
+            targetRow("Rest", "\(exercise.rest.lowerBound)–\(exercise.rest.upperBound) min")
+            VoidHairline()
+            targetRow("Intensity", exercise.lastSetIntensityTechnique)
+        }
+        .padding(.horizontal, 14)
+        .voidPanel(radius: VoidRadius.panel, line: .clear, fill: VoidColor.panel2)
+        .padding(.horizontal, VoidSpace.insetCard)
+    }
+    
+    private func targetRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label).voidEyebrowSm()
+            Spacer(minLength: VoidSpace.s3)
+            Text(value)
+                .font(VoidFont.body)
+                .foregroundStyle(VoidColor.text)
+                .multilineTextAlignment(.trailing)
+        }
+        .frame(minHeight: VoidSize.hitMin)
+        .accessibilityElement(children: .combine)
+    }
+    
+    // MARK: - Video (native player from the backend URL, else the embedded example)
+    
+    @ViewBuilder
+    private func videoSection(_ exercise: Exercise) -> some View {
+        if let videoUrl = viewModel.nativeVideoUrl, let serverId = viewModel.exerciseServerId {
+            VStack(alignment: .leading, spacing: VoidSpace.s2) {
+                Text("Example").voidEyebrowSm()
+                    .padding(.horizontal, VoidSpace.insetText)
+                
+                NativeVideoPlayer(
+                    exerciseServerId: serverId,
+                    videoUrl: videoUrl,
+                    showControls: true
+                )
+                .frame(maxHeight: 400)
+                .padding(.horizontal, VoidSpace.insetCard)
+            }
+        } else if !exercise.example.isEmpty {
+            VStack(alignment: .leading, spacing: VoidSpace.s2) {
+                Text("Example").voidEyebrowSm()
+                    .padding(.horizontal, VoidSpace.insetText)
+                
+                YouTubeEmbedView(html: exercise.example)
+                    .aspectRatio(1.8, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
+                    .frame(height: 200)
+                    .padding(.horizontal, VoidSpace.insetCard)
+            }
+        }
+    }
+    
+    // MARK: - Sets
+    
+    private var trackedSets: [TrackedSet] {
+        viewModel.currentExercise?.trackedSets ?? []
+    }
+    
+    private var setsSection: some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s3) {
+            VoidSectionRow(title: "Sets", trailing: VoidFormat.pad2(trackedSets.count))
+            
+            if trackedSets.isEmpty {
+                Text("No sets yet")
+                    .font(VoidFont.caption)
+                    .foregroundStyle(VoidColor.text3)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, VoidSpace.s4)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(zip(trackedSets.indices, trackedSets)), id: \.0) { index, set in
+                        setRow(index: index, set: set)
+                        if index < trackedSets.count - 1 {
+                            VoidHairline()
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .voidPanel(radius: VoidRadius.panel, line: .clear, fill: VoidColor.panel2)
+                .padding(.horizontal, VoidSpace.insetCard)
+            }
+        }
+    }
+    
+    private func setRow(index: Int, set: TrackedSet) -> some View {
+        HStack(spacing: VoidSpace.s3) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Set \(VoidFormat.pad2(index + 1))")
+                    .font(VoidFont.bodyStrong)
+                    .foregroundStyle(VoidColor.text)
+                Text(set.setType == .warmup ? "Warm-up" : "Working")
+                    .voidEyebrowSm()
+            }
+            
+            Spacer(minLength: VoidSpace.s2)
+            
+            HStack(spacing: VoidSpace.s3) {
+                readout(VoidFormat.pad2(set.reps), unit: "reps")
+                readout(weightText(set.weight), unit: "lbs")
+            }
+            
+            // Edit and Delete (only when not read-only)
+            if !isReadOnly {
+                Menu {
+                    Button {
+                        selectedSetIndex = index
+                        editingReps = set.reps
+                        editingWeight = set.weight
+                        editingSetType = set.setType
+                        isEditingSet = true
+                    } label: {
+                        Label("Edit", systemImage: VoidIcon.edit.systemName)
+                    }
+                    
+                    Button(role: .destructive) {
+                        viewModel.deleteSet(at: index)
+                    } label: {
+                        Label("Delete", systemImage: VoidIcon.trash.systemName)
+                    }
+                } label: {
+                    Image(systemName: VoidIcon.more.systemName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(VoidColor.text2)
+                        .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Set \(index + 1) options")
+            }
+        }
+        .frame(minHeight: VoidSize.listRow)
+    }
+    
+    private func readout(_ value: String, unit: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(value)
+                .font(VoidFont.stepper)
+                .foregroundStyle(VoidColor.text)
+            Text(unit).voidEyebrowSm()
+        }
+        .accessibilityElement(children: .combine)
+    }
+    
+    private func weightText(_ weight: Double) -> String {
+        weight.rounded() == weight ? "\(Int(weight))" : String(format: "%.1f", weight)
+    }
+    
+    // MARK: - Summary
+    
+    private var summaryPanel: some View {
+        HStack(alignment: .top) {
+            summaryStat("Sets", VoidFormat.pad2(trackedSets.count))
+            Spacer()
+            summaryStat("Reps", VoidFormat.pad2(viewModel.totalReps))
+            Spacer()
+            Button {
+                volumeUnit = volumeUnit.next()
+            } label: {
+                summaryStat("Volume", formatVolume(viewModel.totalVolume), alignment: .trailing)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(VoidPlainButtonStyle())
+            .accessibilityHint("Cycles the volume unit")
+        }
+        .padding(14)
+        .voidPanel(radius: VoidRadius.panel, line: .clear, fill: VoidColor.panel2)
+        .padding(.horizontal, VoidSpace.insetCard)
+    }
+    
+    private func summaryStat(_ label: String, _ value: String, alignment: HorizontalAlignment = .leading) -> some View {
+        VStack(alignment: alignment, spacing: 4) {
+            Text(label).voidEyebrowSm()
+            Text(value)
+                .font(VoidFont.stepper)
+                .foregroundStyle(VoidColor.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .accessibilityElement(children: .combine)
+    }
+    
+    private func formatVolume(_ volume: Double) -> String {
+        let convertedVolume = volumeUnit.convert(volume, from: .pounds)
+        return volumeUnit.format(convertedVolume)
+    }
+    
+    // MARK: - Actions
+    
+    private var swapMovementButton: some View {
+        VoidPillButton(title: "Swap movement") {
+            isShowingSwapPicker = true
+        }
+        .padding(.horizontal, VoidSpace.insetCard)
+    }
+    
+    private var ctaBar: some View {
+        VoidCTAButton(title: "Add set", isEnabled: viewModel.matchingExercise != nil) {
+            isShowingAddSet = true
+        }
+        .padding(.horizontal, VoidSpace.insetCard)
+        .padding(.top, VoidSpace.s3)
+        .padding(.bottom, VoidSpace.s3)
+        .background(VoidColor.panel)
     }
     
     private func saveAndClose() {
@@ -268,140 +468,6 @@ struct ActiveExerciseDetailView: View {
             workoutManager.updateExercise(at: exerciseIndex, with: currentExercise)
         }
         showingExerciseDetail = false
-    }
-    
-    private var cancelButton: some View {
-        Button {
-            if let currentExercise = viewModel.currentExercise, !currentExercise.trackedSets.isEmpty {
-                showingCancelAlert = true
-            } else {
-                showingExerciseDetail = false
-            }
-        } label: {
-            Text("Cancel")
-                .foregroundColor(Color.appTheme)
-        }
-    }
-    
-    private var summaryView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Summary")
-                .font(.headline)
-
-            HStack {
-                Spacer()
-
-                volumeStatView(
-                    title: "Sets",
-                    value: "\(viewModel.currentExercise?.trackedSets.count ?? 0)",
-                    icon: "number.square.fill"
-                )
-                
-                Spacer()
-                
-                volumeStatView(
-                    title: "Reps",
-                    value: "\(viewModel.totalReps)",
-                    icon: "repeat.circle.fill"
-                )
-                
-                Spacer()
-                
-                volumeStatView(
-                    title: "Volume",
-                    value: formatVolume(viewModel.totalVolume),
-                    icon: "chart.bar.fill"
-                )
-                .onTapGesture {
-                    volumeUnit = volumeUnit.next()
-                }
-                
-                Spacer()
-            }
-        }
-    }
-    
-    private var trackedSetsView: some View {
-        let trackedSets = viewModel.currentExercise?.trackedSets ?? []
-        return VStack(spacing: 10) {
-            ForEach(Array(zip(trackedSets.indices, trackedSets)), id: \.0) { index, set in
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(set.setType == .warmup ? "Warm-up Set" : "Working Set")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Text("Set \(index + 1)")
-                            .font(.headline)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("\(set.reps) reps")
-                            .font(.headline)
-                        
-                        Text("\(Int(set.weight)) lbs")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    // Edit and Delete buttons (only show if not read-only)
-                    if !isReadOnly {
-                        Menu {
-                            Button {
-                                selectedSetIndex = index
-                                editingReps = set.reps
-                                editingWeight = set.weight
-                                editingSetType = set.setType
-                                isEditingSet = true
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            
-                            Button(role: .destructive) {
-                                viewModel.deleteSet(at: index)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.title3)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(12)
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func volumeStatView(title: String, value: String, icon: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(.appTheme)
-            
-            Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
-                .lineLimit(2)
-                .minimumScaleFactor(0.43)
-                .scaledToFit()
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(width: 80)
-    }
-    
-    private func formatVolume(_ volume: Double) -> String {
-        let convertedVolume = volumeUnit.convert(volume, from: .pounds)
-        return volumeUnit.format(convertedVolume)
     }
 }
 

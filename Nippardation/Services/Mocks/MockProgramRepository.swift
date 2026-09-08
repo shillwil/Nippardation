@@ -187,6 +187,19 @@ final class MockProgramRepository: ProgramRepositoryProtocol {
         try await updateProgram(program)
     }
 
+    func resetProgram(serverId: String) async throws -> Program {
+        try await simulateNetworkCall()
+        guard let index = programs.firstIndex(where: { $0.serverId == serverId }) else {
+            throw RepositoryError.notFound
+        }
+        var program = programs[index]
+        program.currentDayIndex = 0
+        program.timesCompleted = 0
+        program.updatedAt = Date()
+        programs[index] = program
+        return program
+    }
+
     func advanceToNextWorkout(serverId: String) async throws -> Program {
         try await simulateNetworkCall()
         guard let index = programs.firstIndex(where: { $0.serverId == serverId }) else {

@@ -2,7 +2,7 @@
 //  AIWizardView.swift
 //  Nippardation
 //
-//  Multi-step wizard for AI-powered program generation
+//  Four-step wizard for generating a plan with AI. Owns its NavigationStack (presented full screen).
 //
 
 import SwiftUI
@@ -19,8 +19,8 @@ struct AIWizardView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 AIStepIndicator(totalSteps: totalSteps, currentStep: currentStep)
-                    .padding(.top, AppSpacing.sm)
-                    .padding(.bottom, AppSpacing.md)
+                    .padding(.top, VoidSpace.s3)
+                    .padding(.bottom, VoidSpace.s4)
 
                 Group {
                     switch currentStep {
@@ -36,46 +36,22 @@ struct AIWizardView: View {
                         EmptyView()
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // Navigation buttons
-                HStack(spacing: AppSpacing.md) {
-                    if currentStep > 0 {
-                        Button {
-                            withAnimation { currentStep -= 1 }
-                        } label: {
-                            Text("Back")
-                                .fontWeight(.medium)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
-                    }
-
+                WizardFooter(showBack: currentStep > 0, onBack: { currentStep -= 1 }) {
                     if currentStep < totalSteps - 1 {
-                        Button {
-                            withAnimation { currentStep += 1 }
-                        } label: {
-                            Text("Continue")
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
+                        VoidCTAButton(title: "Continue", isEnabled: isCurrentStepValid) {
+                            currentStep += 1
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AIColors.accent)
-                        .controlSize(.large)
-                        .disabled(!isCurrentStepValid)
                     } else {
-                        AIGradientButton(
-                            "Generate Program",
-                            isDisabled: !viewModel.canGenerate
-                        ) {
+                        AIGradientButton("Generate plan", isDisabled: !viewModel.canGenerate) {
                             viewModel.generate()
                         }
-                        .controlSize(.large)
                     }
                 }
-                .padding(AppSpacing.md)
             }
-            .navigationTitle("AI Program Generator")
+            .voidScreen()
+            .navigationTitle("AI plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -118,12 +94,12 @@ struct AIWizardView: View {
                     }
                 }
             }
-            .alert("Generation Failed", isPresented: .init(
+            .alert("Generation failed", isPresented: .init(
                 get: { viewModel.error != nil },
                 set: { if !$0 { viewModel.clearError() } }
             )) {
                 if viewModel.errorIsRetryable {
-                    Button("Try Again") {
+                    Button("Try again") {
                         viewModel.clearError()
                         viewModel.generate()
                     }
@@ -132,7 +108,7 @@ struct AIWizardView: View {
                     Button("OK") { viewModel.clearError() }
                 }
             } message: {
-                Text(viewModel.error ?? "An unknown error occurred")
+                Text(viewModel.error ?? "Something went wrong.")
             }
         }
     }

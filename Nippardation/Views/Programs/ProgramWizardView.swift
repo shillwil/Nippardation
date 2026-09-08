@@ -2,7 +2,7 @@
 //  ProgramWizardView.swift
 //  Nippardation
 //
-//  Multi-step wizard for creating new programs
+//  Three-step wizard for building a new plan. Presented modally inside the presenter's NavigationStack.
 //
 
 import SwiftUI
@@ -16,12 +16,10 @@ struct ProgramWizardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Step indicator
             StepIndicator(totalSteps: totalSteps, currentStep: currentStep)
-                .padding(.top, AppSpacing.sm)
-                .padding(.bottom, AppSpacing.md)
+                .padding(.top, VoidSpace.s3)
+                .padding(.bottom, VoidSpace.s4)
 
-            // Step content
             Group {
                 switch currentStep {
                 case 0:
@@ -34,39 +32,24 @@ struct ProgramWizardView: View {
                     EmptyView()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Navigation buttons
-            HStack(spacing: AppSpacing.md) {
-                if currentStep > 0 {
-                    Button {
-                        withAnimation { currentStep -= 1 }
-                    } label: {
-                        Text("Back")
-                            .fontWeight(.medium)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                }
-
-                Button {
+            WizardFooter(showBack: currentStep > 0, onBack: { currentStep -= 1 }) {
+                VoidCTAButton(
+                    title: currentStep < totalSteps - 1 ? "Continue" : "Create plan",
+                    isEnabled: isCurrentStepValid,
+                    isLoading: viewModel.isSaving
+                ) {
                     if currentStep < totalSteps - 1 {
-                        withAnimation { currentStep += 1 }
+                        currentStep += 1
                     } else {
                         viewModel.save()
                     }
-                } label: {
-                    Text(currentStep < totalSteps - 1 ? "Continue" : "Create Program")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!isCurrentStepValid)
             }
-            .padding(AppSpacing.md)
         }
-        .navigationTitle("New Program")
+        .voidScreen()
+        .navigationTitle("New plan")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -82,9 +65,7 @@ struct ProgramWizardView: View {
         .disabled(viewModel.isSaving)
         .overlay {
             if viewModel.isSaving {
-                ProgressView("Creating...")
-                    .padding()
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+                WizardBusyOverlay(eyebrow: "Saving")
             }
         }
         .alert("Error", isPresented: .init(
@@ -93,7 +74,7 @@ struct ProgramWizardView: View {
         )) {
             Button("OK") { viewModel.clearError() }
         } message: {
-            Text(viewModel.error ?? "An unknown error occurred")
+            Text(viewModel.error ?? "Something went wrong.")
         }
     }
 

@@ -2,7 +2,7 @@
 //  DaySelectorGrid.swift
 //  Nippardation
 //
-//  Seven-button day selector for the program wizard
+//  Seven 44pt squared day tiles for the plan wizard (Mon … Sun).
 //
 
 import SwiftUI
@@ -10,53 +10,35 @@ import SwiftUI
 struct DaySelectorGrid: View {
     @Binding var selectedDays: Set<Int>
 
-    private let days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    private let dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     var body: some View {
-        VStack(spacing: AppSpacing.sm) {
-            HStack(spacing: AppSpacing.xs) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: VoidSpace.s2) {
                 ForEach(0..<7, id: \.self) { index in
-                    dayButton(index: index)
+                    WizardSquareTile(
+                        label: VoidFormat.weekStripLabels[index],
+                        isSelected: selectedDays.contains(index),
+                        accessibilityLabel: dayNames[index]
+                    ) {
+                        if selectedDays.contains(index) {
+                            selectedDays.remove(index)
+                        } else {
+                            selectedDays.insert(index)
+                        }
+                    }
                 }
             }
 
-            Text("\(selectedDays.count) day\(selectedDays.count == 1 ? "" : "s") selected")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            WizardHelperText(text: "\(selectedDays.count) day\(selectedDays.count == 1 ? "" : "s") selected")
         }
-    }
-
-    private func dayButton(index: Int) -> some View {
-        let isSelected = selectedDays.contains(index)
-
-        return Button {
-            if isSelected {
-                selectedDays.remove(index)
-            } else {
-                selectedDays.insert(index)
-            }
-        } label: {
-            VStack(spacing: AppSpacing.xxs) {
-                Text(days[index])
-                    .font(.caption)
-                    .fontWeight(isSelected ? .semibold : .regular)
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.caption2)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, AppSpacing.sm)
-            .background(isSelected ? Color.appTheme.opacity(0.15) : Color(.tertiarySystemBackground))
-            .foregroundColor(isSelected ? .appTheme : .primary)
-            .cornerRadius(AppCornerRadius.small)
-        }
-        .buttonStyle(.plain)
     }
 }
 
 #Preview {
-    DaySelectorGrid(selectedDays: .constant([0, 2, 4]))
-        .padding()
+    ZStack {
+        VoidColor.hull.ignoresSafeArea()
+        DaySelectorGrid(selectedDays: .constant([0, 2, 4]))
+            .padding(VoidSpace.insetCard)
+    }
 }

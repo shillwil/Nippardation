@@ -39,6 +39,11 @@ final class DependencyContainer: ObservableObject {
     /// Network monitor for tracking connectivity
     @Published private(set) var networkMonitor: NetworkMonitor
 
+    /// Fills in missing exercise library items on template exercises (local cache first,
+    /// then the exercise API). Used by the repositories and by the view models that build
+    /// templates locally, so real movement names show everywhere.
+    @Published private(set) var exerciseLibraryResolver: ExerciseLibraryResolver
+
     // MARK: - API Services
 
     /// Exercise API service for API-level operations
@@ -74,6 +79,7 @@ final class DependencyContainer: ObservableObject {
         self.syncService = MockSyncService()
         self.videoCacheService = MockVideoCacheService()
         self.networkMonitor = NetworkMonitor()
+        self.exerciseLibraryResolver = ExerciseLibraryResolver()
 
         // Initialize API services with mocks
         self.exerciseAPIService = MockExerciseAPIService()
@@ -145,7 +151,12 @@ final class DependencyContainer: ObservableObject {
         let workoutRepository = WorkoutRepository(coreDataManager: .shared)
         let exerciseRepository = ExerciseRepository(apiService: exerciseAPI, coreDataManager: .shared)
         let templateRepository = TemplateRepository(apiService: templateAPI, coreDataManager: .shared, exerciseAPIService: exerciseAPI)
-        let programRepository = ProgramRepository(apiService: programAPI, coreDataManager: .shared)
+        let programRepository = ProgramRepository(apiService: programAPI, coreDataManager: .shared, exerciseAPIService: exerciseAPI)
+
+        self.exerciseLibraryResolver = ExerciseLibraryResolver(
+            coreDataManager: .shared,
+            exerciseAPIService: exerciseAPI
+        )
 
         self.workoutRepository = workoutRepository
         self.exerciseRepository = exerciseRepository
@@ -168,6 +179,7 @@ final class DependencyContainer: ObservableObject {
 
     /// Configures the container with mock services for testing/previews
     func configureForTesting() {
+        self.exerciseLibraryResolver = ExerciseLibraryResolver()
         self.exerciseRepository = MockExerciseRepository()
         self.templateRepository = MockTemplateRepository()
         self.programRepository = MockProgramRepository()

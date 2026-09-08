@@ -39,9 +39,24 @@ struct TemplateExercise: Identifiable, Hashable {
 
     // MARK: - Computed Properties
 
-    /// Display name from the library item or a placeholder
+    /// The generic last resort, used only when nothing in the app knows this movement's name.
+    static let unnamedExercise = "Exercise"
+
+    /// The best name the app has for this movement: the resolved library item's name, or a
+    /// name-only placeholder's (an AI generation response carries names but no library payload).
+    /// `nil` when there is genuinely nothing — never a guess.
+    var resolvedName: String? {
+        guard let name = exerciseLibraryItem?.name.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else { return nil }
+        return name
+    }
+
+    /// True once a real name is available, so callers can tell a name from the generic fallback.
+    var hasResolvedName: Bool { resolvedName != nil }
+
+    /// Display name from the library item, falling back to the generic word.
     var displayName: String {
-        exerciseLibraryItem?.name ?? "Unknown Exercise"
+        resolvedName ?? Self.unnamedExercise
     }
 
     /// Formatted rest time string

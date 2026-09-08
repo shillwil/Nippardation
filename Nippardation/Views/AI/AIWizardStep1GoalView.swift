@@ -2,7 +2,7 @@
 //  AIWizardStep1GoalView.swift
 //  Nippardation
 //
-//  Step 1: Training goal and split preference selection
+//  Step 1: training goal and split preference.
 //
 
 import SwiftUI
@@ -12,42 +12,38 @@ struct AIWizardStep1GoalView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.lg) {
-                AISectionHeader("What's Your Goal?", subtitle: "Choose your training focus")
+            VStack(alignment: .leading, spacing: VoidSpace.s6) {
+                AISectionHeader("Your goal", subtitle: "Pick a training focus.")
+                    .padding(.horizontal, VoidSpace.s1)
 
-                // Goal selection grid
                 LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: AppSpacing.sm) {
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ], spacing: 10) {
                     ForEach(AITrainingGoal.allCases) { goal in
                         goalCard(goal)
                     }
                 }
 
-                Divider()
-                    .padding(.vertical, AppSpacing.xs)
+                VStack(alignment: .leading, spacing: VoidSpace.s2) {
+                    WizardSectionLabel(title: "Preferred split")
+                    WizardHelperText(text: "Pick a split or describe your own.")
 
-                // Split preference
-                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                    Text("Preferred Split")
-                        .font(.headline)
-
-                    Text("Choose a template or describe your ideal split")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    // Suggestion chips
-                    FlowLayout(spacing: AppSpacing.xs) {
+                    FlowLayout(spacing: VoidSpace.s2) {
                         ForEach(AISplitSuggestion.allCases) { suggestion in
-                            splitChip(suggestion)
+                            WizardChip(
+                                title: suggestion.rawValue,
+                                isSelected: viewModel.selectedSplitSuggestion == suggestion
+                            ) {
+                                viewModel.selectSplitSuggestion(suggestion)
+                            }
                         }
                     }
+                    .padding(.top, VoidSpace.s1)
 
-                    TextField("Or type your own (e.g., \"Arnold Split\")", text: $viewModel.inspirationSource)
-                        .textFieldStyle(.roundedBorder)
+                    VoidTextField(placeholder: "Or type your own, e.g. Arnold split", text: $viewModel.inspirationSource)
                         .onChange(of: viewModel.inspirationSource) { _, newValue in
-                            // Clear chip selection if user types custom text
+                            // Clear the chip when the text no longer matches it.
                             if let selected = viewModel.selectedSplitSuggestion,
                                newValue != selected.rawValue {
                                 viewModel.selectedSplitSuggestion = nil
@@ -55,74 +51,38 @@ struct AIWizardStep1GoalView: View {
                         }
                 }
             }
-            .padding(AppSpacing.md)
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s2)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     // MARK: - Subviews
 
     private func goalCard(_ goal: AITrainingGoal) -> some View {
-        Button {
-            withAnimation(.spring(duration: 0.2)) {
-                viewModel.selectedGoal = goal
-            }
-        } label: {
-            VStack(spacing: AppSpacing.xs) {
+        WizardOptionCard(isSelected: viewModel.selectedGoal == goal, action: {
+            viewModel.selectedGoal = goal
+        }) {
+            VStack(alignment: .leading, spacing: VoidSpace.s2) {
                 Image(systemName: goal.icon)
-                    .font(.title2)
-                    .foregroundStyle(
-                        viewModel.selectedGoal == goal
-                            ? AnyShapeStyle(AIColors.gradient)
-                            : AnyShapeStyle(Color.secondary)
-                    )
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(VoidColor.text)
+                    .frame(height: 26)
+                    .accessibilityHidden(true)
 
-                Text(goal.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-
-                Text(goal.subtitle)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(goal.displayName)
+                        .font(VoidFont.bodyStrong)
+                        .foregroundStyle(VoidColor.text)
+                    Text(goal.subtitle)
+                        .font(VoidFont.caption2)
+                        .foregroundStyle(VoidColor.text2)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(AppSpacing.md)
-            .background(
-                viewModel.selectedGoal == goal
-                    ? AIColors.subtleGradient
-                    : LinearGradient(colors: [Color(.secondarySystemBackground)], startPoint: .top, endPoint: .bottom)
-            )
-            .cornerRadius(AppCornerRadius.medium)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppCornerRadius.medium)
-                    .stroke(
-                        viewModel.selectedGoal == goal ? AIColors.accent.opacity(0.5) : Color.clear,
-                        lineWidth: 2
-                    )
-            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
         }
-        .buttonStyle(.plain)
-    }
-
-    private func splitChip(_ suggestion: AISplitSuggestion) -> some View {
-        Button {
-            viewModel.selectSplitSuggestion(suggestion)
-        } label: {
-            Text(suggestion.rawValue)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .padding(.horizontal, AppSpacing.sm)
-                .padding(.vertical, AppSpacing.xs)
-                .foregroundColor(
-                    viewModel.selectedSplitSuggestion == suggestion ? .white : .primary
-                )
-                .background(
-                    viewModel.selectedSplitSuggestion == suggestion
-                        ? AnyShapeStyle(AIColors.gradient)
-                        : AnyShapeStyle(Color(.tertiarySystemBackground))
-                )
-                .cornerRadius(AppCornerRadius.small)
-        }
-        .buttonStyle(.plain)
+        .accessibilityLabel("\(goal.displayName), \(goal.subtitle)")
     }
 }
 
@@ -172,6 +132,7 @@ struct FlowLayout: Layout {
 #Preview {
     NavigationStack {
         AIWizardStep1GoalView(viewModel: AIWizardViewModel())
+            .voidScreen()
     }
     .withDependencies(.preview)
 }

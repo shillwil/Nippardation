@@ -108,25 +108,35 @@ User Action → View → ViewModel → Manager → Core Data/Cache
 
 ### View Architecture
 
+The UI is the **Void** design system (spec: `~/Downloads/void-ds/HANDOFF.md`; tokens in `DesignSystem/VoidTheme.swift`, components in `DesignSystem/VoidComponents.swift`, floating tab bar in `DesignSystem/VoidTabBar.swift`). Fonts Michroma / Chakra Petch are bundled under `Resources/Fonts` (UIAppFonts). Icons are SF Symbols via `VoidIcon` — never the void-ds SVGs. User-facing vocabulary: **plan** (model `Program`), **workout** (model `Template`).
+
 #### Primary Navigation Flow
 ```
-HomeView → WorkoutSelectionView → ActiveWorkoutView → ActiveExerciseDetailView
-    ↓                                     ↓
-Resume Active Workout              Sheet Presentation
+MainTabView (Today · Plan · Progress, custom floating VoidTabBar)
+  Today  → TodayView → ActiveWorkoutView (fullScreenCover) → ActiveExerciseDetailView (sheet)
+                      → WorkoutPreviewView (Preview Exercises) · SwapWorkoutSheet
+  Plan   → PlanView (rotation) → TemplateEditorView · ProgramEditorView (Edit plan) · PlansHubView
+           PlansHubView → AIWizardView · StarterPlansSheet · ProgramWizardView · PasteLinkSheet · PlanPreviewView · AccountView
+           (PlanView shows PlansHubView directly when there is no active plan)
+  Progress → ProgressTabView → BodyWeightSheet
+  Deep link (nippardation://share, recess://plan, https://recess.fit/p) → PlanReceivedSheet
 ```
 
 #### Key Views
-- **HomeView**: Dashboard with workout selection and statistics
+- **TodayView**: one workout, one Start; Swap Workout / Rest day overrides (`TodayOverrideStore`), auto-advances the plan after the scheduled workout completes (`TodayViewModel`)
+- **PlanView**: the active plan's rotation (`PlanRotationBuilder`), ··· menu (switch / restart / pause / share / library / account / delete)
+- **PlansHubView**: create (AI / starter / build), Sent to you (`ReceivedPlansStore`), Your plans, Community placeholder
+- **ProgressTabView**: streak, volume, PRs, plan progress, body weight, workouts/week (`ProgressStatsCalculator`)
 - **ActiveWorkoutView**: Real-time workout tracking interface
 - **ActiveExerciseDetailView**: Individual exercise tracking with video guidance
-- **WorkoutSelectionView**: Modal workout template selection
-- **ExercisesListView**: Read-only exercise browsing for templates
+- **TemplateListView / TemplateEditorView**: the workout library and editor
 
 #### View Features
 - **Adaptive Presentations**: ActiveExerciseDetailView uses multiple presentation detents
 - **Real-time Updates**: Views subscribe to WorkoutManager for live data
 - **State Persistence**: Active workout state survives app lifecycle events
 - **WebView Integration**: YouTube video demonstrations for exercises
+- **Debug preview mode**: `xcrun simctl launch booted com.shillwil.recess-fitness --void-preview [--void-tab plan] [--void-empty] [--void-share]` shows the app with mock data and no sign-in (DEBUG only, see `Configuration/VoidPreviewMode.swift`)
 
 ### Workout Template System
 
@@ -163,7 +173,7 @@ The app includes 5 predefined workout templates based on Jeff Nippard's programs
 
 ### Important Patterns and Conventions
 
-1. **File Organization**: Features are grouped by folder (Exercise/, Home/, CoreData/, Models/)
+1. **File Organization**: Features are grouped by folder (Views/Today, Views/Plan, Views/Progress, Exercise/, CoreData/, Models/)
 2. **View Naming**: `*View.swift` for SwiftUI views, `*ViewModel.swift` for view models
 3. **Navigation**: Uses NavigationStack with sheets and full screen covers
 4. **Data Transformers**: Custom `StringArrayTransformer` for storing arrays in Core Data
@@ -194,7 +204,7 @@ End Workout → WorkoutManager → WorkoutCacheManager (complete) → CoreDataMa
 
 **Statistics Flow:**
 ```
-HomeView → HomeViewModel → WorkoutManager → CoreDataManager → Core Data Analysis
+ProgressTabView → ProgressViewModel → WorkoutManager.completedWorkouts → ProgressStatsCalculator
 ```
 
 ### Testing Approach
@@ -223,10 +233,10 @@ Use `#expect` syntax for assertions in new tests.
 xcodebuild -project Nippardation.xcodeproj -scheme Nippardation -sdk iphonesimulator build
 
 # Run unit tests
-xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5' -only-testing:NippardationTests
+xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:NippardationTests
 
 # Run specific test file
-xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5' -only-testing:NippardationTests/TestClassName
+xcodebuild test -project Nippardation.xcodeproj -scheme Nippardation -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:NippardationTests/TestClassName
 ```
 
 ### Change Summary Requirements

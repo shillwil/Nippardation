@@ -3,6 +3,7 @@
 //  Nippardation
 //
 //  Auto-playing muted video preview card for exercise carousel
+//  Void chrome: radius 12, panel fill, hairline, SF 13 name, eyebrow-sm caption, no shadow.
 //
 
 import SwiftUI
@@ -25,11 +26,23 @@ struct ExercisePreviewCard: View {
         libraryItem?.videoUrl != nil
     }
 
+    private var name: String {
+        libraryItem?.name ?? templateExercise.displayName
+    }
+
+    /// `CHEST · 3 × 8-12`
+    private var caption: String {
+        VoidFormat.readout([
+            libraryItem?.primaryMuscles.first?.rawValue,
+            "\(templateExercise.workingSets) × \(templateExercise.targetReps ?? "?")"
+        ])
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Video / thumbnail area
             ZStack {
-                Color.black
+                VoidColor.hull
 
                 if hasVideo {
                     VideoPlayerLayer(
@@ -43,7 +56,7 @@ struct ExercisePreviewCard: View {
                 // Loading indicator
                 if viewModel.isLoading && hasVideo {
                     ProgressView()
-                        .tint(.white)
+                        .tint(VoidColor.text)
                 }
 
                 // Error state
@@ -53,40 +66,26 @@ struct ExercisePreviewCard: View {
             }
             .frame(width: cardWidth, height: cardWidth)
             .clipped()
-            .cornerRadius(AppCornerRadius.medium, corners: [.topLeft, .topRight])
 
             // Info area
-            VStack(alignment: .leading, spacing: AppSpacing.xxs) {
-                Text(libraryItem?.name ?? templateExercise.displayName)
-                    .font(.caption)
-                    .fontWeight(.medium)
+            VStack(alignment: .leading, spacing: VoidSpace.s1) {
+                Text(name)
+                    .font(VoidFont.caption)
+                    .foregroundStyle(VoidColor.text)
                     .lineLimit(1)
-                    .foregroundColor(.primary)
 
-                HStack(spacing: AppSpacing.xxs) {
-                    if let muscle = libraryItem?.primaryMuscles.first {
-                        PillBadge(
-                            text: muscle.rawValue.capitalized,
-                            color: .appTheme,
-                            style: .tinted
-                        )
-                    }
-
-                    Spacer()
-
-                    Text(templateExercise.setSummary)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+                Text(caption)
+                    .voidEyebrowSm()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(AppSpacing.xs)
+            .padding(10)
             .frame(width: cardWidth, alignment: .leading)
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(AppCornerRadius.medium, corners: [.bottomLeft, .bottomRight])
         }
         .frame(width: cardWidth)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(name), \(caption)")
         .task {
             guard let item = libraryItem else { return }
             await viewModel.loadVideo(
@@ -103,18 +102,19 @@ struct ExercisePreviewCard: View {
 
     private var errorOverlay: some View {
         ZStack {
-            Color.black.opacity(0.5)
+            VoidColor.hull.opacity(0.7)
 
-            VStack(spacing: AppSpacing.xxs) {
+            VStack(spacing: VoidSpace.s1) {
                 Image(systemName: "video.slash")
-                    .font(.title3)
-                    .foregroundColor(.white)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(VoidColor.text)
 
                 Text("Tap to retry")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
+                    .font(VoidFont.caption2)
+                    .foregroundStyle(VoidColor.text2)
             }
         }
+        .contentShape(Rectangle())
         .onTapGesture {
             guard let item = libraryItem else { return }
             Task {
@@ -124,45 +124,25 @@ struct ExercisePreviewCard: View {
                 )
             }
         }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("Video failed to load. Tap to retry")
     }
 
     private var placeholder: some View {
         Rectangle()
-            .fill(Color.gray.opacity(0.3))
+            .fill(VoidColor.panel2)
             .overlay(
-                Image(systemName: "figure.strengthtraining.traditional")
-                    .font(.title2)
-                    .foregroundColor(.gray)
+                Image(systemName: VoidIcon.workoutDefault.systemName)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(VoidColor.text3)
             )
-    }
-}
-
-// MARK: - Corner Radius Helper
-
-private extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCornerShape(radius: radius, corners: corners))
-    }
-}
-
-private struct RoundedCornerShape: Shape {
-    var radius: CGFloat
-    var corners: UIRectCorner
-
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
-        )
-        return Path(path.cgPath)
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    HStack(spacing: 12) {
+    HStack(spacing: 10) {
         ExercisePreviewCard(
             templateExercise: TemplateExercise(
                 id: UUID(),
@@ -209,4 +189,5 @@ private struct RoundedCornerShape: Shape {
         )
     }
     .padding()
+    .background(VoidColor.hull)
 }

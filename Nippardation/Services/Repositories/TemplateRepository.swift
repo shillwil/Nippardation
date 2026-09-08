@@ -19,6 +19,10 @@ final class TemplateRepository: TemplateRepositoryProtocol {
     private let coreDataManager: CoreDataManager
     private let exerciseAPIService: (any ExerciseAPIServiceProtocol)?
 
+    /// Fills in the exercise library items the API leaves out (cache first, then the
+    /// exercise endpoint). Shared with `ProgramRepository` so every path resolves the same way.
+    private let resolver: ExerciseLibraryResolver
+
     // MARK: - Configuration
 
     /// How long cached exercises are considered fresh (in seconds)
@@ -36,6 +40,10 @@ final class TemplateRepository: TemplateRepositoryProtocol {
         self.apiService = apiService
         self.coreDataManager = coreDataManager
         self.exerciseAPIService = exerciseAPIService
+        self.resolver = ExerciseLibraryResolver(
+            coreDataManager: coreDataManager,
+            exerciseAPIService: exerciseAPIService
+        )
     }
 
     // MARK: - Fetch Operations
@@ -100,6 +108,10 @@ final class TemplateRepository: TemplateRepositoryProtocol {
                 }
             }
 
+            // List endpoints never nest the exercise object, so resolve the library items
+            // in one deduplicated batch before anything reads a name off these templates.
+            allTemplates = await resolver.resolve(allTemplates)
+
             // Cache all templates (preserves existing exercises for list-fetched templates)
             try? await coreDataManager.cacheTemplates(allTemplates)
 
@@ -128,7 +140,7 @@ final class TemplateRepository: TemplateRepositoryProtocol {
             // Exercises present but some unresolved - try resolving from exercise cache
             if hasExercises && !allResolved {
                 var resolved = cached
-                resolved.exercises = resolveExerciseLibraryItems(resolved.exercises)
+                resolved.exercises = resolver.resolveFromCache(resolved.exercises)
                 if resolved.exercises.allSatisfy({ $0.exerciseLibraryItem != nil }),
                    areCachedExercisesFresh(resolved.exercises) {
                     return resolved
@@ -149,11 +161,9 @@ final class TemplateRepository: TemplateRepositoryProtocol {
                 try? await coreDataManager.cacheExercises(libraryItems)
             }
 
-            // Resolve any exercises still missing their library item from cache
-            template.exercises = resolveExerciseLibraryItems(template.exercises)
-
-            // For any still missing, fetch individually from exercise API
-            template.exercises = await fetchMissingExerciseLibraryItems(template.exercises)
+            // Resolve any exercises still missing their library item: cache first, then the
+            // exercise API for whatever is left.
+            template = await resolver.resolve(template)
 
             // Cache the result
             try? await coreDataManager.cacheTemplate(template)
@@ -178,9 +188,10 @@ final class TemplateRepository: TemplateRepositoryProtocol {
         )
 
         // Filter by isPublic (API might not have category filter)
-        let templates = dtos
+        let publicTemplates: [Template] = dtos
             .filter { $0.isPublic ?? false }
             .map { TemplateMapper.toDomain($0) }
+        let templates = await resolver.resolve(publicTemplates)
 
         let totalPages = pagination.hasMore ? (page + 1) : page
         let totalItems = pagination.hasMore ? (page * defaultPageSize + 1) : templates.count
@@ -224,7 +235,7 @@ final class TemplateRepository: TemplateRepositoryProtocol {
         if !libraryItems.isEmpty {
             try? await coreDataManager.cacheExercises(libraryItems)
         }
-        createdTemplate.exercises = resolveExerciseLibraryItems(createdTemplate.exercises)
+        createdTemplate = await resolver.resolve(createdTemplate)
 
         // Cache the new template
         try? await coreDataManager.cacheTemplate(createdTemplate)
@@ -265,7 +276,7 @@ final class TemplateRepository: TemplateRepositoryProtocol {
         if !libraryItems.isEmpty {
             try? await coreDataManager.cacheExercises(libraryItems)
         }
-        updatedTemplate.exercises = resolveExerciseLibraryItems(updatedTemplate.exercises)
+        updatedTemplate = await resolver.resolve(updatedTemplate)
 
         // Update cache
         try? await coreDataManager.cacheTemplate(updatedTemplate)
@@ -289,7 +300,7 @@ final class TemplateRepository: TemplateRepositoryProtocol {
         if !libraryItems.isEmpty {
             try? await coreDataManager.cacheExercises(libraryItems)
         }
-        template.exercises = resolveExerciseLibraryItems(template.exercises)
+        template = await resolver.resolve(template)
 
         // Cache the new template
         try? await coreDataManager.cacheTemplate(template)
@@ -303,7 +314,7 @@ final class TemplateRepository: TemplateRepositoryProtocol {
         let cached = coreDataManager.fetchCachedTemplates()
         return cached.map { template in
             var domain = coreDataManager.toDomain(template)
-            domain.exercises = resolveExerciseLibraryItems(domain.exercises)
+            domain.exercises = resolver.resolveFromCache(domain.exercises)
             return domain
         }
     }
@@ -313,7 +324,7 @@ final class TemplateRepository: TemplateRepositoryProtocol {
             return nil
         }
         var domain = coreDataManager.toDomain(cached)
-        domain.exercises = resolveExerciseLibraryItems(domain.exercises)
+        domain.exercises = resolver.resolveFromCache(domain.exercises)
         return domain
     }
 
@@ -349,44 +360,4 @@ final class TemplateRepository: TemplateRepositoryProtocol {
         }
     }
 
-    /// Resolves missing exerciseLibraryItem on template exercises from the local exercise cache.
-    private func resolveExerciseLibraryItems(_ exercises: [TemplateExercise]) -> [TemplateExercise] {
-        exercises.map { exercise in
-            guard exercise.exerciseLibraryItem == nil else { return exercise }
-            guard let cdExercise = coreDataManager.fetchCachedExercise(serverId: exercise.exerciseServerId) else {
-                return exercise
-            }
-            var resolved = exercise
-            resolved.exerciseLibraryItem = coreDataManager.toDomain(cdExercise)
-            return resolved
-        }
-    }
-
-    /// Fetches exercise library items individually from the API for any exercises still missing them.
-    private func fetchMissingExerciseLibraryItems(_ exercises: [TemplateExercise]) async -> [TemplateExercise] {
-        guard let exerciseAPI = exerciseAPIService else { return exercises }
-
-        var result = exercises
-        var fetchedItems: [ExerciseLibraryItem] = []
-
-        for i in result.indices {
-            guard result[i].exerciseLibraryItem == nil,
-                  !result[i].exerciseServerId.isEmpty else { continue }
-            do {
-                let dto = try await exerciseAPI.fetchExercise(id: result[i].exerciseServerId)
-                let item = ExerciseMapper.toDomain(dto)
-                result[i].exerciseLibraryItem = item
-                fetchedItems.append(item)
-            } catch {
-                print("Failed to fetch exercise \(result[i].exerciseServerId): \(error)")
-            }
-        }
-
-        // Cache newly fetched items for future lookups
-        if !fetchedItems.isEmpty {
-            try? await coreDataManager.cacheExercises(fetchedItems)
-        }
-
-        return result
-    }
 }

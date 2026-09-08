@@ -10,8 +10,16 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>nippardation</string>
+				<string>recess</string>
 			</array>
 		</dict>
+	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Michroma-Regular.ttf</string>
+		<string>ChakraPetch-SemiBold.ttf</string>
+		<string>ChakraPetch-Medium.ttf</string>
+		<string>ChakraPetch-Regular.ttf</string>
 	</array>
 </dict>
 </plist>

@@ -35,8 +35,13 @@ final class TemplateEditorViewModel: ObservableObject {
         var restSeconds: Int
         var notes: String
 
+        /// The library item's name when there is one, otherwise the generic word — the same
+        /// fallback `TemplateExercise.displayName` uses, so the editor and the rest of the
+        /// app never disagree about what a row is called.
         var displayName: String {
-            exerciseLibraryItem?.name ?? "Unknown Exercise"
+            guard let name = exerciseLibraryItem?.name.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !name.isEmpty else { return TemplateExercise.unnamedExercise }
+            return name
         }
     }
 

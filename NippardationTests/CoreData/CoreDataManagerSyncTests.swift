@@ -10,7 +10,9 @@ import Foundation
 import CoreData
 @testable import Nippardation
 
-@Suite("CoreDataManager+Sync Tests")
+// Serialized: these tests share the global `lastSyncTimestamp` UserDefaults key — one test
+// removes it while another expects the value it just wrote, so they must not interleave.
+@Suite("CoreDataManager+Sync Tests", .serialized)
 struct CoreDataManagerSyncTests {
 
     // MARK: - Sync Timestamp

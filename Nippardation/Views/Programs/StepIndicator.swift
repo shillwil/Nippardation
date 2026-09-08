@@ -2,7 +2,7 @@
 //  StepIndicator.swift
 //  Nippardation
 //
-//  Dot-based step indicator for the program wizard
+//  Squared 4pt step marks for the plan wizard (matches AIStepIndicator).
 //
 
 import SwiftUI
@@ -12,21 +12,26 @@ struct StepIndicator: View {
     let currentStep: Int
 
     var body: some View {
-        HStack(spacing: AppSpacing.xs) {
+        HStack(spacing: VoidSpace.s2) {
             ForEach(0..<totalSteps, id: \.self) { step in
-                Capsule()
-                    .fill(step <= currentStep ? Color.appTheme : Color.secondary.opacity(0.3))
-                    .frame(width: step == currentStep ? 24 : 8, height: 8)
-                    .animation(.spring(duration: 0.3), value: currentStep)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(step <= currentStep ? VoidColor.plasma : VoidColor.track)
+                    .frame(width: step == currentStep ? 24 : 8, height: 4)
+                    .animation(.easeOut(duration: 0.12), value: currentStep)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(currentStep + 1) of \(totalSteps)")
     }
 }
 
 #Preview {
-    VStack(spacing: AppSpacing.lg) {
-        StepIndicator(totalSteps: 3, currentStep: 0)
-        StepIndicator(totalSteps: 3, currentStep: 1)
-        StepIndicator(totalSteps: 3, currentStep: 2)
+    ZStack {
+        VoidColor.hull.ignoresSafeArea()
+        VStack(spacing: VoidSpace.s6) {
+            StepIndicator(totalSteps: 3, currentStep: 0)
+            StepIndicator(totalSteps: 3, currentStep: 1)
+            StepIndicator(totalSteps: 3, currentStep: 2)
+        }
     }
 }

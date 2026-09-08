@@ -2,7 +2,9 @@
 //  ExerciseBrowserView.swift
 //  Nippardation
 //
-//  Browse and filter exercises with optional selection
+//  Browse and filter exercises with optional selection. Void chrome: hull background,
+//  squared search well, 28pt muscle chips, hairline rows, plasma selection checks,
+//  and a content-sized "Add (n)" CTA when picking.
 //
 
 import SwiftUI
@@ -66,61 +68,64 @@ struct ExerciseBrowserContent: View {
         !viewModel.selectedExercises.isEmpty
     }
 
+    private var showsFloatingButton: Bool {
+        viewModel.isPickerMode && !viewModel.selectedExercises.isEmpty && onConfirmSelection != nil
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
-                // Search bar
-                searchBar
+                VoidTextField(
+                    placeholder: "Search exercises",
+                    text: $viewModel.searchText,
+                    icon: .search,
+                    autocapitalization: .never
+                )
+                .padding(.horizontal, VoidSpace.insetCard)
+                .padding(.top, VoidSpace.s2)
+                .padding(.bottom, VoidSpace.s3)
 
-                // Muscle group filter bar
                 MuscleGroupFilterBar(
                     selectedMuscles: viewModel.filter.muscleGroups,
                     onToggle: { muscle in
                         viewModel.toggleMuscleGroupFilter(muscle)
                     }
                 )
-                .padding(.bottom, AppSpacing.xs)
 
-                // Advanced filter chips
                 if viewModel.filter.hasNonMuscleFilters {
                     filterChips
+                        .padding(.top, VoidSpace.s2)
                 }
 
-                // Exercise list
-                if viewModel.isLoading && viewModel.exercises.isEmpty {
-                    Spacer()
-                    ProgressView("Loading exercises...")
-                    Spacer()
-                } else if viewModel.exercises.isEmpty {
-                    emptyView
-                } else {
-                    exerciseList
+                Group {
+                    if viewModel.isLoading && viewModel.exercises.isEmpty {
+                        loadingView
+                    } else if viewModel.exercises.isEmpty {
+                        emptyView
+                    } else {
+                        exerciseList
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, VoidSpace.s1)
             }
 
-            // Floating selection button
-            if viewModel.isPickerMode,
-               !viewModel.selectedExercises.isEmpty,
-               let onConfirmSelection {
+            if showsFloatingButton, let onConfirmSelection {
                 FloatingSelectionButton(
                     count: viewModel.selectedExercises.count,
                     action: {
                         onConfirmSelection(viewModel.selectedExercisesList)
                     }
                 )
-                .padding(.bottom, AppSpacing.lg)
+                .padding(.bottom, VoidSpace.s6)
             }
         }
         .navigationTitle("Exercises")
+        .navigationBarTitleDisplayMode(.inline)
+        .voidScreen()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showFilters = true
-                } label: {
-                    Image(systemName: viewModel.filter.activeFilterCount > 0
-                          ? "line.3.horizontal.decrease.circle.fill"
-                          : "line.3.horizontal.decrease.circle")
-                }
+                filterButton
             }
         }
         .sheet(isPresented: $showFilters) {
@@ -148,38 +153,31 @@ struct ExerciseBrowserContent: View {
         }
     }
 
-    // MARK: - Subviews
+    // MARK: - Chrome
 
-    private var searchBar: some View {
-        HStack(spacing: AppSpacing.xs) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
-
-            TextField("Search exercises", text: $viewModel.searchText)
-                .textFieldStyle(.plain)
-                .autocorrectionDisabled()
-
-            if !viewModel.searchText.isEmpty {
-                Button {
-                    viewModel.searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
+    private var filterButton: some View {
+        Button {
+            showFilters = true
+        } label: {
+            Image(systemName: GapIcon.filter)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(VoidColor.text)
+                .overlay(alignment: .topTrailing) {
+                    if viewModel.filter.activeFilterCount > 0 {
+                        PlasmaDot(size: 6)
+                            .offset(x: 5, y: -4)
+                    }
                 }
-            }
         }
-        .padding(AppSpacing.sm)
-        .background(Color(.tertiarySystemBackground))
-        .cornerRadius(AppCornerRadius.medium)
-        .padding(.horizontal, AppSpacing.md)
-        .padding(.top, AppSpacing.sm)
+        .accessibilityLabel("Filters")
+        .accessibilityValue(viewModel.filter.activeFilterCount > 0 ? "\(viewModel.filter.activeFilterCount) active" : "")
     }
 
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack {
-                ForEach(Array(viewModel.filter.equipment), id: \.self) { equip in
-                    filterChip(equip.displayName) {
+            HStack(spacing: VoidSpace.s2) {
+                ForEach(Array(viewModel.filter.equipment).sorted { $0.displayName < $1.displayName }, id: \.self) { equip in
+                    VoidSquareChip(text: equip.displayName, isSelected: true, trailingIcon: .close) {
                         var newFilter = viewModel.filter
                         newFilter.equipment.remove(equip)
                         viewModel.applyFilters(newFilter)
@@ -187,7 +185,7 @@ struct ExerciseBrowserContent: View {
                 }
 
                 if let difficulty = viewModel.filter.difficulty {
-                    filterChip(difficulty.displayName) {
+                    VoidSquareChip(text: difficulty.displayName, isSelected: true, trailingIcon: .close) {
                         var newFilter = viewModel.filter
                         newFilter.difficulty = nil
                         viewModel.applyFilters(newFilter)
@@ -195,103 +193,87 @@ struct ExerciseBrowserContent: View {
                 }
 
                 if let pattern = viewModel.filter.movementPattern {
-                    filterChip(pattern.displayName) {
+                    VoidSquareChip(text: pattern.displayName, isSelected: true, trailingIcon: .close) {
                         var newFilter = viewModel.filter
                         newFilter.movementPattern = nil
                         viewModel.applyFilters(newFilter)
                     }
                 }
 
-                Button("Clear All") {
+                Button {
                     viewModel.clearFilters()
+                } label: {
+                    Text("Clear all")
+                        .font(VoidFont.buttonSm)
+                        .foregroundStyle(VoidColor.text2)
+                        .frame(minWidth: VoidSize.hitMin, minHeight: VoidSize.hitMin)
+                        .contentShape(Rectangle())
                 }
-                .font(.caption)
+                .buttonStyle(VoidPlainButtonStyle())
+                .padding(.leading, VoidSpace.s1)
             }
-            .padding(.horizontal, AppSpacing.md)
+            .padding(.horizontal, VoidSpace.insetCard)
         }
-        .padding(.bottom, AppSpacing.xs)
     }
 
-    private func filterChip(_ value: String, onRemove: @escaping () -> Void) -> some View {
-        HStack(spacing: 4) {
-            Text(value)
+    // MARK: - States
 
-            Button(action: onRemove) {
-                Image(systemName: "xmark")
-                    .font(.caption2)
-            }
+    private var loadingView: some View {
+        VStack(spacing: VoidSpace.s3) {
+            ProgressView()
+                .tint(VoidColor.text2)
+            Text("Loading")
+                .voidEyebrowSm()
         }
-        .font(.caption)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.appTheme.opacity(0.2))
-        .foregroundColor(.appTheme)
-        .cornerRadius(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var emptyView: some View {
-        ContentUnavailableView {
-            Label("No Exercises", systemImage: "figure.strengthtraining.traditional")
-        } description: {
-            if let error = viewModel.error {
-                Text(error)
-            } else if viewModel.filter.isEmpty {
-                Text("No exercises found")
-            } else {
-                Text("Try adjusting your filters")
-            }
-        } actions: {
+        VStack(spacing: VoidSpace.s4) {
+            VoidPlaceholder(eyebrow: "No exercises", caption: emptyCaption)
+
             if viewModel.error != nil {
-                Button("Retry") {
+                VoidPillButton(title: "Retry") {
                     viewModel.clearError()
                     viewModel.loadExercises(refresh: true)
                 }
-                .buttonStyle(.borderedProminent)
             } else if !viewModel.filter.isEmpty {
-                Button("Clear Filters") {
+                VoidPillButton(title: "Clear filters") {
                     viewModel.clearFilters()
                 }
             }
         }
+        .padding(.horizontal, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    private var emptyCaption: String {
+        if let error = viewModel.error {
+            return error
+        }
+        if viewModel.filter.isEmpty {
+            return "Nothing in the library yet."
+        }
+        return "Try fewer filters."
+    }
+
+    // MARK: - List
 
     private var exerciseList: some View {
         List {
-            // Recently used section
             if !viewModel.recentlyUsedExercises.isEmpty && viewModel.searchText.isEmpty {
                 Section {
                     ForEach(viewModel.recentlyUsedExercises) { exercise in
-                        ExerciseSelectionRow(
-                            exercise: exercise,
-                            isSelected: viewModel.isPickerMode ? viewModel.isSelected(exercise) : nil,
-                            onTap: {
-                                if viewModel.isPickerMode {
-                                    viewModel.toggleSelection(exercise)
-                                } else {
-                                    onSelect?(exercise)
-                                }
-                            }
-                        )
+                        row(exercise)
                     }
                 } header: {
-                    SectionHeader(title: "Recently Used")
+                    sectionHeader("Recently used")
                 }
             }
 
-            // Library section
             Section {
                 ForEach(viewModel.exercises) { exercise in
-                    ExerciseSelectionRow(
-                        exercise: exercise,
-                        isSelected: viewModel.isPickerMode ? viewModel.isSelected(exercise) : nil,
-                        onTap: {
-                            if viewModel.isPickerMode {
-                                viewModel.toggleSelection(exercise)
-                            } else {
-                                onSelect?(exercise)
-                            }
-                        }
-                    )
+                    row(exercise)
                 }
 
                 if viewModel.hasMore {
@@ -299,19 +281,61 @@ struct ExerciseBrowserContent: View {
                         Spacer()
                         if viewModel.isLoadingMore {
                             ProgressView()
+                                .tint(VoidColor.text2)
                         }
                         Spacer()
                     }
+                    .frame(height: VoidSize.pill)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
                     .onAppear {
                         viewModel.loadMore()
                     }
                 }
             } header: {
-                SectionHeader(title: "Library")
+                sectionHeader("Library")
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .listSectionSeparator(.hidden)
+        .scrollDismissesKeyboard(.interactively)
+        .contentMargins(.bottom, showsFloatingButton ? VoidSize.cta + VoidSpace.s6 * 2 : 0, for: .scrollContent)
     }
+
+    private func row(_ exercise: ExerciseLibraryItem) -> some View {
+        ExerciseSelectionRow(
+            exercise: exercise,
+            isSelected: viewModel.isPickerMode ? viewModel.isSelected(exercise) : nil,
+            onTap: {
+                if viewModel.isPickerMode {
+                    viewModel.toggleSelection(exercise)
+                } else {
+                    onSelect?(exercise)
+                }
+            }
+        )
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .voidEyebrowSm()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, VoidSpace.insetText)
+            .padding(.top, VoidSpace.s3)
+            .padding(.bottom, VoidSpace.s2)
+            .background(VoidColor.hull)
+            .listRowInsets(EdgeInsets())
+    }
+}
+
+/// SF Symbols the Void glyph set does not name yet.
+private enum GapIcon {
+    static let filter = "line.3.horizontal.decrease"
 }
 
 // MARK: - Previews

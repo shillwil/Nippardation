@@ -51,6 +51,7 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
 
     private let programRepository: any ProgramRepositoryProtocol
     private let templateRepository: any TemplateRepositoryProtocol
+    private let exerciseLibraryResolver: ExerciseLibraryResolver
 
     // MARK: - Initialization
 
@@ -59,13 +60,15 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
         metadata: GenerationMetadataDTO?,
         reusedTemplateIds: Set<String> = [],
         programRepository: (any ProgramRepositoryProtocol)? = nil,
-        templateRepository: (any TemplateRepositoryProtocol)? = nil
+        templateRepository: (any TemplateRepositoryProtocol)? = nil,
+        exerciseLibraryResolver: ExerciseLibraryResolver? = nil
     ) {
         self.originalProgram = program
         self.metadata = metadata
         self.reusedTemplateIds = reusedTemplateIds
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
         self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
+        self.exerciseLibraryResolver = exerciseLibraryResolver ?? DependencyContainer.shared.exerciseLibraryResolver
 
         self.programName = program.name
         self.programDescription = program.description ?? ""
@@ -147,9 +150,15 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
                     _ = try await self.programRepository.updateProgram(updatedProgram)
                 }
 
+                // The generation response carries exercise names but no library payload, and
+                // `cacheTemplate` only stores the exercise id — so hydrate the templates
+                // before caching them. Anything still unresolved keeps its name through the
+                // resolver's placeholder cache instead of coming back as "Exercise".
+                let resolvedProgram = await self.exerciseLibraryResolver.resolve(updatedProgram)
+
                 // Cache the program and its templates locally
-                try await self.programRepository.cacheProgram(updatedProgram)
-                for workout in updatedProgram.workouts {
+                try await self.programRepository.cacheProgram(resolvedProgram)
+                for workout in resolvedProgram.workouts {
                     if let template = workout.template {
                         try? await self.templateRepository.cacheTemplate(template)
                     }
@@ -162,7 +171,7 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
             } catch {
                 await MainActor.run {
                     self.isSaving = false
-                    self.error = "Failed to save program: \(error.localizedDescription)"
+                    self.error = "Couldn't save the plan: \(error.localizedDescription)"
                 }
             }
         }

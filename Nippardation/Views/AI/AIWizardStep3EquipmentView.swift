@@ -2,7 +2,7 @@
 //  AIWizardStep3EquipmentView.swift
 //  Nippardation
 //
-//  Step 3: Equipment selection and experience level
+//  Step 3: experience level and equipment.
 //
 
 import SwiftUI
@@ -16,48 +16,39 @@ struct AIWizardStep3EquipmentView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.lg) {
+            VStack(alignment: .leading, spacing: VoidSpace.s6) {
                 AISectionHeader(
-                    "Your Setup",
+                    "Your setup",
                     subtitle: showEquipment
-                        ? "Select your experience level and available equipment"
-                        : "Select your experience level"
+                        ? "Your experience level and the equipment you have."
+                        : "Your experience level."
                 )
+                .padding(.horizontal, VoidSpace.s1)
 
                 // Experience level
-                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                    Text("Experience Level")
-                        .font(.headline)
+                VStack(alignment: .leading, spacing: VoidSpace.s2) {
+                    WizardSectionLabel(title: "Experience")
 
-                    Picker("Experience", selection: $viewModel.experienceLevel) {
-                        ForEach(AIExperienceLevel.allCases) { level in
-                            Text(level.displayName).tag(level)
-                        }
-                    }
-                    .pickerStyle(.segmented)
+                    VoidSegmentedControl(
+                        items: AIExperienceLevel.allCases,
+                        label: { $0.displayName },
+                        selection: $viewModel.experienceLevel
+                    )
                 }
 
                 if showEquipment {
-                    Divider()
-                        .padding(.vertical, AppSpacing.xs)
-
-                    // Equipment selection
-                    VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                        HStack {
-                            Text("Available Equipment")
-                                .font(.headline)
-                            Spacer()
-                            Text("\(viewModel.selectedEquipment.count) selected")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                    VStack(alignment: .leading, spacing: VoidSpace.s2) {
+                        WizardSectionLabel(
+                            title: "Equipment",
+                            trailing: "\(VoidFormat.pad2(viewModel.selectedEquipment.count)) selected"
+                        )
 
                         LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: AppSpacing.sm) {
+                            GridItem(.flexible(), spacing: VoidSpace.s2),
+                            GridItem(.flexible(), spacing: VoidSpace.s2),
+                            GridItem(.flexible(), spacing: VoidSpace.s2),
+                            GridItem(.flexible(), spacing: VoidSpace.s2)
+                        ], spacing: VoidSpace.s2) {
                             ForEach(AIEquipment.allCases) { equipment in
                                 equipmentCard(equipment)
                             }
@@ -65,7 +56,8 @@ struct AIWizardStep3EquipmentView: View {
                     }
                 }
             }
-            .padding(AppSpacing.md)
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s2)
         }
     }
 
@@ -74,51 +66,39 @@ struct AIWizardStep3EquipmentView: View {
     private func equipmentCard(_ equipment: AIEquipment) -> some View {
         let isSelected = viewModel.selectedEquipment.contains(equipment)
 
-        return Button {
-            withAnimation(.spring(duration: 0.2)) {
-                if isSelected {
-                    viewModel.selectedEquipment.remove(equipment)
-                } else {
-                    viewModel.selectedEquipment.insert(equipment)
-                }
+        return WizardOptionCard(isSelected: isSelected, checkInset: 6, action: {
+            if isSelected {
+                viewModel.selectedEquipment.remove(equipment)
+            } else {
+                viewModel.selectedEquipment.insert(equipment)
             }
-        } label: {
-            VStack(spacing: AppSpacing.xxs) {
+        }) {
+            VStack(spacing: 6) {
                 Image(systemName: equipment.icon)
-                    .font(.title3)
-                    .foregroundStyle(
-                        isSelected
-                            ? AnyShapeStyle(AIColors.gradient)
-                            : AnyShapeStyle(Color.secondary)
-                    )
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(VoidColor.text)
+                    .frame(height: 24)
+                    .accessibilityHidden(true)
 
                 Text(equipment.displayName)
-                    .font(.caption2)
+                    .font(VoidFont.caption2)
                     .fontWeight(.medium)
+                    .foregroundStyle(VoidColor.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, AppSpacing.sm)
-            .padding(.horizontal, AppSpacing.xxs)
-            .background(
-                isSelected
-                    ? AIColors.subtleGradient
-                    : LinearGradient(colors: [Color(.secondarySystemBackground)], startPoint: .top, endPoint: .bottom)
-            )
-            .cornerRadius(AppCornerRadius.small)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppCornerRadius.small)
-                    .stroke(isSelected ? AIColors.accent.opacity(0.5) : Color.clear, lineWidth: 1.5)
-            )
+            .padding(.vertical, 12)
+            .padding(.horizontal, VoidSpace.s1)
         }
-        .buttonStyle(.plain)
+        .accessibilityLabel(equipment.displayName)
     }
 }
 
 #Preview {
     NavigationStack {
         AIWizardStep3EquipmentView(viewModel: AIWizardViewModel())
+            .voidScreen()
     }
     .withDependencies(.preview)
 }
