@@ -77,7 +77,7 @@ struct GeneratedProgramPreviewView: View {
                     onDiscard()
                 } label: {
                     Text("Discard")
-                        .font(VoidFont.body)
+                        .font(VoidFont.buttonPlain)
                         .foregroundStyle(VoidColor.warning)
                 }
                 .disabled(viewModel.isSaving)

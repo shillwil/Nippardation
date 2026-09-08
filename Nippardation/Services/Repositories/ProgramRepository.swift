@@ -18,6 +18,12 @@ final class ProgramRepository: ProgramRepositoryProtocol {
     private let apiService: ProgramAPIServiceProtocol
     private let coreDataManager: CoreDataManager
 
+    /// Templates embedded in a program response never nest the exercise object, so every
+    /// program that comes back from the API is hydrated through the same resolver the
+    /// template repository uses. Without this an un-activated plan reads "Exercise" on
+    /// every row.
+    private let resolver: ExerciseLibraryResolver
+
     // MARK: - Configuration
 
     private let defaultPageSize = 20
@@ -26,10 +32,15 @@ final class ProgramRepository: ProgramRepositoryProtocol {
 
     init(
         apiService: ProgramAPIServiceProtocol,
-        coreDataManager: CoreDataManager = .shared
+        coreDataManager: CoreDataManager = .shared,
+        exerciseAPIService: (any ExerciseAPIServiceProtocol)? = nil
     ) {
         self.apiService = apiService
         self.coreDataManager = coreDataManager
+        self.resolver = ExerciseLibraryResolver(
+            coreDataManager: coreDataManager,
+            exerciseAPIService: exerciseAPIService
+        )
     }
 
     // MARK: - Fetch Operations
@@ -82,9 +93,15 @@ final class ProgramRepository: ProgramRepositoryProtocol {
                 }
             }
 
+            // Hydrate the embedded templates' exercises in one deduplicated batch, so a
+            // movement that repeats across days costs a single request.
+            let filled: [Program] = allPrograms.map { fillTemplatesFromCache($0) }
+            allPrograms = await resolver.resolve(filled)
+
             // Cache all programs (preserves existing workouts for list-fetched programs)
             for program in allPrograms {
                 try? await coreDataManager.cacheProgram(program)
+                await cacheEmbeddedTemplates(of: program)
             }
 
             return allPrograms
@@ -99,17 +116,21 @@ final class ProgramRepository: ProgramRepositoryProtocol {
     }
 
     func fetchProgram(serverId: String, forceRefresh: Bool) async throws -> Program {
-        // Check cache first if not forcing refresh
+        // Check cache first if not forcing refresh. This is the drill-into-a-plan path, so
+        // resolve the exercise library items too: a plan created on another device can be
+        // cached here while its movements have never been fetched into the exercise cache,
+        // and without this its rows would read "Exercise" forever.
         if !forceRefresh, let cached = getCachedProgram(serverId: serverId) {
-            return cached
+            return await resolver.resolve(cached)
         }
 
         do {
             let dto = try await apiService.fetchProgram(id: serverId)
-            let program = ProgramMapper.toDomain(dto)
+            let program = await hydrate(ProgramMapper.toDomain(dto))
 
             // Cache the result
             try? await coreDataManager.cacheProgram(program)
+            await cacheEmbeddedTemplates(of: program)
 
             return program
         } catch {
@@ -131,9 +152,10 @@ final class ProgramRepository: ProgramRepositoryProtocol {
         )
 
         // Filter by isPublic
-        let programs = dtos
+        let publicPrograms: [Program] = dtos
             .filter { $0.isPublic ?? false }
             .map { ProgramMapper.toDomain($0) }
+        let programs = await resolver.resolve(publicPrograms)
 
         let totalPages = pagination.hasMore ? (page + 1) : page
         let totalItems = pagination.hasMore ? (page * defaultPageSize + 1) : programs.count
@@ -168,10 +190,11 @@ final class ProgramRepository: ProgramRepositoryProtocol {
         )
 
         let dto = try await apiService.createProgram(request)
-        let createdProgram = ProgramMapper.toDomain(dto)
+        let createdProgram = await hydrate(ProgramMapper.toDomain(dto))
 
         // Cache the new program
         try? await coreDataManager.cacheProgram(createdProgram)
+        await cacheEmbeddedTemplates(of: createdProgram)
 
         return createdProgram
     }
@@ -200,10 +223,11 @@ final class ProgramRepository: ProgramRepositoryProtocol {
             workoutInputs
         )
 
-        let updatedProgram = ProgramMapper.toDomain(dto)
+        let updatedProgram = await hydrate(ProgramMapper.toDomain(dto))
 
         // Update cache
         try? await coreDataManager.cacheProgram(updatedProgram)
+        await cacheEmbeddedTemplates(of: updatedProgram)
 
         return updatedProgram
     }
@@ -267,10 +291,11 @@ final class ProgramRepository: ProgramRepositoryProtocol {
                 return nil
             }
 
-            let program = ProgramMapper.toDomain(dto.program)
+            let program = await hydrate(ProgramMapper.toDomain(dto.program))
 
             // Cache the active program
             try? await coreDataManager.cacheProgram(program)
+            await cacheEmbeddedTemplates(of: program)
 
             return program
         } catch {
@@ -284,11 +309,12 @@ final class ProgramRepository: ProgramRepositoryProtocol {
 
     func setActiveProgram(serverId: String) async throws -> Program {
         let dto = try await apiService.activateProgram(id: serverId)
-        let program = ProgramMapper.toDomain(dto)
+        let program = await hydrate(ProgramMapper.toDomain(dto))
 
         // Update local cache
         try? await coreDataManager.setActiveProgram(serverId: serverId)
         try? await coreDataManager.cacheProgram(program)
+        await cacheEmbeddedTemplates(of: program)
 
         return program
     }
@@ -319,22 +345,108 @@ final class ProgramRepository: ProgramRepositoryProtocol {
 
     func advanceToNextWorkout(serverId: String) async throws -> Program {
         let dto = try await apiService.advanceProgram(id: serverId)
-        let program = ProgramMapper.toDomain(dto)
+        let program = await hydrate(ProgramMapper.toDomain(dto))
 
         // Update local cache
         try? await coreDataManager.cacheProgram(program)
+        await cacheEmbeddedTemplates(of: program)
 
         return program
     }
 
     func resetProgram(serverId: String) async throws -> Program {
         let dto = try await apiService.resetProgram(id: serverId)
-        let program = ProgramMapper.toDomain(dto)
+        let program = await hydrate(ProgramMapper.toDomain(dto))
 
         // Update local cache
         try? await coreDataManager.cacheProgram(program)
+        await cacheEmbeddedTemplates(of: program)
 
         return program
+    }
+
+    // MARK: - Embedded Templates
+
+    /// Everything a program coming off the API needs before anyone reads a name off it:
+    /// fill in workouts the response summarised away, then resolve the exercise library
+    /// items its templates arrived without. Never throws — an offline read degrades to
+    /// whatever the caches hold.
+    private func hydrate(_ program: Program) async -> Program {
+        await resolver.resolve(fillTemplatesFromCache(program))
+    }
+
+    /// Program responses embed each workout's template as a summary, often with no
+    /// exercises at all. Fill those from the template cache so a plan the user has not
+    /// activated still shows its real workouts (and therefore its real movement names)
+    /// instead of empty rows.
+    private func fillTemplatesFromCache(_ program: Program) -> Program {
+        var updated = program
+        updated.workouts = program.workouts.map { workout in
+            let embedded = workout.template
+            guard embedded == nil || embedded?.exercises.isEmpty == true else { return workout }
+
+            let templateId = embedded.map { $0.serverId.isEmpty ? workout.templateServerId : $0.serverId }
+                ?? workout.templateServerId
+            guard !templateId.isEmpty,
+                  let cached = coreDataManager.fetchCachedTemplate(serverId: templateId) else {
+                return workout
+            }
+
+            var template = coreDataManager.toDomain(cached)
+            guard !template.exercises.isEmpty else { return workout }
+            // The response is newer than the cache for the workout's own fields.
+            if let embedded {
+                template.name = embedded.name
+                template.description = embedded.description
+            }
+
+            var updatedWorkout = workout
+            updatedWorkout.template = template
+            return updatedWorkout
+        }
+        return updated
+    }
+
+    /// Caches the workouts a program response carried.
+    ///
+    /// `cacheProgram` only stores the rotation, so without this the workouts a plan response
+    /// embedded would never reach `CDTemplate`, and an offline read of a plan the user has
+    /// not activated would have no exercises — and therefore no names — to show.
+    ///
+    /// Templates the cache already holds unchanged are skipped: most program responses
+    /// summarise their templates away and `fillTemplatesFromCache` puts the cached copy
+    /// back, and rewriting that copy on every plan read is pure churn. Exercise library
+    /// items are deliberately not re-cached here — the resolver already caches what it
+    /// fetched, and rewriting cache-resolved items would refresh their `lastFetchedAt`
+    /// without a network round trip, so they would never look stale again.
+    private func cacheEmbeddedTemplates(of program: Program) async {
+        for workout in program.workouts {
+            guard let template = workout.template,
+                  !template.serverId.isEmpty,
+                  !template.exercises.isEmpty,
+                  templateCacheNeedsUpdate(template) else { continue }
+            try? await coreDataManager.cacheTemplate(template)
+        }
+    }
+
+    /// True when the cached copy of this template differs from the one that just arrived.
+    private func templateCacheNeedsUpdate(_ template: Template) -> Bool {
+        guard let cached = coreDataManager.fetchCachedTemplate(serverId: template.serverId) else {
+            return true
+        }
+        if cached.name != template.name { return true }
+
+        let cachedExercises = cached.exercisesArray
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .map { exercise -> String in
+                "\(exercise.exerciseServerId ?? "")|\(exercise.warmupSets)|\(exercise.workingSets)|\(exercise.targetReps ?? "")|\(exercise.restSeconds)"
+            }
+        let incomingExercises = template.exercises
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .map { exercise -> String in
+                "\(exercise.exerciseServerId)|\(exercise.warmupSets ?? 0)|\(exercise.workingSets)|\(exercise.targetReps ?? "")|\(exercise.restSeconds ?? 0)"
+            }
+        return cachedExercises != incomingExercises
     }
 
     // MARK: - Cache Operations

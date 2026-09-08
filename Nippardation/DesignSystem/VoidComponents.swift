@@ -297,32 +297,41 @@ struct VoidDestructiveButton: View {
     }
 }
 
-/// The giant Start: 200×200, radius 28, plasma, three-ring glow, play triangle + "Start".
-/// Press: scale .97 over 120ms. Fires a light haptic.
+/// The giant Start: 200×200, radius 28, plasma, a rippling ring field, play triangle + "Start".
+/// Press: scale .97 over 120ms — the rings ride that scale, so they collapse in with the square —
+/// plus one faster, brighter ring thrown out of the press. Fires a light haptic.
 struct VoidStartButton: View {
     var title: String = "Start"
     var isEnabled: Bool = true
     let action: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var ring1: Double { colorScheme == .dark ? 0.06 : 0.08 }
-    private var ring2: Double { colorScheme == .dark ? 0.03 : 0.04 }
+    /// The ripple clock only runs while the button is on screen and live.
+    @State private var isOnScreen = false
+    /// Clock origin, so the field eases in instead of snapping to mid-flight.
+    @State private var appearDate = Date()
+    /// The last tap, driving the one fast ring.
+    @State private var tapDate: Date?
+    /// Reduce Motion tap response: 0…1 brightening of the static rings, no travel.
+    @State private var flash: Double = 0
+
     private var glow: Double { colorScheme == .dark ? 0.25 : 0.22 }
 
     var body: some View {
         Button {
             VoidHaptics.light()
+            respondToTap()
             action()
         } label: {
             ZStack {
-                // Glow rings (box-shadow spreads 28 / 14 in the kit)
-                RoundedRectangle(cornerRadius: VoidRadius.start + 28, style: .continuous)
-                    .fill(VoidColor.plasma.opacity(ring2))
-                    .frame(width: VoidSize.start + 56, height: VoidSize.start + 56)
-                RoundedRectangle(cornerRadius: VoidRadius.start + 14, style: .continuous)
-                    .fill(VoidColor.plasma.opacity(ring1))
-                    .frame(width: VoidSize.start + 28, height: VoidSize.start + 28)
+                VoidStartRipple(
+                    isRunning: isOnScreen && isEnabled,
+                    startDate: appearDate,
+                    tapDate: tapDate,
+                    flash: flash
+                )
                 RoundedRectangle(cornerRadius: VoidRadius.start, style: .continuous)
                     .fill(VoidColor.plasma)
                     .frame(width: VoidSize.start, height: VoidSize.start)
@@ -343,6 +352,144 @@ struct VoidStartButton: View {
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.5)
         .accessibilityLabel(title)
+        .onAppear {
+            appearDate = Date()
+            isOnScreen = true
+        }
+        .onDisappear { isOnScreen = false }
+    }
+
+    /// Reduce Motion gets a plain brighten-and-settle; otherwise the press throws a ring.
+    private func respondToTap() {
+        guard isEnabled else { return }
+        if reduceMotion {
+            withAnimation(.easeOut(duration: 0.12)) { flash = 1 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.easeOut(duration: 0.45)) { flash = 0 }
+            }
+        } else {
+            tapDate = Date()
+        }
+    }
+}
+
+/// The Start button's ring field: rounded rectangles concentric with the 28pt radius that slide
+/// out from under the square, widen and dissolve — three in flight, staggered a third of a cycle
+/// apart. One `TimelineView(.animation)` drives the lot; nothing here churns state per frame and
+/// nothing here lays out (the rings overflow their 200pt frame, as the kit's box-shadow does).
+/// Off screen, disabled, or with Reduce Motion on it falls back to the original static rings.
+private struct VoidStartRipple: View {
+    /// False when the button is off screen or disabled — the clock stops and the rings go static.
+    var isRunning: Bool
+    /// When the clock started.
+    var startDate: Date
+    /// The last tap, or nil.
+    var tapDate: Date?
+    /// Reduce Motion tap response level, 0…1.
+    var flash: Double
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    // The kit's two static glow spreads. Light mode sits a touch higher; keep that relationship.
+    private var ring1: Double { colorScheme == .dark ? 0.06 : 0.08 }
+    private var ring2: Double { colorScheme == .dark ? 0.03 : 0.04 }
+    /// Ceiling for a travelling ring: what the two static rings composite to where they overlap.
+    private var tapPeak: Double { colorScheme == .dark ? 0.09 : 0.115 }
+
+    /// A slow pulse: one ring every 3.4s, three in flight, each a third of a cycle behind the last.
+    private let cycle: Double = 3.4
+    private let ringCount = 3
+    private let reach: CGFloat = 44
+    private let tapCycle: Double = 0.9
+    private let tapReach: CGFloat = 64
+
+    var body: some View {
+        Group {
+            if reduceMotion || !isRunning {
+                staticRings
+            } else {
+                TimelineView(.animation) { context in
+                    ripple(at: context.date)
+                }
+            }
+        }
+        .frame(width: VoidSize.start, height: VoidSize.start)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    // MARK: Static — Reduce Motion, off screen, disabled
+
+    private var staticRings: some View {
+        ZStack {
+            glowRing(spread: 28, opacity: ring2)
+            glowRing(spread: 14, opacity: ring1)
+            // The Reduce Motion tap response: the same rings brighten and settle back.
+            ZStack {
+                glowRing(spread: 28, opacity: ring2 * 0.6)
+                glowRing(spread: 14, opacity: ring1 * 0.6)
+            }
+            .opacity(flash)
+        }
+    }
+
+    /// A filled rounded rect standing `spread` points proud of the button on every side.
+    private func glowRing(spread: CGFloat, opacity: Double) -> some View {
+        RoundedRectangle(cornerRadius: VoidRadius.start + spread, style: .continuous)
+            .fill(VoidColor.plasma.opacity(opacity))
+            .frame(width: VoidSize.start + spread * 2, height: VoidSize.start + spread * 2)
+    }
+
+    // MARK: Motion
+
+    private func ripple(at now: Date) -> some View {
+        let elapsed: Double = max(0, now.timeIntervalSince(startDate))
+        // Ease the field in on appear so no ring pops into view mid-flight.
+        let fadeIn: Double = min(1, elapsed / 0.7)
+        return ZStack {
+            ForEach(0..<ringCount, id: \.self) { index in
+                band(progress: phase(elapsed: elapsed, index: index),
+                     peak: ring1 * fadeIn,
+                     reach: reach,
+                     width: 14,
+                     spread: 10)
+            }
+            if let tapDate {
+                let tapProgress = now.timeIntervalSince(tapDate) / tapCycle
+                if tapProgress >= 0, tapProgress <= 1 {
+                    band(progress: tapProgress,
+                         peak: tapPeak * fadeIn,
+                         reach: tapReach,
+                         width: 10,
+                         spread: 18)
+                }
+            }
+        }
+        .blur(radius: 5)
+    }
+
+    /// 0…1 position of ring `index` in the cycle, staggered by a third.
+    private func phase(elapsed: Double, index: Int) -> Double {
+        let raw = elapsed / cycle + Double(index) / Double(ringCount)
+        return raw - raw.rounded(.down)
+    }
+
+    /// One expanding band. `progress` walks its outer edge from the button's edge out to `reach`,
+    /// decelerating, while the band widens by `spread` and fades to nothing. At progress 0 the
+    /// band sits entirely under the opaque square, so it reads as emanating from the edge.
+    private func band(progress: Double, peak: Double, reach: CGFloat, width: CGFloat, spread: CGFloat) -> some View {
+        let p: Double = min(max(progress, 0), 1)
+        // Decelerating travel out from the edge, a widening band, then a soft dissolve.
+        let eased: Double = 1 - pow(1 - p, 2.2)
+        let rise: Double = 0.12
+        let fade: Double = p < rise ? p / rise : pow(1 - (p - rise) / (1 - rise), 1.7)
+        let distance: CGFloat = reach * CGFloat(eased)
+        let line: CGFloat = width + spread * CGFloat(p)
+        let side: CGFloat = VoidSize.start + distance * 2
+        return RoundedRectangle(cornerRadius: VoidRadius.start + distance, style: .continuous)
+            .strokeBorder(VoidColor.plasma.opacity(peak * fade), lineWidth: line)
+            .frame(width: side, height: side)
     }
 }
 
@@ -627,7 +774,7 @@ struct VoidStatTile: View {
                         .minimumScaleFactor(0.7)
                     if let unit {
                         Text(unit)
-                            .font(.system(size: 13))
+                            .font(VoidFont.caption)
                             .foregroundStyle(VoidColor.text2)
                     }
                 }

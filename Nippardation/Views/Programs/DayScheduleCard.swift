@@ -55,6 +55,7 @@ struct DayScheduleCard: View {
                             Text("Rest day")
                                 .font(VoidFont.bodyStrong)
                                 .foregroundStyle(VoidColor.text2)
+                                .lineLimit(1)
                         } else if let templateName {
                             Text(templateName)
                                 .font(VoidFont.bodyStrong)
@@ -67,6 +68,7 @@ struct DayScheduleCard: View {
                             Text("Select workout")
                                 .font(VoidFont.bodyStrong)
                                 .foregroundStyle(VoidColor.plasma)
+                                .lineLimit(1)
                         }
                     }
 

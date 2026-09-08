@@ -27,7 +27,9 @@ enum WorkoutBuilder {
 
         return Exercise(
             type: ExerciseType(
-                name: libraryItem?.name ?? "Exercise",
+                // Prefer any name the app already has (a resolved library item, or the
+                // name-only placeholder an AI plan carries) over the generic word.
+                name: templateExercise.displayName,
                 muscleGroup: libraryItem?.primaryMuscles ?? []
             ),
             exerciseServerId: libraryItem?.serverId ?? templateExercise.exerciseServerId,

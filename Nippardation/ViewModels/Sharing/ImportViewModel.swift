@@ -56,16 +56,19 @@ final class ImportViewModel: ObservableObject {
     private let shareAPIService: any ShareAPIServiceProtocol
     private let templateRepository: any TemplateRepositoryProtocol
     private let programRepository: any ProgramRepositoryProtocol
+    private let exerciseLibraryResolver: ExerciseLibraryResolver
     private var token: String?
 
     init(
         shareAPIService: (any ShareAPIServiceProtocol)? = nil,
         templateRepository: (any TemplateRepositoryProtocol)? = nil,
-        programRepository: (any ProgramRepositoryProtocol)? = nil
+        programRepository: (any ProgramRepositoryProtocol)? = nil,
+        exerciseLibraryResolver: ExerciseLibraryResolver? = nil
     ) {
         self.shareAPIService = shareAPIService ?? DependencyContainer.shared.shareAPIService
         self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
+        self.exerciseLibraryResolver = exerciseLibraryResolver ?? DependencyContainer.shared.exerciseLibraryResolver
     }
 
     /// Fetches the share preview from the backend
@@ -77,7 +80,9 @@ final class ImportViewModel: ObservableObject {
         Task {
             do {
                 let response = try await shareAPIService.fetchShare(token: token)
-                self.sharedItem = SharedItem.fromDTO(response)
+                // Share payloads embed templates without the nested exercise object, so the
+                // preview would otherwise read "Exercise" on every row.
+                self.sharedItem = await exerciseLibraryResolver.resolve(SharedItem.fromDTO(response))
                 self.state = .loaded
             } catch let error as RepositoryError {
                 if case .notFound = error {

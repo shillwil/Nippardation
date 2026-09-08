@@ -151,6 +151,7 @@ private struct FilterOptionRow: View {
                 Text(label)
                     .font(VoidFont.body)
                     .foregroundStyle(VoidColor.text)
+                    .lineLimit(1)
 
                 Spacer()
 

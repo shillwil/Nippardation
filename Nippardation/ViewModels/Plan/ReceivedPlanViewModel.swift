@@ -45,6 +45,7 @@ final class ReceivedPlanViewModel: ObservableObject {
     private let shareAPIService: any ShareAPIServiceProtocol
     private let templateRepository: any TemplateRepositoryProtocol
     private let programRepository: any ProgramRepositoryProtocol
+    private let exerciseLibraryResolver: ExerciseLibraryResolver
     private let store: ReceivedPlansStore
     private let taskManager = TaskManager()
 
@@ -53,12 +54,14 @@ final class ReceivedPlanViewModel: ObservableObject {
         shareAPIService: (any ShareAPIServiceProtocol)? = nil,
         templateRepository: (any TemplateRepositoryProtocol)? = nil,
         programRepository: (any ProgramRepositoryProtocol)? = nil,
+        exerciseLibraryResolver: ExerciseLibraryResolver? = nil,
         store: ReceivedPlansStore? = nil
     ) {
         self.token = token
         self.shareAPIService = shareAPIService ?? DependencyContainer.shared.shareAPIService
         self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
+        self.exerciseLibraryResolver = exerciseLibraryResolver ?? DependencyContainer.shared.exerciseLibraryResolver
         self.store = store ?? ReceivedPlansStore.shared
         self.isSaved = self.store.plan(token: token)?.isRead == true
     }
@@ -129,7 +132,9 @@ final class ReceivedPlanViewModel: ObservableObject {
     private func performLoad() async {
         do {
             let response = try await shareAPIService.fetchShare(token: token)
-            let fetched = SharedItem.fromDTO(response)
+            // Share payloads embed templates without the nested exercise object; hydrate
+            // them so the preview shows real movement names.
+            let fetched = await exerciseLibraryResolver.resolve(SharedItem.fromDTO(response))
             item = fetched
             plan = ReceivedPlan(item: fetched)
             // Every opened share is filed under Sent to you, unread, so a swiped-away sheet
@@ -215,7 +220,8 @@ final class ReceivedPlanViewModel: ObservableObject {
         ImportViewModel(
             shareAPIService: shareAPIService,
             templateRepository: templateRepository,
-            programRepository: programRepository
+            programRepository: programRepository,
+            exerciseLibraryResolver: exerciseLibraryResolver
         )
     }
 

@@ -111,6 +111,7 @@ struct TemplateSelectorSheet: View {
                 Text("Create new workout")
                     .font(VoidFont.bodyStrong)
                     .foregroundStyle(VoidColor.text)
+                    .lineLimit(1)
 
                 Spacer(minLength: VoidSpace.s2)
 

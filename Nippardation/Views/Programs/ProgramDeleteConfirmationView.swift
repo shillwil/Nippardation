@@ -153,6 +153,7 @@ struct ProgramDeleteConfirmationView: View {
                     Text("\(template.exerciseCount) \(template.exerciseCount == 1 ? "exercise" : "exercises")")
                         .font(VoidFont.caption2)
                         .foregroundStyle(VoidColor.text2)
+                        .lineLimit(1)
                 }
 
                 Spacer(minLength: VoidSpace.s2)

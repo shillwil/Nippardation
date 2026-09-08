@@ -263,9 +263,11 @@ private struct NewWorkoutRow: View {
                     Text("New workout")
                         .font(VoidFont.bodyStrong)
                         .foregroundStyle(VoidColor.text)
+                        .lineLimit(1)
                     Text("Pick exercises, sets and rest")
                         .font(VoidFont.caption2)
                         .foregroundStyle(VoidColor.text2)
+                        .lineLimit(1)
                 }
 
                 Spacer(minLength: VoidSpace.s2)

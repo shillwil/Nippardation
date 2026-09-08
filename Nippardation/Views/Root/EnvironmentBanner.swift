@@ -10,8 +10,8 @@ struct EnvironmentBannerModifier: ViewModifier {
         #if STAGING
         content.overlay(alignment: .top) {
             Text("STAGING")
-                .font(.caption2)
-                .fontWeight(.bold)
+                .font(VoidFont.eyebrowSm)
+                .tracking(VoidFont.Tracking.eyebrowSm)
                 .foregroundStyle(.white)
                 .padding(.horizontal, AppSpacing.xs)
                 .padding(.vertical, AppSpacing.xxs)

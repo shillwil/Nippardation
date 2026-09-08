@@ -299,8 +299,10 @@ enum AIGeneratedProgramMapper {
     }
 
     static func toDomain(_ dto: AIGeneratedExerciseDTO, orderIndex: Int) -> TemplateExercise {
-        // Create a stub ExerciseLibraryItem so displayName works
-        // (the AI response provides exercise names directly)
+        // Create a placeholder ExerciseLibraryItem so the name the AI returned is shown
+        // straight away. It is flagged as a placeholder so `ExerciseLibraryResolver`
+        // upgrades it to the real library item (muscles, video, thumbnail) as soon as the
+        // exercise id can be looked up, and never caches over a real entry.
         let stubLibraryItem = dto.name.map { name in
             ExerciseLibraryItem(
                 id: UUID(),
@@ -316,7 +318,8 @@ enum AIGeneratedProgramMapper {
                 videoUrl: nil,
                 thumbnailUrl: nil,
                 popularityScore: 0,
-                lastFetchedAt: nil
+                lastFetchedAt: nil,
+                isPlaceholder: true
             )
         }
 

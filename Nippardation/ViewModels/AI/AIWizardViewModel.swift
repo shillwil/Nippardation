@@ -70,6 +70,7 @@ final class AIWizardViewModel: ObservableObject {
     private let aiAPIService: any AIAPIServiceProtocol
     private let programRepository: any ProgramRepositoryProtocol
     private let templateRepository: any TemplateRepositoryProtocol
+    private let exerciseLibraryResolver: ExerciseLibraryResolver
     private var generateTask: Task<Void, Never>?
     private var loadingTimer: Timer?
 
@@ -104,11 +105,13 @@ final class AIWizardViewModel: ObservableObject {
     init(
         aiAPIService: (any AIAPIServiceProtocol)? = nil,
         programRepository: (any ProgramRepositoryProtocol)? = nil,
-        templateRepository: (any TemplateRepositoryProtocol)? = nil
+        templateRepository: (any TemplateRepositoryProtocol)? = nil,
+        exerciseLibraryResolver: ExerciseLibraryResolver? = nil
     ) {
         self.aiAPIService = aiAPIService ?? DependencyContainer.shared.aiAPIService
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
         self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
+        self.exerciseLibraryResolver = exerciseLibraryResolver ?? DependencyContainer.shared.exerciseLibraryResolver
     }
 
     // MARK: - Public Methods
@@ -246,8 +249,13 @@ final class AIWizardViewModel: ObservableObject {
             do {
                 let response = try await self.aiAPIService.generateProgram(request)
 
-                // Map the AI-specific DTO to a domain model
-                let program = AIGeneratedProgramMapper.toDomain(response.program)
+                // Map the AI-specific DTO to a domain model. The response carries exercise
+                // names but no library payload, so upgrade the name-only placeholders to
+                // real library items (muscles, video) where the exercise id resolves; the
+                // names survive either way.
+                let program = await self.exerciseLibraryResolver.resolve(
+                    AIGeneratedProgramMapper.toDomain(response.program)
+                )
 
                 // Extract reused template IDs from the response
                 let reusedIds = Set(

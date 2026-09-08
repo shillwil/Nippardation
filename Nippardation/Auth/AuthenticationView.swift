@@ -126,7 +126,7 @@ struct AuthenticationView: View {
     private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(VoidFont.caption)
+                .font(VoidFont.buttonLink)
                 .foregroundStyle(VoidColor.plasma)
                 .frame(minHeight: VoidSize.hitMin)
                 .contentShape(Rectangle())
@@ -182,7 +182,7 @@ struct AuthenticationView: View {
 
 // MARK: - Secure field (Void chrome; the foundation only ships `VoidTextField`)
 
-/// Squared secure field well: panel-2 fill, radius 12, SF 15 — the `SecureField` twin of `VoidTextField`.
+/// Squared secure field well: panel-2 fill, radius 12, Chakra Petch 15.5 — the `SecureField` twin of `VoidTextField`.
 private struct VoidSecureField: View {
     let placeholder: String
     @Binding var text: String

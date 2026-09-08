@@ -95,7 +95,7 @@ struct WorkoutPreviewView: View {
                     .voidEyebrowSm(VoidColor.text3)
                     .frame(width: 22, alignment: .leading)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(exercise.exerciseLibraryItem?.name ?? "Exercise")
+                    Text(exercise.displayName)
                         .font(VoidFont.bodyStrong)
                         .foregroundStyle(VoidColor.text)
                         .lineLimit(1)

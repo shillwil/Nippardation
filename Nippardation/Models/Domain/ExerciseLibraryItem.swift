@@ -9,7 +9,7 @@ import Foundation
 
 /// Domain model representing an exercise from the library
 /// Used throughout the app for exercise selection and display
-struct ExerciseLibraryItem: Identifiable, Hashable {
+struct ExerciseLibraryItem: Identifiable, Hashable, Sendable {
     let id: UUID
     let serverId: String
     let name: String
@@ -24,6 +24,12 @@ struct ExerciseLibraryItem: Identifiable, Hashable {
     let thumbnailUrl: URL?
     let popularityScore: Int
     let lastFetchedAt: Date?
+
+    /// True for a name-only item the app synthesised itself rather than one that came from
+    /// the exercise library (an AI generation response carries names but no library payload).
+    /// A placeholder is replaced by the real library item as soon as one can be resolved,
+    /// and is never allowed to overwrite a real cached entry.
+    var isPlaceholder: Bool = false
 
     // MARK: - Hashable
 

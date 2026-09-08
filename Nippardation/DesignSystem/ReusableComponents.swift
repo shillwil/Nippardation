@@ -151,8 +151,7 @@ struct SectionHeader: View {
             if let action {
                 Button(action: action.handler) {
                     Text(action.label)
-                        .font(VoidFont.caption)
-                        .fontWeight(.semibold)
+                        .font(VoidFont.buttonSm)
                         .foregroundStyle(VoidColor.plasma)
                 }
                 .buttonStyle(VoidPlainButtonStyle())

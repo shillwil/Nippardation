@@ -3,8 +3,10 @@
 //  Nippardation
 //
 //  Void design system tokens — mirrors void-ds/tokens/*.css 1:1.
-//  Fonts: Michroma-Regular.ttf and ChakraPetch-SemiBold.ttf are bundled under
-//  Resources/Fonts and registered via UIAppFonts in Info.plist.
+//  Fonts: Michroma-Regular.ttf plus ChakraPetch-Regular/Medium/SemiBold.ttf are bundled
+//  under Resources/Fonts and registered via UIAppFonts in Info.plist.
+//  Chakra Petch is the whole reading face — body, captions, titles, steppers, nav titles.
+//  Michroma stays on display words and big numbers. Only buttons and the tab bar keep SF.
 //
 //  Glyphs: the app uses SF Symbols (its existing icon set) rather than the
 //  SVGs that shipped with the design bundle. See `VoidIcon`.
@@ -55,31 +57,57 @@ enum VoidColor {
 // MARK: - Type
 
 enum VoidFont {
+    /// Font names as registered in the bundle (UIAppFonts).
+    static let displayFontName  = "Michroma-Regular"
+    /// The label/heading weight — eyebrows, readouts, titles, steppers, strong body.
+    static let labelFontName    = "ChakraPetch-SemiBold"
+    /// The reading weight — body, captions, list-row copy, text fields.
+    static let labelFontRegular = "ChakraPetch-Regular"
+    /// The in-between weight. Nothing points at it directly; it is bundled so that
+    /// `.fontWeight(.medium)` on a Chakra Petch run resolves inside the family
+    /// instead of being synthesised.
+    static let labelFontMedium  = "ChakraPetch-Medium"
+
     // Display — Michroma, one weight. Always uppercase, tracking 0.02em.
     static let wordHero   = Font.custom("Michroma-Regular", size: 44)
     static let wordRow    = Font.custom("Michroma-Regular", size: 30)
     static let numberHero = Font.custom("Michroma-Regular", size: 48)
     static let number     = Font.custom("Michroma-Regular", size: 24)
+
     // Labels — Chakra Petch SemiBold. Always uppercase, tracking 0.12em (readout 0.06em).
     static let eyebrow    = Font.custom("ChakraPetch-SemiBold", size: 12)
     static let eyebrowSm  = Font.custom("ChakraPetch-SemiBold", size: 11)
     static let readout    = Font.custom("ChakraPetch-SemiBold", size: 13)
-    // UI — SF
-    static let body       = Font.system(size: 15)
-    static let bodyStrong = Font.system(size: 15, weight: .semibold)
-    static let caption    = Font.system(size: 13)
-    static let caption2   = Font.system(size: 12)
+
+    // Reading type — Chakra Petch. Sizes run +0.5pt over the SF sizes they replace:
+    // Chakra Petch's x-height is 0.498em against SF Text's ~0.517em, so at parity it
+    // reads about 4% small. Half a point puts the lowercase back on the SF line.
+    static let body       = Font.custom("ChakraPetch-Regular", size: 15.5)
+    static let bodyStrong = Font.custom("ChakraPetch-SemiBold", size: 15.5)
+    static let caption    = Font.custom("ChakraPetch-Regular", size: 13.5)
+    static let caption2   = Font.custom("ChakraPetch-Regular", size: 12.5)
+    /// Section / sheet titles.
+    static let title      = Font.custom("ChakraPetch-SemiBold", size: 20)
+    /// Stepper and logger numbers. Chakra Petch ships no `tnum` feature, so
+    /// `monospacedDigit()` is a no-op here — the face's digits are already uniform width.
+    static let stepper    = Font.custom("ChakraPetch-SemiBold", size: 20).monospacedDigit()
+
+    // Controls — SF. Buttons and the tab bar never change face.
     static let button     = Font.system(size: 15, weight: .semibold)
     static let buttonLg   = Font.system(size: 17, weight: .semibold)
+    /// Small emphasised text button ("Clear all", "Reorder", "See all").
+    static let buttonSm   = Font.system(size: 13, weight: .semibold)
+    /// Unemphasised text button, e.g. a toolbar "Discard".
+    static let buttonPlain = Font.system(size: 15)
+    /// Small plain text link inside a button ("Forgot password?").
+    static let buttonLink = Font.system(size: 13)
     static let start      = Font.system(size: 20, weight: .bold)
     static let tab        = Font.system(size: 10, weight: .medium)
-    static let stepper    = Font.system(size: 20, weight: .bold).monospacedDigit()
-    /// Section / sheet titles in SF.
-    static let title      = Font.system(size: 20, weight: .bold)
 
-    /// Font names as registered in the bundle (UIAppFonts).
-    static let displayFontName = "Michroma-Regular"
-    static let labelFontName   = "ChakraPetch-SemiBold"
+    /// Pushed-screen navigation titles, applied through `UINavigationBar` appearance
+    /// in `NippardationApp` (SwiftUI's `navigationTitle` has no font modifier).
+    static let navTitleSize: CGFloat = 17.5
+    static let navLargeTitleSize: CGFloat = 34
 
     // Tracking, in points (em × size).
     enum Tracking {

@@ -124,6 +124,7 @@ struct ProgramEditorView: View {
                 Text(viewModel.isIndefinite ? "Ongoing" : "\(viewModel.durationWeeks ?? 8) weeks")
                     .font(VoidFont.body)
                     .foregroundStyle(VoidColor.text)
+                    .lineLimit(1)
                 Spacer()
                 VoidSegmentedControl(
                     items: [PlanLength.ongoing, PlanLength.weeks],
@@ -139,6 +140,7 @@ struct ProgramEditorView: View {
                     Text("Weeks")
                         .font(VoidFont.body)
                         .foregroundStyle(VoidColor.text)
+                        .lineLimit(1)
                     Spacer()
                     PlanStepperWell(value: weeksBinding, range: 1...52)
                 }

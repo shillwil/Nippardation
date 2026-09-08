@@ -191,6 +191,55 @@ extension CoreDataManager {
         }
     }
 
+    /// Caches only exercises that are not in the library cache yet.
+    ///
+    /// Used for name-only placeholders (an AI generation response, say) so the movement name
+    /// survives a Core Data round trip, without ever overwriting a real library entry that
+    /// carries muscles, a video and a thumbnail. Placeholders are stored with no
+    /// `lastFetchedAt`, which is how they stay recognisable as placeholders on the way back
+    /// out and why they are treated as stale and re-fetched when the network is available.
+    func cacheExercisesIfAbsent(_ exercises: [ExerciseLibraryItem]) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let context = persistentContainer.newBackgroundContext()
+            context.perform {
+                do {
+                    for exercise in exercises {
+                        let request: NSFetchRequest<CDExerciseLibrary> = CDExerciseLibrary.fetchRequest()
+                        request.predicate = NSPredicate(format: "serverId == %@", exercise.serverId)
+                        request.fetchLimit = 1
+
+                        // Never overwrite what is already cached.
+                        let existing = try context.fetch(request).first
+                        if existing != nil { continue }
+
+                        let cdExercise = CDExerciseLibrary(context: context)
+                        cdExercise.id = exercise.id
+                        cdExercise.serverId = exercise.serverId
+                        cdExercise.name = exercise.name
+                        cdExercise.primaryMuscles = exercise.primaryMuscles.map { $0.rawValue } as NSArray
+                        cdExercise.secondaryMuscles = exercise.secondaryMuscles.map { $0.rawValue } as NSArray
+                        cdExercise.equipment = exercise.equipment?.rawValue
+                        cdExercise.difficulty = exercise.difficulty?.rawValue
+                        cdExercise.movementPattern = exercise.movementPattern?.rawValue
+                        cdExercise.exerciseType = exercise.exerciseType?.rawValue
+                        cdExercise.instructions = exercise.instructions
+                        cdExercise.videoUrl = exercise.videoUrl?.absoluteString
+                        cdExercise.thumbnailUrl = exercise.thumbnailUrl?.absoluteString
+                        cdExercise.popularityScore = Int32(exercise.popularityScore)
+                        cdExercise.lastFetchedAt = exercise.isPlaceholder ? nil : Date()
+                    }
+
+                    if context.hasChanges {
+                        try context.save()
+                    }
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: RepositoryError.storageError(error))
+                }
+            }
+        }
+    }
+
     /// Clear exercise cache
     func clearExerciseCache() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -230,7 +279,10 @@ extension CoreDataManager {
             videoUrl: cdExercise.videoUrl.flatMap { URL(string: $0) },
             thumbnailUrl: cdExercise.thumbnailUrl.flatMap { URL(string: $0) },
             popularityScore: Int(cdExercise.popularityScore),
-            lastFetchedAt: cdExercise.lastFetchedAt
+            lastFetchedAt: cdExercise.lastFetchedAt,
+            // Rows written by `cacheExercisesIfAbsent` for a name-only placeholder carry no
+            // fetch timestamp; every real cache write stamps one.
+            isPlaceholder: cdExercise.lastFetchedAt == nil
         )
     }
 

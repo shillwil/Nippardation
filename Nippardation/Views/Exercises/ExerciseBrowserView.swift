@@ -204,8 +204,7 @@ struct ExerciseBrowserContent: View {
                     viewModel.clearFilters()
                 } label: {
                     Text("Clear all")
-                        .font(VoidFont.caption)
-                        .fontWeight(.semibold)
+                        .font(VoidFont.buttonSm)
                         .foregroundStyle(VoidColor.text2)
                         .frame(minWidth: VoidSize.hitMin, minHeight: VoidSize.hitMin)
                         .contentShape(Rectangle())

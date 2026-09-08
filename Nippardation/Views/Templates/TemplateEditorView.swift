@@ -324,8 +324,7 @@ private struct TemplateEditorContent: View {
                         isReordering.toggle()
                     } label: {
                         Text(isReordering ? "Done" : "Reorder")
-                            .font(VoidFont.caption)
-                            .fontWeight(.semibold)
+                            .font(VoidFont.buttonSm)
                             .foregroundStyle(VoidColor.text)
                             .frame(minWidth: VoidSize.hitMin, minHeight: VoidSize.hitMin)
                             .contentShape(Rectangle())
