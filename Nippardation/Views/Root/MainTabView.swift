@@ -2,7 +2,7 @@
 //  MainTabView.swift
 //  Nippardation
 //
-//  Root of the authenticated experience: Today · Plan · Progress behind the floating Void tab bar.
+//  Root of the authenticated experience: Today · Plan · Progress in the standard iOS tab bar.
 //  Also lands incoming share links in the Plan received sheet.
 //
 
@@ -17,34 +17,32 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
-            NavigationStack {
-                TodayView()
+            Tab(AppTab.today.label, systemImage: AppTab.today.icon.systemName, value: .today) {
+                NavigationStack {
+                    TodayView()
+                }
             }
-            .voidTabBarClearance()
-            .toolbar(.hidden, for: .tabBar)
-            .tag(AppTab.today)
 
-            NavigationStack {
-                PlanView()
+            Tab(AppTab.plan.label, systemImage: AppTab.plan.icon.systemName, value: .plan) {
+                NavigationStack {
+                    PlanView()
+                }
             }
-            .voidTabBarClearance()
-            .toolbar(.hidden, for: .tabBar)
-            .tag(AppTab.plan)
+            .badge(receivedPlans.hasUnread ? 1 : 0)
 
-            NavigationStack {
-                ProgressTabView()
+            Tab(AppTab.progress.label, systemImage: AppTab.progress.icon.systemName, value: .progress) {
+                NavigationStack {
+                    ProgressTabView()
+                }
             }
-            .voidTabBarClearance()
-            .toolbar(.hidden, for: .tabBar)
-            .tag(AppTab.progress)
         }
-        .voidTabBar(selection: $navigation.selectedTab, showsPlanDot: receivedPlans.hasUnread)
         .background(VoidColor.hull.ignoresSafeArea())
         .tint(VoidColor.plasma)
         .preferredColorScheme(nil)
         .environmentObject(navigation)
         .environmentBanner()
         .onAppear {
+            paintWindowBackground()
             consumePendingToken()
         }
         .onChange(of: deepLinkRouter.pendingShareToken) { _, _ in
@@ -60,6 +58,17 @@ struct MainTabView: View {
                     deepLinkRouter.clearPendingToken()
                 }
             }
+        }
+    }
+
+    /// The window shows behind the scaled-down presenter under a `.large` sheet and during
+    /// full-screen-cover transitions; paint it hull so light mode does not show black there.
+    private func paintWindowBackground() {
+        let windows = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+        for window in windows {
+            window.backgroundColor = VoidColor.hullUIColor
         }
     }
 
