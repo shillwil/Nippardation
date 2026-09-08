@@ -137,10 +137,12 @@ struct TodayView: View {
             Text(hero.eyebrow)
                 .voidEyebrow(hero.eyebrowColor)
                 .padding(.bottom, TodayLayout.wordGap)
+            // The one display word. A long workout name shrinks to 0.7×, then wraps to a second
+            // line; truncation is the last resort, not the first.
             Text(hero.word)
                 .voidWordHero()
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
                 .padding(.horizontal, VoidSpace.insetText)
                 .padding(.bottom, TodayLayout.wordGap)
             Text(hero.readout)

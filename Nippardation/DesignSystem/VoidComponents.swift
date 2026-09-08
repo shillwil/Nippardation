@@ -391,18 +391,23 @@ private struct VoidStartRipple: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    // The kit's two static glow spreads. Light mode sits a touch higher; keep that relationship.
+    // The kit's two static glow spreads, used for the Reduce Motion / off-screen fallback.
+    // Light mode sits a touch higher; keep that relationship.
     private var ring1: Double { colorScheme == .dark ? 0.06 : 0.08 }
     private var ring2: Double { colorScheme == .dark ? 0.03 : 0.04 }
-    /// Ceiling for a travelling ring: what the two static rings composite to where they overlap.
-    private var tapPeak: Double { colorScheme == .dark ? 0.09 : 0.115 }
 
-    /// A slow pulse: one ring every 3.4s, three in flight, each a third of a cycle behind the last.
-    private let cycle: Double = 3.4
+    /// Peak brightness of a travelling idle band. Well above the static rings' 6% — the ripple has
+    /// to read as motion across the room, and a band is only near its peak for a fraction of a second.
+    private var idlePeak: Double { colorScheme == .dark ? 0.20 : 0.24 }
+    /// The tap band: brighter and faster than the idle ones, so the press clearly throws a ring.
+    private var tapPeak: Double { colorScheme == .dark ? 0.42 : 0.48 }
+
+    /// A steady pulse: one ring every 2.8s, three in flight, each a third of a cycle behind the last.
+    private let cycle: Double = 2.8
     private let ringCount = 3
-    private let reach: CGFloat = 44
-    private let tapCycle: Double = 0.9
-    private let tapReach: CGFloat = 64
+    private let reach: CGFloat = 62
+    private let tapCycle: Double = 0.85
+    private let tapReach: CGFloat = 92
 
     var body: some View {
         Group {
@@ -450,10 +455,10 @@ private struct VoidStartRipple: View {
         return ZStack {
             ForEach(0..<ringCount, id: \.self) { index in
                 band(progress: phase(elapsed: elapsed, index: index),
-                     peak: ring1 * fadeIn,
+                     peak: idlePeak * fadeIn,
                      reach: reach,
-                     width: 14,
-                     spread: 10)
+                     width: 16,
+                     spread: 14)
             }
             if let tapDate {
                 let tapProgress = now.timeIntervalSince(tapDate) / tapCycle
@@ -461,12 +466,12 @@ private struct VoidStartRipple: View {
                     band(progress: tapProgress,
                          peak: tapPeak * fadeIn,
                          reach: tapReach,
-                         width: 10,
-                         spread: 18)
+                         width: 12,
+                         spread: 22)
                 }
             }
         }
-        .blur(radius: 5)
+        .blur(radius: 4)
     }
 
     /// 0…1 position of ring `index` in the cycle, staggered by a third.
