@@ -59,7 +59,7 @@ final class AIWizardViewModel: ObservableObject {
     let loadingMessages = [
         "Analyzing your goals...",
         "Selecting exercises...",
-        "Building your program...",
+        "Building your plan...",
         "Optimizing your split...",
         "Fine-tuning volume...",
         "Almost there..."
@@ -307,7 +307,7 @@ final class AIWizardViewModel: ObservableObject {
                 await MainActor.run {
                     self.isGenerating = false
                     self.stopLoadingMessages()
-                    self.error = "Failed to generate program. Please try again."
+                    self.error = "Couldn't generate a plan. Try again."
                     self.errorIsRetryable = true
                 }
             }

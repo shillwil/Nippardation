@@ -22,20 +22,18 @@ struct ExerciseVideoCarousel: View {
 
     var body: some View {
         if !exercises.isEmpty {
-            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            VStack(alignment: .leading, spacing: VoidSpace.s3) {
                 if let title {
-                    SectionHeader(title: title)
-                        .padding(.horizontal, AppSpacing.md)
+                    VoidSectionRow(title: title)
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: AppSpacing.sm) {
+                    LazyHStack(spacing: 10) {
                         ForEach(exercises) { exercise in
                             ExercisePreviewCard(templateExercise: exercise)
                         }
                     }
-                    .padding(.horizontal, AppSpacing.md)
-                    .padding(.vertical, AppSpacing.xs)
+                    .padding(.horizontal, VoidSpace.insetCard)
                 }
             }
             .task {
@@ -54,4 +52,5 @@ struct ExerciseVideoCarousel: View {
         title: "Up Next"
     )
     .withDependencies(.preview)
+    .background(VoidColor.hull)
 }

@@ -92,6 +92,11 @@ protocol ProgramRepositoryProtocol {
     /// - Returns: The updated program with advanced position
     func advanceToNextWorkout(serverId: String) async throws -> Program
 
+    /// Restarts the program from day 1 (server + cache): currentDayIndex = 0, timesCompleted = 0
+    /// - Parameter serverId: The server ID of the program
+    /// - Returns: The updated program
+    func resetProgram(serverId: String) async throws -> Program
+
     // MARK: - Cache Operations
 
     /// Returns all cached programs

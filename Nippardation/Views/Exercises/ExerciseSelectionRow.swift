@@ -2,7 +2,7 @@
 //  ExerciseSelectionRow.swift
 //  Nippardation
 //
-//  Exercise row with icon circle and selection indicator for picker mode
+//  66pt browser row: 44pt glyph / thumbnail tile · name · "Chest · Barbell" · check or chevron.
 //
 
 import SwiftUI
@@ -14,82 +14,151 @@ struct ExerciseSelectionRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: AppSpacing.sm) {
-                // Icon circle
-                IconCircle(
-                    icon: iconForExercise,
-                    color: colorForMuscle(exercise.primaryMuscles.first ?? .chest),
-                    size: 44
-                )
+            HStack(spacing: VoidSpace.s3) {
+                ExerciseGlyphTile(exercise: exercise)
 
-                // Details
-                VStack(alignment: .leading, spacing: AppSpacing.xxs) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(exercise.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
+                        .font(VoidFont.bodyStrong)
+                        .foregroundStyle(VoidColor.text)
+                        .lineLimit(1)
 
-                    HStack(spacing: AppSpacing.xs) {
-                        Text(exercise.primaryMuscles.map { $0.rawValue.capitalized }.joined(separator: ", "))
-
-                        if let equipment = exercise.equipment {
-                            Text("·")
-                            Text(equipment.displayName)
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    Text(caption)
+                        .font(VoidFont.caption2)
+                        .foregroundStyle(VoidColor.text2)
+                        .lineLimit(1)
                 }
 
-                Spacer()
+                Spacer(minLength: VoidSpace.s2)
 
-                // Selection indicator
                 if let selected = isSelected {
-                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(selected ? .appTheme : .gray)
-                        .font(.title3)
+                    SelectionCheck(isOn: selected)
                 } else {
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(.secondary)
-                        .font(.caption)
+                    VoidChevron()
                 }
             }
-            .padding(.vertical, AppSpacing.xxs)
+            .padding(.horizontal, VoidSpace.insetText)
+            .frame(height: VoidSize.listRow)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(VoidRowButtonStyle())
+        .overlay(alignment: .bottom) {
+            VoidHairline()
+                .padding(.horizontal, VoidSpace.insetText)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected == true ? [.isSelected] : [])
     }
 
-    private var iconForExercise: String {
-        guard let category = exercise.exerciseType else {
-            return "figure.strengthtraining.traditional"
+    /// "Chest, Triceps · Barbell"
+    private var caption: String {
+        var parts = [exercise.primaryMuscles.map { $0.rawValue.capitalized }.joined(separator: ", ")]
+        if let equipment = exercise.equipment {
+            parts.append(equipment.displayName)
         }
-        switch category {
-        case .compound: return "figure.strengthtraining.traditional"
-        case .isolation: return "dumbbell.fill"
-        case .cardio: return "heart.fill"
-        case .plyometric: return "figure.jumprope"
-        case .stretching: return "figure.flexibility"
+        return parts.filter { !$0.isEmpty }.joined(separator: VoidFormat.dot)
+    }
+}
+
+// MARK: - Glyph / thumbnail tile
+
+/// Squared tile (radius 10, panel-2) showing the exercise thumbnail when there is one,
+/// otherwise a glyph picked from the primary muscle / category.
+struct ExerciseGlyphTile: View {
+    let exercise: ExerciseLibraryItem
+    var size: CGFloat = 44
+
+    var body: some View {
+        Group {
+            if let url = exercise.thumbnailUrl {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        glyph
+                    }
+                }
+            } else {
+                glyph
+            }
+        }
+        .frame(width: size, height: size)
+        .background(VoidColor.panel2)
+        .clipShape(RoundedRectangle(cornerRadius: VoidRadius.avatar, style: .continuous))
+        .accessibilityHidden(true)
+    }
+
+    private var glyph: some View {
+        Image(systemName: icon.systemName)
+            .font(.system(size: size * 0.42, weight: .medium))
+            .foregroundStyle(VoidColor.text)
+    }
+
+    private var icon: VoidIcon {
+        if let muscle = exercise.primaryMuscles.first {
+            switch muscle {
+            case .quads, .hamstrings, .glutes, .calves: return .workoutLegs
+            case .back, .biceps: return .workoutPull
+            case .chest, .triceps, .shoulders: return .workoutPush
+            case .abs: return .workoutCore
+            }
+        }
+        switch exercise.exerciseType {
+        case .cardio?: return .workoutCardio
+        case .plyometric?: return .workoutFullBody
+        case .stretching?: return .workoutCore
+        default: return .barbell
         }
     }
 }
 
+// MARK: - Selection check
+
+/// 22pt squared check (radius 6): plasma with an on-plasma check when on, text-3 outline when off.
+struct SelectionCheck: View {
+    let isOn: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: VoidRadius.mark, style: .continuous)
+                .fill(isOn ? VoidColor.plasma : Color.clear)
+            RoundedRectangle(cornerRadius: VoidRadius.mark, style: .continuous)
+                .strokeBorder(isOn ? Color.clear : VoidColor.text3, lineWidth: 1)
+            if isOn {
+                Image(systemName: VoidIcon.check.systemName)
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(VoidColor.onPlasma)
+            }
+        }
+        .frame(width: 22, height: 22)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Previews
+
 #Preview {
-    List {
-        ExerciseSelectionRow(
-            exercise: MockExerciseRepository.sampleExercises[0],
-            isSelected: nil,
-            onTap: {}
-        )
-        ExerciseSelectionRow(
-            exercise: MockExerciseRepository.sampleExercises[1],
-            isSelected: true,
-            onTap: {}
-        )
-        ExerciseSelectionRow(
-            exercise: MockExerciseRepository.sampleExercises[2],
-            isSelected: false,
-            onTap: {}
-        )
+    ZStack {
+        VoidColor.hull.ignoresSafeArea()
+        VStack(spacing: 0) {
+            ExerciseSelectionRow(
+                exercise: MockExerciseRepository.sampleExercises[0],
+                isSelected: nil,
+                onTap: {}
+            )
+            ExerciseSelectionRow(
+                exercise: MockExerciseRepository.sampleExercises[1],
+                isSelected: true,
+                onTap: {}
+            )
+            ExerciseSelectionRow(
+                exercise: MockExerciseRepository.sampleExercises[3],
+                isSelected: false,
+                onTap: {}
+            )
+        }
     }
 }

@@ -2,130 +2,143 @@
 //  ExerciseEditorCard.swift
 //  Nippardation
 //
-//  Card component for displaying an exercise in the template editor
+//  66pt exercise row in the workout editor: index square · name · "4 × 6-8 · rest 3:00" · chevron.
+//  Tap opens the config sheet; the context menu moves or removes the exercise.
 //
 
 import SwiftUI
 
 struct ExerciseEditorCard: View {
 
+    let index: Int
     let exercise: TemplateEditorViewModel.EditableExercise
+    var isLast: Bool = false
     let onConfigure: () -> Void
     let onDelete: () -> Void
+    var onMoveUp: (() -> Void)? = nil
+    var onMoveDown: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            // Top row: badge + name + gear
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: AppSpacing.xxs) {
-                    if let category = exercise.exerciseLibraryItem?.exerciseType {
-                        PillBadge(
-                            text: category.displayName,
-                            color: colorForCategory(category),
-                            style: .tinted
-                        )
-                    }
+        Button(action: onConfigure) {
+            HStack(spacing: VoidSpace.s3) {
+                VoidAvatar(text: VoidFormat.pad2(index + 1))
 
+                VStack(alignment: .leading, spacing: 2) {
                     Text(exercise.displayName)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .lineLimit(2)
-
-                    if let muscles = exercise.exerciseLibraryItem?.primaryMuscles, !muscles.isEmpty {
-                        Text(muscles.map { $0.rawValue.capitalized }.joined(separator: ", "))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                        .font(VoidFont.bodyStrong)
+                        .foregroundStyle(VoidColor.text)
+                        .lineLimit(1)
+                    Text(summary)
+                        .font(VoidFont.caption2)
+                        .foregroundStyle(VoidColor.text2)
+                        .lineLimit(1)
                 }
 
-                Spacer()
+                Spacer(minLength: VoidSpace.s2)
 
-                Button(action: onConfigure) {
-                    Image(systemName: "gearshape")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .frame(width: 32, height: 32)
-                }
+                VoidChevron()
             }
-
-            // Summary pills
-            HStack(spacing: AppSpacing.sm) {
-                if exercise.warmupSets > 0 {
-                    summaryPill(icon: "flame", text: "\(exercise.warmupSets) warmup")
-                }
-                summaryPill(icon: "number", text: "\(exercise.workingSets) x \(exercise.targetReps)")
-                summaryPill(icon: "timer", text: formatRestTime(exercise.restSeconds))
-            }
-
-            if !exercise.notes.isEmpty {
-                Text(exercise.notes)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .italic()
-                    .lineLimit(2)
+            .frame(height: VoidSize.listRow)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(VoidRowButtonStyle())
+        .overlay(alignment: .bottom) {
+            if !isLast {
+                VoidHairline()
             }
         }
-        .padding(AppSpacing.sm)
-        .cardStyle()
         .contextMenu {
+            if let onMoveUp {
+                Button(action: onMoveUp) {
+                    Label("Move up", systemImage: GapIcon.up)
+                }
+            }
+            if let onMoveDown {
+                Button(action: onMoveDown) {
+                    Label("Move down", systemImage: GapIcon.down)
+                }
+            }
+            Button(action: onConfigure) {
+                Label("Configure", systemImage: VoidIcon.edit.systemName)
+            }
+            Divider()
             Button(role: .destructive, action: onDelete) {
-                Label("Remove Exercise", systemImage: "trash")
+                Label("Remove exercise", systemImage: VoidIcon.trash.systemName)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Configure sets, reps and rest")
     }
 
     // MARK: - Helpers
 
-    private func summaryPill(icon: String, text: String) -> some View {
-        HStack(spacing: AppSpacing.xxs) {
-            Image(systemName: icon)
-            Text(text)
+    /// "4 × 6-8 · rest 3:00 · 2 warmup · note"
+    private var summary: String {
+        var parts: [String] = []
+        parts.append("\(exercise.workingSets) × \(exercise.targetReps.isEmpty ? "?" : exercise.targetReps)")
+        parts.append("rest \(ExerciseConfigFormat.rest(exercise.restSeconds))")
+        if exercise.warmupSets > 0 {
+            parts.append("\(exercise.warmupSets) warmup")
         }
-        .font(.caption)
-        .foregroundColor(.secondary)
+        if !exercise.notes.isEmpty {
+            parts.append(exercise.notes)
+        }
+        return parts.joined(separator: VoidFormat.dot)
     }
+}
 
-    private func colorForCategory(_ category: ExerciseCategory) -> Color {
-        switch category {
-        case .compound: return .blue
-        case .isolation: return .green
-        case .cardio: return .orange
-        case .plyometric: return .purple
-        case .stretching: return .teal
-        }
+/// Console formatting shared by the editor row and the config sheet.
+enum ExerciseConfigFormat {
+    /// 180 → "3:00", 90 → "1:30", 45 → "0:45"
+    static func rest(_ seconds: Int) -> String {
+        let total = max(0, seconds)
+        return "\(total / 60):\(String(format: "%02d", total % 60))"
     }
+}
 
-    private func formatRestTime(_ seconds: Int) -> String {
-        if seconds >= 60 {
-            let minutes = seconds / 60
-            let remainingSeconds = seconds % 60
-            if remainingSeconds == 0 {
-                return "\(minutes)m"
-            }
-            return "\(minutes):\(String(format: "%02d", remainingSeconds))"
-        }
-        return "\(seconds)s"
-    }
+/// SF Symbols the Void glyph set does not name yet.
+private enum GapIcon {
+    static let up = "arrow.up"
+    static let down = "arrow.down"
 }
 
 // MARK: - Previews
 
 #Preview {
-    VStack(spacing: AppSpacing.sm) {
-        ExerciseEditorCard(
-            exercise: TemplateEditorViewModel.EditableExercise(
-                orderIndex: 0,
-                exerciseServerId: "ex_001",
-                exerciseLibraryItem: MockExerciseRepository.sampleExercises[0],
-                warmupSets: 2,
-                workingSets: 4,
-                targetReps: "6-8",
-                restSeconds: 180,
-                notes: "Focus on mind-muscle connection"
-            ),
-            onConfigure: {},
-            onDelete: {}
-        )
+    ZStack {
+        VoidColor.hull.ignoresSafeArea()
+        VoidListPanel {
+            ExerciseEditorCard(
+                index: 0,
+                exercise: TemplateEditorViewModel.EditableExercise(
+                    orderIndex: 0,
+                    exerciseServerId: "ex_001",
+                    exerciseLibraryItem: MockExerciseRepository.sampleExercises[0],
+                    warmupSets: 2,
+                    workingSets: 4,
+                    targetReps: "6-8",
+                    restSeconds: 180,
+                    notes: "Pause on the chest"
+                ),
+                onConfigure: {},
+                onDelete: {}
+            )
+            ExerciseEditorCard(
+                index: 1,
+                exercise: TemplateEditorViewModel.EditableExercise(
+                    orderIndex: 1,
+                    exerciseServerId: "ex_005",
+                    exerciseLibraryItem: MockExerciseRepository.sampleExercises[4],
+                    warmupSets: 0,
+                    workingSets: 3,
+                    targetReps: "12-15",
+                    restSeconds: 60,
+                    notes: ""
+                ),
+                isLast: true,
+                onConfigure: {},
+                onDelete: {}
+            )
+        }
     }
-    .padding()
 }

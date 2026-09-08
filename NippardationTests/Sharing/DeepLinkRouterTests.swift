@@ -61,6 +61,43 @@ import Foundation
         #expect(token == "abc-123-def")
     }
 
+    // MARK: - Void link forms
+
+    @Test func extractsTokenFromRecessPlanURL() {
+        let url = URL(string: "recess://plan/abc123")!
+        #expect(DeepLinkRouter.extractShareToken(from: url) == "abc123")
+    }
+
+    @Test func extractsTokenFromRecessShareURL() {
+        let url = URL(string: "recess://share/abc123")!
+        #expect(DeepLinkRouter.extractShareToken(from: url) == "abc123")
+    }
+
+    @Test func extractsTokenFromUniversalLink() {
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "https://recess.fit/p/a3Bf9kLm2xQz")!) == "a3Bf9kLm2xQz")
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "https://www.recess.fit/p/abc")!) == "abc")
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "HTTPS://RECESS.FIT/p/abc")!) == "abc")
+    }
+
+    @Test func rejectsUniversalLinksOnOtherHostsOrPaths() {
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "https://recess.fit/x/abc")!) == nil)
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "https://recess.fit/p/")!) == nil)
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "https://example.com/p/abc")!) == nil)
+    }
+
+    @Test func rejectsRecessURLsWithOtherHosts() {
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "recess://workout/abc")!) == nil)
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "recess://plan/")!) == nil)
+    }
+
+    @Test func isShareLinkAcceptsAllForms() {
+        #expect(DeepLinkRouter.isShareLink("nippardation://share/abc"))
+        #expect(DeepLinkRouter.isShareLink("  recess://plan/abc \n"))
+        #expect(DeepLinkRouter.isShareLink("https://recess.fit/p/abc"))
+        #expect(DeepLinkRouter.isShareLink("https://apple.com") == false)
+        #expect(DeepLinkRouter.isShareLink("not a url") == false)
+    }
+
     // MARK: - handleURL (requires MainActor)
 
     @MainActor
@@ -88,6 +125,15 @@ import Foundation
 
         #expect(handled == false)
         #expect(router.pendingShareToken == nil)
+    }
+
+    @MainActor
+    @Test func openTokenSetsPendingToken() async {
+        let router = DeepLinkRouter.shared
+        router.clearPendingToken()
+        router.open(token: "saved_plan")
+        #expect(router.pendingShareToken == "saved_plan")
+        router.clearPendingToken()
     }
 
     @MainActor

@@ -4,6 +4,8 @@
 //
 //  Created by Alex Shillingford on 5/16/25.
 //
+//  "Edit set" sheet: panel chrome, eyebrow title, panel-2 stepper wells, one plasma CTA.
+//
 
 import SwiftUI
 
@@ -27,114 +29,73 @@ struct EditSetView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Text("Edit Set")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .padding(.top)
-                
+        VStack(spacing: 0) {
+            LoggerSheetHeader(title: "Edit set") {
+                LoggerCloseButton(accessibilityLabel: "Cancel") {
+                    dismiss()
+                }
+            }
+
+            VStack(alignment: .leading, spacing: VoidSpace.s4) {
                 // Reps section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("REPS")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    HStack {
-                        Button {
+                VStack(alignment: .leading, spacing: 6) {
+                    LoggerFieldLabel(title: "Reps")
+                    LoggerStepperWell(
+                        value: VoidFormat.pad2(reps),
+                        unit: "reps",
+                        decrementLabel: "One rep fewer",
+                        incrementLabel: "One rep more",
+                        onDecrement: {
                             if reps > 1 {
                                 reps -= 1
                             }
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .resizable()
-                                .frame(width: 36, height: 36)
-                                .foregroundColor(.blue)
-                        }
-                        
-                        Spacer()
-                        
-                        Text("\(reps)")
-                            .font(.system(size: 48, weight: .bold))
-                        
-                        Spacer()
-                        
-                        Button {
+                        },
+                        onIncrement: {
                             reps += 1
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .resizable()
-                                .frame(width: 36, height: 36)
-                                .foregroundColor(.blue)
                         }
-                    }
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(12)
+                    )
                 }
-                .padding(.horizontal)
-                
-                Picker("Set Type", selection: $setType) {
-                    Text("Warm-up").tag(SetType.warmup)
-                    Text("Working").tag(SetType.working)
+
+                // Set type
+                VStack(alignment: .leading, spacing: 6) {
+                    LoggerFieldLabel(title: "Set type")
+                    LoggerSegmentedControl(
+                        items: [SetType.warmup, SetType.working],
+                        label: { $0 == .warmup ? "Warm-up" : "Working" },
+                        selection: $setType
+                    )
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
 
                 // Weight section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("WEIGHT (LBS)")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    Button {
+                VStack(alignment: .leading, spacing: 6) {
+                    LoggerFieldLabel(title: "Weight · lbs")
+                    LoggerValueWell(
+                        value: String(format: "%.1f", weight),
+                        unit: "lbs",
+                        accessibilityLabel: "Weight, opens the weight entry"
+                    ) {
                         showingWeightPicker = true
-                    } label: {
-                        HStack {
-                            Text("\(weight, specifier: "%.1f")")
-                                .font(.system(size: 48, weight: .bold))
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(12)
                     }
                 }
-                .padding(.horizontal)
-                
-                Spacer()
-                
-                // Save button
-                Button {
-                    onSave(reps, weight, setType)
-                    dismiss()
-                } label: {
-                    Text("Save Changes")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
-                }
-                .padding()
             }
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
-                trailing: Button("Save") {
-                    onSave(reps, weight, setType)
-                    dismiss()
-                }
-            )
-            .sheet(isPresented: $showingWeightPicker) {
-                WeightInputView(weight: $weight, weightString: $weightString)
-                    .presentationDetents([.fraction(0.667)])
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.top, VoidSpace.s2)
+
+            Spacer(minLength: VoidSpace.s4)
+
+            // Save button
+            VoidCTAButton(title: "Save set") {
+                onSave(reps, weight, setType)
+                dismiss()
             }
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.bottom, VoidSpace.s3)
+        }
+        .background(VoidColor.panel.ignoresSafeArea())
+        .sheet(isPresented: $showingWeightPicker) {
+            WeightInputView(weight: $weight, weightString: $weightString)
+                .presentationDetents([.fraction(0.667)])
+                .voidSheet()
         }
     }
 }

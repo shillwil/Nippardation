@@ -2,7 +2,8 @@
 //  ExerciseFilterSheet.swift
 //  Nippardation
 //
-//  Filter sheet for exercise browsing
+//  Filter sheet for exercise browsing. Void sheet: panel background, eyebrow sections,
+//  44pt rows with hairlines and a plasma check on the selected options.
 //
 
 import SwiftUI
@@ -24,19 +25,21 @@ struct ExerciseFilterSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                // Muscle groups
-                muscleGroupsSection
-
-                // Equipment
-                equipmentSection
-
-                // Difficulty
-                difficultySection
-
-                // Movement pattern
-                movementPatternSection
+            ScrollView {
+                VStack(alignment: .leading, spacing: VoidSpace.s5) {
+                    muscleGroupsSection
+                    equipmentSection
+                    difficultySection
+                    movementPatternSection
+                }
+                .padding(.horizontal, VoidSpace.insetText)
+                .padding(.top, VoidSpace.s3)
+                .padding(.bottom, VoidSpace.s6)
             }
+            .scrollContentBackground(.hidden)
+            .background(VoidColor.panel.ignoresSafeArea())
+            .toolbarBackground(VoidColor.panel, for: .navigationBar)
+            .tint(VoidColor.plasma)
             .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -54,14 +57,15 @@ struct ExerciseFilterSheet: View {
                 }
             }
         }
+        .voidSheet()
     }
 
     // MARK: - Sections
 
     private var muscleGroupsSection: some View {
-        Section("Muscle Groups") {
+        section("Muscle groups") {
             ForEach(MuscleGroup.allCases, id: \.self) { muscle in
-                filterToggle(
+                FilterOptionRow(
                     label: muscle.rawValue.capitalized,
                     isSelected: filter.muscleGroups.contains(muscle),
                     onToggle: { selected in
@@ -77,9 +81,9 @@ struct ExerciseFilterSheet: View {
     }
 
     private var equipmentSection: some View {
-        Section("Equipment") {
+        section("Equipment") {
             ForEach(Equipment.allCases, id: \.self) { equip in
-                filterToggle(
+                FilterOptionRow(
                     label: equip.displayName,
                     isSelected: filter.equipment.contains(equip),
                     onToggle: { selected in
@@ -95,9 +99,9 @@ struct ExerciseFilterSheet: View {
     }
 
     private var difficultySection: some View {
-        Section("Difficulty") {
+        section("Difficulty") {
             ForEach(Difficulty.allCases, id: \.self) { difficulty in
-                filterToggle(
+                FilterOptionRow(
                     label: difficulty.displayName,
                     isSelected: filter.difficulty == difficulty,
                     onToggle: { selected in
@@ -109,9 +113,9 @@ struct ExerciseFilterSheet: View {
     }
 
     private var movementPatternSection: some View {
-        Section("Movement Pattern") {
+        section("Movement pattern") {
             ForEach(MovementPattern.allCases, id: \.self) { pattern in
-                filterToggle(
+                FilterOptionRow(
                     label: pattern.displayName,
                     isSelected: filter.movementPattern == pattern,
                     onToggle: { selected in
@@ -122,28 +126,48 @@ struct ExerciseFilterSheet: View {
         }
     }
 
-    // MARK: - Filter Toggle
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .voidEyebrowSm()
+                .padding(.bottom, VoidSpace.s1)
+            content()
+        }
+    }
+}
 
-    private func filterToggle(
-        label: String,
-        isSelected: Bool,
-        onToggle: @escaping (Bool) -> Void
-    ) -> some View {
+// MARK: - Option row
+
+private struct FilterOptionRow: View {
+    let label: String
+    let isSelected: Bool
+    let onToggle: (Bool) -> Void
+
+    var body: some View {
         Button {
             onToggle(!isSelected)
         } label: {
             HStack {
                 Text(label)
-                    .foregroundColor(.primary)
+                    .font(VoidFont.body)
+                    .foregroundStyle(VoidColor.text)
 
                 Spacer()
 
                 if isSelected {
-                    Image(systemName: "checkmark")
-                        .foregroundColor(.blue)
+                    Image(systemName: VoidIcon.check.systemName)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(VoidColor.plasma)
                 }
             }
+            .frame(height: VoidSize.pill)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(VoidRowButtonStyle())
+        .overlay(alignment: .bottom) {
+            VoidHairline()
+        }
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 

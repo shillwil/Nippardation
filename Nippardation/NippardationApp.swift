@@ -21,6 +21,18 @@ struct NippardationApp: App {
 
         // Configure dependency container with real implementations
         DependencyContainer.shared.configureForProduction()
+
+        #if DEBUG
+        // `--void-preview` launch argument: mock data, no sign-in (screenshots / design review)
+        VoidPreviewMode.configure()
+        #endif
+    }
+
+    private var showsMainInterface: Bool {
+        #if DEBUG
+        if VoidPreviewMode.isEnabled { return true }
+        #endif
+        return authManager.isAuthenticated
     }
     
     private func configureFirebase() {
@@ -38,7 +50,7 @@ struct NippardationApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if authManager.isAuthenticated {
+            if showsMainInterface {
                 MainTabView()
                     .environmentObject(authManager)
                     .environmentObject(deepLinkRouter)

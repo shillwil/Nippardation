@@ -154,7 +154,7 @@ final class TemplateListViewModel: ObservableObject {
                     }
                 } catch {
                     await MainActor.run {
-                        self.error = "Failed to delete template: \(error.localizedDescription)"
+                        self.error = "Couldn't delete the workout: \(error.localizedDescription)"
                     }
                 }
             }
@@ -178,7 +178,7 @@ final class TemplateListViewModel: ObservableObject {
                     }
                 } catch {
                     await MainActor.run {
-                        self.error = "Failed to duplicate template: \(error.localizedDescription)"
+                        self.error = "Couldn't duplicate the workout: \(error.localizedDescription)"
                     }
                 }
             }

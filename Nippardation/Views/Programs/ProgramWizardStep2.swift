@@ -2,7 +2,7 @@
 //  ProgramWizardStep2.swift
 //  Nippardation
 //
-//  Step 2 of the program wizard: weekly schedule builder
+//  Step 2 of the plan wizard: assign a workout to each training day.
 //
 
 import SwiftUI
@@ -14,30 +14,25 @@ struct ProgramWizardStep2: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: AppSpacing.lg) {
-                // Step title
-                VStack(spacing: AppSpacing.xs) {
-                    Text("Build Your Schedule")
-                        .font(.title2)
-                        .fontWeight(.bold)
+            VStack(alignment: .leading, spacing: VoidSpace.s6) {
+                WizardStepHeading(title: "Your schedule", caption: "Pick a workout for each training day, or make it a rest day.")
 
-                    Text("Assign templates to each training day")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
+                VStack(alignment: .leading, spacing: 10) {
+                    WizardSectionLabel(
+                        title: "Schedule",
+                        trailing: "DAYS \(VoidFormat.ratio(assignedCount, viewModel.workouts.count))"
+                    )
 
-                // Progress
-                progressBar
+                    VoidProgressBar(progress: Double(assignedCount) / Double(max(viewModel.workouts.count, 1)))
+                        .padding(.horizontal, VoidSpace.s1)
 
-                // Day cards
-                VStack(spacing: AppSpacing.sm) {
                     ForEach(Array(viewModel.workouts.enumerated()), id: \.element.id) { index, workout in
-                        let isRest = viewModel.restDays.contains(index)
                         DayScheduleCard(
                             dayNumber: dayNumberForWorkout(index),
+                            dayIndex: index,
                             templateName: workout.templateName,
                             exerciseCount: exerciseCount(for: workout),
-                            isRest: isRest,
+                            isRest: viewModel.restDays.contains(index),
                             onSelectTemplate: {
                                 selectedWorkoutIndex = index
                                 showTemplatePicker = true
@@ -49,7 +44,8 @@ struct ProgramWizardStep2: View {
                     }
                 }
             }
-            .padding(AppSpacing.md)
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s2)
         }
         .sheet(isPresented: $showTemplatePicker) {
             TemplateSelectorSheet(
@@ -64,25 +60,13 @@ struct ProgramWizardStep2: View {
         }
     }
 
-    // MARK: - Subviews
+    // MARK: - Helpers
 
-    private var progressBar: some View {
-        let assigned = viewModel.workouts.enumerated().filter { index, workout in
+    private var assignedCount: Int {
+        viewModel.workouts.enumerated().filter { index, workout in
             viewModel.restDays.contains(index) || workout.templateServerId != nil
         }.count
-        let total = viewModel.workouts.count
-
-        return VStack(spacing: AppSpacing.xxs) {
-            ProgressView(value: Double(assigned), total: Double(max(total, 1)))
-                .tint(.appTheme)
-
-            Text("\(assigned)/\(total) days configured")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
     }
-
-    // MARK: - Helpers
 
     private func dayNumberForWorkout(_ index: Int) -> Int {
         let sortedDays = viewModel.selectedDays.sorted()
@@ -100,5 +84,6 @@ struct ProgramWizardStep2: View {
 
 #Preview {
     ProgramWizardStep2(viewModel: ProgramEditorViewModel())
+        .voidScreen()
         .withDependencies(.preview)
 }

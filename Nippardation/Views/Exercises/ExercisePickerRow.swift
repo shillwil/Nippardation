@@ -2,7 +2,7 @@
 //  ExercisePickerRow.swift
 //  Nippardation
 //
-//  Row component for displaying an exercise with optional selection
+//  Exercise row with a 52pt thumbnail tile and optional selection check.
 //
 
 import SwiftUI
@@ -15,104 +15,78 @@ struct ExercisePickerRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Thumbnail
-                thumbnailView
+            HStack(spacing: VoidSpace.s3) {
+                ExerciseGlyphTile(exercise: exercise, size: VoidSize.tile)
 
-                // Details
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(exercise.name)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
+                        .font(VoidFont.bodyStrong)
+                        .foregroundStyle(VoidColor.text)
+                        .lineLimit(1)
 
                     Text(exercise.primaryMuscles.map { $0.rawValue.capitalized }.joined(separator: ", "))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(VoidFont.caption2)
+                        .foregroundStyle(VoidColor.text2)
+                        .lineLimit(1)
 
-                    HStack(spacing: 8) {
-                        if let equipment = exercise.equipment {
-                            Label(equipment.displayName, systemImage: "dumbbell")
-                        }
-                        if let difficulty = exercise.difficulty {
-                            Label(difficulty.displayName, systemImage: "chart.bar")
-                        }
+                    if !detail.isEmpty {
+                        Text(detail)
+                            .font(VoidFont.caption2)
+                            .foregroundStyle(VoidColor.text3)
+                            .lineLimit(1)
                     }
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
                 }
 
-                Spacer()
+                Spacer(minLength: VoidSpace.s2)
 
-                // Selection indicator
                 if let selected = isSelected {
-                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(selected ? .blue : .gray)
-                        .font(.title3)
+                    SelectionCheck(isOn: selected)
                 } else {
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(.secondary)
+                    VoidChevron()
                 }
             }
+            .padding(.horizontal, VoidSpace.insetText)
+            .frame(minHeight: VoidSize.listRow)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Thumbnail
-
-    @ViewBuilder
-    private var thumbnailView: some View {
-        if let thumbnailUrl = exercise.thumbnailUrl {
-            AsyncImage(url: thumbnailUrl) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure, .empty:
-                    placeholderImage
-                @unknown default:
-                    placeholderImage
-                }
-            }
-            .frame(width: 60, height: 60)
-            .cornerRadius(8)
-        } else {
-            placeholderImage
-                .frame(width: 60, height: 60)
+        .buttonStyle(VoidRowButtonStyle())
+        .overlay(alignment: .bottom) {
+            VoidHairline()
+                .padding(.horizontal, VoidSpace.insetText)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected == true ? [.isSelected] : [])
     }
 
-    private var placeholderImage: some View {
-        Rectangle()
-            .fill(Color.gray.opacity(0.2))
-            .overlay(
-                Image(systemName: "figure.strengthtraining.traditional")
-                    .foregroundColor(.gray)
-            )
-            .cornerRadius(8)
+    /// "Barbell · Intermediate"
+    private var detail: String {
+        [exercise.equipment?.displayName, exercise.difficulty?.displayName]
+            .compactMap { $0 }
+            .joined(separator: VoidFormat.dot)
     }
 }
 
 // MARK: - Previews
 
 #Preview {
-    List {
-        ExercisePickerRow(
-            exercise: MockExerciseRepository.sampleExercises[0],
-            isSelected: nil,
-            onTap: {}
-        )
-        ExercisePickerRow(
-            exercise: MockExerciseRepository.sampleExercises[1],
-            isSelected: true,
-            onTap: {}
-        )
-        ExercisePickerRow(
-            exercise: MockExerciseRepository.sampleExercises[2],
-            isSelected: false,
-            onTap: {}
-        )
+    ZStack {
+        VoidColor.hull.ignoresSafeArea()
+        VStack(spacing: 0) {
+            ExercisePickerRow(
+                exercise: MockExerciseRepository.sampleExercises[0],
+                isSelected: nil,
+                onTap: {}
+            )
+            ExercisePickerRow(
+                exercise: MockExerciseRepository.sampleExercises[1],
+                isSelected: true,
+                onTap: {}
+            )
+            ExercisePickerRow(
+                exercise: MockExerciseRepository.sampleExercises[2],
+                isSelected: false,
+                onTap: {}
+            )
+        }
     }
 }

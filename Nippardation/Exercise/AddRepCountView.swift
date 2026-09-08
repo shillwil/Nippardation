@@ -4,6 +4,8 @@
 //
 //  Created by Alex Shillingford on 5/9/25.
 //
+//  "Add set" sheet: panel chrome, eyebrow title, panel-2 stepper wells, one plasma CTA.
+//
 
 import SwiftUI
 
@@ -59,84 +61,78 @@ struct AddRepCountView: View {
     }
     
     var body: some View {
-        VStack {
-            xButton
-                .padding()
-            
-            Text("Track Set")
-                .font(.title)
-                .fontWeight(.bold)
-            
-            // Reps section
-            repsSection
-                .padding()
-            
-            // Set type selector
-            repTypePicker
-            
-            // Weight section
-            weightSelector
-                .padding(.horizontal)
-            
-            Spacer()
-            
-            // Target range info
-            let targetReps = exercise.reps.lowerBound...exercise.reps.upperBound
-            Text("Target: \(targetReps.lowerBound)-\(targetReps.upperBound) reps")
-                .foregroundColor(.secondary)
-                .padding(.bottom, 5)
-            
-            // Save button
+        VStack(spacing: 0) {
+            LoggerSheetHeader(title: "Add set") {
+                LoggerCloseButton(accessibilityLabel: "Close") {
+                    dismiss()
+                }
+            }
+
+            VStack(alignment: .leading, spacing: VoidSpace.s4) {
+                Text(exercise.type.name)
+                    .font(VoidFont.title)
+                    .foregroundStyle(VoidColor.text)
+                    .lineLimit(2)
+                    .padding(.leading, VoidSpace.insetText - VoidSpace.insetCard)
+
+                repsSection
+
+                repTypePicker
+
+                weightSelector
+
+                Text(targetReadout)
+                    .voidReadout()
+                    .padding(.leading, VoidSpace.insetText - VoidSpace.insetCard)
+            }
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.top, VoidSpace.s2)
+
+            Spacer(minLength: VoidSpace.s4)
+
             saveButton
         }
+        .background(VoidColor.panel.ignoresSafeArea())
         .sheet(isPresented: $showWeightPicker) {
             WeightInputView(weight: $weight, weightString: $weightString)
                 .presentationDetents([.fraction(0.667)])
+                .voidSheet()
         }
+    }
+
+    private var targetReadout: String {
+        "Target \(VoidFormat.pad2(exercise.reps.lowerBound)) – \(VoidFormat.pad2(exercise.reps.upperBound)) reps"
     }
     
     private var repsSection: some View {
-        VStack(alignment: .center, spacing: 10) {
-            Text("REPS")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            
-            Text("\(reps)")
-                .font(.system(size: 80, weight: .bold))
-            
-            // Stepper for reps
-            HStack(spacing: 24) {
-                Button {
+        VStack(alignment: .leading, spacing: 6) {
+            LoggerFieldLabel(title: "Reps")
+            LoggerStepperWell(
+                value: VoidFormat.pad2(reps),
+                unit: "reps",
+                decrementLabel: "One rep fewer",
+                incrementLabel: "One rep more",
+                onDecrement: {
                     if reps > 1 {
                         reps -= 1
                     }
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .resizable()
-                        .frame(width: 44, height: 44)
-                        .foregroundColor(Color.appTheme)
-                }
-                
-                Button {
+                },
+                onIncrement: {
                     reps += 1
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .resizable()
-                        .frame(width: 44, height: 44)
-                        .foregroundColor(Color.appTheme)
                 }
-            }
-            .padding(.vertical, 5)
+            )
         }
     }
     
     private var repTypePicker: some View {
-        Picker("Set Type", selection: $setType) {
-            Text("Warm-up").tag(SetType.warmup)
-            Text("Working").tag(SetType.working)
+        VStack(alignment: .leading, spacing: 6) {
+            LoggerFieldLabel(title: "Set type")
+            LoggerSegmentedControl(
+                items: [SetType.warmup, SetType.working],
+                label: { $0 == .warmup ? "Warm-up" : "Working" },
+                selection: $setType
+            )
         }
-        .pickerStyle(.segmented)
-        .padding(.horizontal)
         .onChange(of: setType) { oldValue, newValue in
            // Update values based on set type
            if newValue == .warmup {
@@ -162,32 +158,20 @@ struct AddRepCountView: View {
     }
     
     private var weightSelector: some View {
-        VStack(alignment: .center, spacing: 10) {
-            Text("WEIGHT (LBS)")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            
-            Button {
+        VStack(alignment: .leading, spacing: 6) {
+            LoggerFieldLabel(title: "Weight · lbs")
+            LoggerValueWell(
+                value: String(format: "%.1f", weight),
+                unit: "lbs",
+                accessibilityLabel: "Weight, opens the weight entry"
+            ) {
                 showWeightPicker = true
-            } label: {
-                HStack {
-                    Text("\(weight, specifier: "%.1f")")
-                        .font(.system(size: 44, weight: .bold))
-                        .foregroundColor(.primary)
-                    
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(.gray)
-                }
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(12)
-                .frame(maxWidth: .infinity)
             }
         }
     }
     
     private var saveButton: some View {
-        Button {
+        VoidCTAButton(title: "Save set") {
             // Save the weight for this exercise and set type
             if setType == .working {
                 lastWorkingWeight = weight
@@ -204,31 +188,9 @@ struct AddRepCountView: View {
             let trackedSet = TrackedSet(reps: reps, weight: weight, setType: setType, exerciseType: exercise.type)
             onSave(trackedSet)
             dismiss()
-        } label: {
-            Text("Save Set")
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(Color.appTheme)
-                .cornerRadius(16)
-                .padding(.vertical)
         }
-        .padding(.horizontal)
-    }
-    
-    private var xButton: some View {
-        HStack {
-            Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .resizable()
-                    .frame(width: 32, height: 32)
-                    .aspectRatio(contentMode: .fit)
-                    .foregroundStyle(Color(uiColor: .systemGray))
-            }
-        }
+        .padding(.horizontal, VoidSpace.insetCard)
+        .padding(.bottom, VoidSpace.s3)
     }
 }
 

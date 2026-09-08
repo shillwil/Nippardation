@@ -2,7 +2,10 @@
 //  AppDesignSystem.swift
 //  Nippardation
 //
-//  Centralized design tokens and reusable view modifiers
+//  Legacy design tokens and card modifiers, re-pointed at the Void system.
+//  Existing call sites keep compiling; every card now renders as a flat Void panel
+//  (panel fill, 1pt hairline, squared radius, no shadow, no gradient).
+//  New code should use VoidTheme / VoidComponents directly.
 //
 
 import SwiftUI
@@ -19,43 +22,32 @@ enum AppSpacing {
     static let xxl: CGFloat = 48
 }
 
-// MARK: - Corner Radius Tokens
+// MARK: - Corner Radius Tokens (Void: squared, never pills)
 
 enum AppCornerRadius {
-    static let small: CGFloat = 8
-    static let medium: CGFloat = 12
-    static let large: CGFloat = 16
-    static let xl: CGFloat = 20
+    /// Small controls (···, segmented).
+    static let small: CGFloat = VoidRadius.control
+    /// Tiles, pills, stepper wells.
+    static let medium: CGFloat = VoidRadius.tile
+    /// Cards and stat tiles.
+    static let large: CGFloat = VoidRadius.panel
+    /// Hero panels, tab bar, sheets.
+    static let xl: CGFloat = VoidRadius.tabBar
 }
 
 // MARK: - Shadow Presets
 
+/// Void has no card shadows. The only shadows in the system are the tab bar and the Start glow.
 struct AppShadow {
     let color: Color
     let radius: CGFloat
     let x: CGFloat
     let y: CGFloat
 
-    static let card = AppShadow(
-        color: Color.primary.opacity(0.08),
-        radius: 8,
-        x: 0,
-        y: 2
-    )
-
-    static let elevated = AppShadow(
-        color: Color.primary.opacity(0.15),
-        radius: 12,
-        x: 0,
-        y: 4
-    )
-
-    static let floating = AppShadow(
-        color: Color.primary.opacity(0.2),
-        radius: 16,
-        x: 0,
-        y: 6
-    )
+    static let none = AppShadow(color: .clear, radius: 0, x: 0, y: 0)
+    static let card = AppShadow.none
+    static let elevated = AppShadow.none
+    static let floating = AppShadow.none
 }
 
 // MARK: - Card View Modifier
@@ -64,26 +56,16 @@ struct CardModifier: ViewModifier {
     var cornerRadius: CGFloat = AppCornerRadius.large
     var shadow: AppShadow = .card
     var hasBorder: Bool = false
-    var borderColor: Color = Color.primary.opacity(0.1)
-    var backgroundColor: Color = Color(.secondarySystemBackground)
+    var borderColor: Color = VoidColor.hairline2
+    var backgroundColor: Color = VoidColor.panel
 
     func body(content: Content) -> some View {
         content
             .background(backgroundColor)
-            .cornerRadius(cornerRadius)
-            .shadow(
-                color: shadow.color,
-                radius: shadow.radius,
-                x: shadow.x,
-                y: shadow.y
-            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                Group {
-                    if hasBorder {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .stroke(borderColor, lineWidth: 1)
-                    }
-                }
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(hasBorder ? borderColor : VoidColor.hairline, lineWidth: 1)
             )
     }
 }
@@ -92,47 +74,37 @@ struct CardModifier: ViewModifier {
 
 struct DashedCardModifier: ViewModifier {
     var cornerRadius: CGFloat = AppCornerRadius.large
-    var dashColor: Color = Color.secondary.opacity(0.4)
-    var lineWidth: CGFloat = 2
-    var dash: [CGFloat] = [8, 6]
+    var dashColor: Color = VoidColor.hairline2
+    var lineWidth: CGFloat = 1
+    var dash: [CGFloat] = [6, 5]
 
     func body(content: Content) -> some View {
         content
-            .background(Color(.secondarySystemBackground).opacity(0.5))
-            .cornerRadius(cornerRadius)
+            .background(VoidColor.panel.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: lineWidth, dash: dash))
-                    .foregroundColor(dashColor)
+                    .foregroundStyle(dashColor)
             )
     }
 }
 
-// MARK: - Gradient Card View Modifier
+// MARK: - Gradient Card View Modifier (now flat — Void has no gradients)
 
 struct GradientCardModifier: ViewModifier {
     var colors: [Color]
     var cornerRadius: CGFloat = AppCornerRadius.xl
     var hasBorder: Bool = true
-    var borderColor: Color = Color.appTheme.opacity(0.3)
+    var borderColor: Color = VoidColor.hairline2
 
     func body(content: Content) -> some View {
         content
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: colors),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(cornerRadius)
+            .background(VoidColor.panel)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                Group {
-                    if hasBorder {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .stroke(borderColor, lineWidth: 1)
-                    }
-                }
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(hasBorder ? borderColor : VoidColor.hairline, lineWidth: 1)
             )
     }
 }
@@ -144,8 +116,8 @@ extension View {
         cornerRadius: CGFloat = AppCornerRadius.large,
         shadow: AppShadow = .card,
         hasBorder: Bool = false,
-        borderColor: Color = Color.primary.opacity(0.1),
-        backgroundColor: Color = Color(.secondarySystemBackground)
+        borderColor: Color = VoidColor.hairline2,
+        backgroundColor: Color = VoidColor.panel
     ) -> some View {
         modifier(CardModifier(
             cornerRadius: cornerRadius,
@@ -158,7 +130,7 @@ extension View {
 
     func dashedCardStyle(
         cornerRadius: CGFloat = AppCornerRadius.large,
-        dashColor: Color = Color.secondary.opacity(0.4)
+        dashColor: Color = VoidColor.hairline2
     ) -> some View {
         modifier(DashedCardModifier(
             cornerRadius: cornerRadius,
@@ -167,10 +139,10 @@ extension View {
     }
 
     func gradientCardStyle(
-        colors: [Color] = [Color.appTheme.opacity(0.15), Color.appTheme.opacity(0.05)],
+        colors: [Color] = [VoidColor.panel, VoidColor.panel],
         cornerRadius: CGFloat = AppCornerRadius.xl,
         hasBorder: Bool = true,
-        borderColor: Color = Color.appTheme.opacity(0.3)
+        borderColor: Color = VoidColor.hairline2
     ) -> some View {
         modifier(GradientCardModifier(
             colors: colors,
@@ -196,21 +168,18 @@ extension View {
                 .padding(AppSpacing.md)
                 .cardStyle(hasBorder: true)
 
-            Text("Elevated Card")
-                .frame(maxWidth: .infinity)
-                .padding(AppSpacing.md)
-                .cardStyle(shadow: .elevated)
-
             Text("Dashed Card")
                 .frame(maxWidth: .infinity)
                 .padding(AppSpacing.md)
                 .dashedCardStyle()
 
-            Text("Gradient Card")
+            Text("Hero Panel")
                 .frame(maxWidth: .infinity)
                 .padding(AppSpacing.md)
                 .gradientCardStyle()
         }
         .padding(AppSpacing.md)
+        .foregroundStyle(VoidColor.text)
     }
+    .background(VoidColor.hull)
 }

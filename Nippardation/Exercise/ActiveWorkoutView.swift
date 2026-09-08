@@ -4,6 +4,10 @@
 //
 //  Created by Alex Shillingford on 5/14/25.
 //
+//  Active workout logger: hull screen, a stats panel (radius 14 + hairline), the exercises as a
+//  list panel with eyebrow-sm labels over stepper numbers and a plasma check once sets exist,
+//  and "End workout" as the destructive panel button behind a confirmation alert.
+//
 
 import SwiftUI
 
@@ -23,132 +27,16 @@ struct ActiveWorkoutView: View {
     }
     
     var body: some View {
-        List {
-            Section {
-                VStack(spacing: 16) {
-                    // Duration and start time row
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Duration")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Text(viewModel.formattedElapsedTime)
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text("Started")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Text(viewModel.workout.startTime?.formatted(date: .omitted, time: .shortened) ?? "")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                        }
-                    }
-                    
-                    // Progress bar and stats
-                    if viewModel.completedSets > 0 {
-                        Divider()
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Completed Sets")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                
-                                Text("\(viewModel.completedSets)")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text("Volume")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                
-                                Text(viewModel.formattedTotalVolume)
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                    .onTapGesture {
-                                        viewModel.cycleVolumeUnit()
-                                    }
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 8)
+        ScrollView {
+            VStack(spacing: VoidSpace.s3) {
+                statsPanel
+                exercisesSection
+                endSection
             }
-            
-            // Exercises section
-            Section("Exercises") {
-                ForEach(Array(zip(viewModel.workout.trackedExercises.indices, viewModel.workout.trackedExercises)), id: \.0) { index, exercise in
-                    Button {
-                        selectedDetent = .large
-                        selectedExercise = IdentifiableIndex(id: index)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(exercise.exerciseName)
-                                    .foregroundColor(.primary)
-
-                                if exercise.trackedSets.isEmpty {
-                                    Text("No sets recorded")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    let setInfo = exercise.trackedSets.count == 1 ? "1 set" : "\(exercise.trackedSets.count) sets"
-                                    let exerciseVolume = exercise.trackedSets.reduce(0.0) { $0 + (Double($1.reps) * $1.weight) }
-
-                                    Text("\(setInfo) • \(Int(exerciseVolume)) lbs")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-
-                            Spacer()
-
-                            if !exercise.trackedSets.isEmpty {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .font(.subheadline)
-                            }
-
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                        }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button {
-                            swappingExerciseIndex = index
-                        } label: {
-                            Label("Swap", systemImage: "arrow.triangle.2.circlepath")
-                        }
-                        .tint(Color.appTheme)
-                    }
-                }
-            }
-            
-            // End workout button
-            Section {
-                // In ActiveWorkoutView where you handle ending the workout:
-                Button("End Workout", role: .destructive) {
-                    viewModel.endWorkout()
-                    
-                    // Short delay to ensure data is saved before dismissing
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
-                        dismiss()
-                    }
-                }
-            }
+            .padding(.top, VoidSpace.s2)
+            .padding(.bottom, VoidSpace.s6)
         }
+        .voidScreen()
         .sheet(item: $selectedExercise) { identifiableIndex in
             ActiveExerciseDetailView(
                 workout: $viewModel.workout,
@@ -159,7 +47,7 @@ struct ActiveWorkoutView: View {
                 exerciseIndex: identifiableIndex.value
             )
             .presentationDetents([.height(350), .height(180), .large], selection: $selectedDetent)
-            .presentationDragIndicator(.visible)
+            .voidSheet()
             .interactiveDismissDisabled()
             .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
@@ -180,17 +68,18 @@ struct ActiveWorkoutView: View {
                     }
                 }
             }
+            .tint(VoidColor.plasma)
         }
         .navigationTitle(viewModel.workout.workoutTemplate)
         .navigationBarTitleDisplayMode(.inline)
-        .alert("End Workout", isPresented: $viewModel.isShowingEndWorkoutAlert) {
+        .alert("End workout", isPresented: $viewModel.isShowingEndWorkoutAlert) {
             Button("Cancel", role: .cancel) {}
-            Button("End Workout", role: .destructive) {
+            Button("End workout", role: .destructive) {
                 viewModel.endWorkout()
                 dismiss()
             }
         } message: {
-            Text("Are you sure you want to end this workout? Your progress will be saved.")
+            Text("Your progress will be saved.")
         }
         .onAppear {
             viewModel.startTimer()
@@ -199,17 +88,158 @@ struct ActiveWorkoutView: View {
             viewModel.stopTimer()
         }
     }
+    
+    // MARK: - Stats
+    
+    /// Duration / started, then completed sets / volume once a set is logged.
+    private var statsPanel: some View {
+        VStack(spacing: 14) {
+            // Duration and start time row
+            HStack(alignment: .top) {
+                stat("Duration", viewModel.formattedElapsedTime)
+                Spacer()
+                stat("Started", startedText, alignment: .trailing)
+            }
+            
+            // Completed sets and volume
+            if viewModel.completedSets > 0 {
+                VoidHairline()
+                
+                HStack(alignment: .top) {
+                    stat("Completed sets", VoidFormat.pad2(viewModel.completedSets))
+                    Spacer()
+                    Button {
+                        viewModel.cycleVolumeUnit()
+                    } label: {
+                        stat("Volume", viewModel.formattedTotalVolume, alignment: .trailing)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(VoidPlainButtonStyle())
+                    .accessibilityHint("Cycles the volume unit")
+                }
+            }
+        }
+        .padding(14)
+        .voidPanel(radius: VoidRadius.panel, line: VoidColor.hairline)
+        .padding(.horizontal, VoidSpace.insetCard)
+    }
+    
+    private var startedText: String {
+        viewModel.workout.startTime?.formatted(date: .omitted, time: .shortened) ?? "–"
+    }
+    
+    private func stat(_ label: String, _ value: String, alignment: HorizontalAlignment = .leading) -> some View {
+        VStack(alignment: alignment, spacing: 4) {
+            Text(label).voidEyebrowSm()
+            Text(value)
+                .font(VoidFont.stepper)
+                .foregroundStyle(VoidColor.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .accessibilityElement(children: .combine)
+    }
+    
+    // MARK: - Exercises
+    
+    private var exercises: [TrackedExercise] {
+        viewModel.workout.trackedExercises
+    }
+    
+    /// Eyebrow over a list panel of exercise rows. Long-press a row for Swap (the detail sheet
+    /// also carries a "Swap movement" pill).
+    private var exercisesSection: some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s3) {
+            VoidSectionRow(title: "Exercises")
+            
+            VoidListPanel {
+                ForEach(Array(zip(exercises.indices, exercises)), id: \.0) { index, exercise in
+                    Button {
+                        selectedDetent = .large
+                        selectedExercise = IdentifiableIndex(id: index)
+                    } label: {
+                        exerciseRow(exercise)
+                    }
+                    .buttonStyle(VoidRowButtonStyle())
+                    .contextMenu {
+                        Button {
+                            swappingExerciseIndex = index
+                        } label: {
+                            Label("Swap", systemImage: VoidIcon.swap.systemName)
+                        }
+                    }
+                    
+                    if index < exercises.count - 1 {
+                        VoidHairline()
+                    }
+                }
+            }
+        }
+        .padding(.top, VoidSpace.s2)
+    }
+    
+    private func exerciseRow(_ exercise: TrackedExercise) -> some View {
+        HStack(spacing: VoidSpace.s3) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(exercise.exerciseName)
+                    .font(VoidFont.bodyStrong)
+                    .foregroundStyle(VoidColor.text)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                
+                Text(setCaption(exercise))
+                    .voidEyebrowSm(exercise.trackedSets.isEmpty ? VoidColor.text3 : VoidColor.text2)
+                    .lineLimit(1)
+            }
+            
+            Spacer(minLength: VoidSpace.s2)
+            
+            if !exercise.trackedSets.isEmpty {
+                Image(systemName: VoidIcon.check.systemName)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(VoidColor.plasma)
+                    .accessibilityLabel("Logged")
+            }
+            
+            VoidChevron()
+        }
+        .padding(.vertical, VoidSpace.s3)
+        .frame(minHeight: VoidSize.listRow)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+    
+    private func setCaption(_ exercise: TrackedExercise) -> String {
+        let sets = exercise.trackedSets
+        guard !sets.isEmpty else { return "No sets" }
+        let volume = sets.reduce(0.0) { $0 + (Double($1.reps) * $1.weight) }
+        let setWord = sets.count == 1 ? "set" : "sets"
+        return VoidFormat.readout(["\(VoidFormat.pad2(sets.count)) \(setWord)", "\(Int(volume)) lbs"])
+    }
+    
+    // MARK: - End workout
+    
+    /// Opens the confirmation alert; its destructive action ends the workout and closes the cover.
+    private var endSection: some View {
+        VoidDestructiveButton(title: "End workout") {
+            viewModel.isShowingEndWorkoutAlert = true
+        }
+        .padding(.horizontal, VoidSpace.insetCard)
+        .padding(.top, VoidSpace.s3)
+    }
 }
 
 #Preview {
-    ActiveWorkoutView(workout: TrackedWorkout(
-        date: Date(),
-        workoutTemplate: "Pull Day (Hypertrophy Focus)",
-        trackedExercises: [
-            TrackedExercise(
-                exerciseName: "TEst exercise",
-                muscleGroups: [MuscleGroup.shoulders.rawValue],
-                trackedSets: []
-            )
-        ]))
+    NavigationStack {
+        ActiveWorkoutView(workout: TrackedWorkout(
+            date: Date(),
+            workoutTemplate: "Pull Day (Hypertrophy Focus)",
+            trackedExercises: [
+                TrackedExercise(
+                    exerciseName: "TEst exercise",
+                    muscleGroups: [MuscleGroup.shoulders.rawValue],
+                    trackedSets: []
+                )
+            ]))
+    }
 }

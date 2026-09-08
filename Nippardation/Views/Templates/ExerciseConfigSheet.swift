@@ -2,7 +2,8 @@
 //  ExerciseConfigSheet.swift
 //  Nippardation
 //
-//  Modern configuration sheet for exercise parameters in the template editor
+//  Sets / reps / rest / notes for one exercise in the workout editor.
+//  Void sheet: panel background, panel-2 stepper wells (radius 12), stepper numbers.
 //
 
 import SwiftUI
@@ -41,28 +42,59 @@ struct ExerciseConfigSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: AppSpacing.lg) {
-                    // Exercise header
-                    headerSection
+                VStack(alignment: .leading, spacing: VoidSpace.s5) {
+                    header
 
-                    // Set counters
-                    setCountersSection
+                    section("Sets") {
+                        HStack(spacing: 10) {
+                            ExerciseStepperWell(label: "Warmup", value: $warmupSets, range: 0...5)
+                            ExerciseStepperWell(label: "Working", value: $workingSets, range: 1...10)
+                        }
+                    }
 
-                    // Target reps
-                    repsSection
+                    section("Reps and rest") {
+                        HStack(spacing: 10) {
+                            repsWell
+                            ExerciseStepperWell(
+                                label: "Rest",
+                                value: $restSeconds,
+                                range: 0...600,
+                                step: 15,
+                                display: ExerciseConfigFormat.rest
+                            )
+                        }
+                        HStack(spacing: VoidSpace.s2) {
+                            ForEach(restOptions, id: \.self) { seconds in
+                                VoidSquareChip(
+                                    text: ExerciseConfigFormat.rest(seconds),
+                                    isSelected: restSeconds == seconds
+                                ) {
+                                    restSeconds = seconds
+                                }
+                            }
+                        }
+                    }
 
-                    // Rest timer
-                    restSection
+                    section("Notes") {
+                        MultilineTextWell(placeholder: "Notes (optional)", text: $notes)
+                    }
 
-                    // Notes
-                    notesSection
-
-                    // Delete button
-                    deleteSection
+                    VoidDestructiveButton(title: "Remove exercise") {
+                        onDelete()
+                        dismiss()
+                    }
+                    .padding(.top, VoidSpace.s1)
                 }
-                .padding(AppSpacing.md)
+                .padding(.horizontal, VoidSpace.insetText)
+                .padding(.top, VoidSpace.s3)
+                .padding(.bottom, VoidSpace.s6)
             }
-            .navigationTitle("Configure Exercise")
+            .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(VoidColor.panel.ignoresSafeArea())
+            .toolbarBackground(VoidColor.panel, for: .navigationBar)
+            .tint(VoidColor.plasma)
+            .navigationTitle("Configure exercise")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -77,160 +109,118 @@ struct ExerciseConfigSheet: View {
                 }
             }
         }
+        .voidSheet()
     }
 
     // MARK: - Sections
 
-    private var headerSection: some View {
-        VStack(spacing: AppSpacing.xs) {
+    private var header: some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s1) {
             Text(exercise.displayName)
-                .font(.headline)
+                .font(VoidFont.title)
+                .foregroundStyle(VoidColor.text)
+                .lineLimit(2)
 
             if let muscles = exercise.exerciseLibraryItem?.primaryMuscles, !muscles.isEmpty {
-                Text(muscles.map { $0.rawValue.capitalized }.joined(separator: " · "))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                Text(muscles.map { $0.rawValue.capitalized }.joined(separator: VoidFormat.dot))
+                    .font(VoidFont.caption)
+                    .foregroundStyle(VoidColor.text2)
             }
         }
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s2) {
+            Text(title)
+                .voidEyebrowSm()
+            content()
+        }
+    }
+
+    /// Text well matching the stepper wells: "8-12" in the stepper font.
+    private var repsWell: some View {
+        VStack(spacing: VoidSpace.s2) {
+            Text("Reps")
+                .voidEyebrowSm()
+            TextField("8-12", text: $targetReps)
+                .font(VoidFont.stepper)
+                .foregroundStyle(VoidColor.text)
+                .multilineTextAlignment(.center)
+                .keyboardType(.numbersAndPunctuation)
+                .autocorrectionDisabled()
+                .frame(height: VoidSize.hitMin)
+                .accessibilityLabel("Target reps")
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 6)
         .frame(maxWidth: .infinity)
-        .padding(AppSpacing.md)
-        .cardStyle()
-    }
-
-    private var setCountersSection: some View {
-        VStack(spacing: AppSpacing.sm) {
-            Text("Sets")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: AppSpacing.md) {
-                counterControl(label: "Warmup", value: $warmupSets, range: 0...5)
-                counterControl(label: "Working", value: $workingSets, range: 1...10)
-            }
-        }
-    }
-
-    private var repsSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
-            Text("Target Reps")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-
-            TextField("e.g., 8-12", text: $targetReps)
-                .textFieldStyle(.roundedBorder)
-        }
-    }
-
-    private var restSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
-            Text("Rest Period")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-
-            HStack(spacing: AppSpacing.xs) {
-                ForEach(restOptions, id: \.self) { seconds in
-                    Button {
-                        restSeconds = seconds
-                    } label: {
-                        Text(formatRest(seconds))
-                            .font(.subheadline)
-                            .fontWeight(restSeconds == seconds ? .semibold : .regular)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, AppSpacing.sm)
-                            .background(
-                                restSeconds == seconds
-                                    ? Color.appTheme.opacity(0.15)
-                                    : Color(.tertiarySystemBackground)
-                            )
-                            .foregroundColor(restSeconds == seconds ? .appTheme : .primary)
-                            .cornerRadius(AppCornerRadius.small)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    private var notesSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
-            Text("Notes")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-
-            TextField("Exercise notes (optional)", text: $notes, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(3...6)
-        }
-    }
-
-    private var deleteSection: some View {
-        Button(role: .destructive) {
-            onDelete()
-            dismiss()
-        } label: {
-            Label("Remove Exercise", systemImage: "trash")
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.bordered)
-        .tint(.red)
-    }
-
-    // MARK: - Counter Control
-
-    private func counterControl(label: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
-        VStack(spacing: AppSpacing.xs) {
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            HStack(spacing: AppSpacing.sm) {
-                Button {
-                    if value.wrappedValue > range.lowerBound {
-                        value.wrappedValue -= 1
-                    }
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(value.wrappedValue > range.lowerBound ? .appTheme : .secondary.opacity(0.3))
-                }
-                .disabled(value.wrappedValue <= range.lowerBound)
-
-                Text("\(value.wrappedValue)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .frame(minWidth: 32)
-
-                Button {
-                    if value.wrappedValue < range.upperBound {
-                        value.wrappedValue += 1
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(value.wrappedValue < range.upperBound ? .appTheme : .secondary.opacity(0.3))
-                }
-                .disabled(value.wrappedValue >= range.upperBound)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(AppSpacing.sm)
-        .background(Color(.tertiarySystemBackground))
-        .cornerRadius(AppCornerRadius.medium)
-    }
-
-    // MARK: - Helpers
-
-    private func formatRest(_ seconds: Int) -> String {
-        if seconds >= 60 {
-            let minutes = seconds / 60
-            let remaining = seconds % 60
-            if remaining == 0 { return "\(minutes)m" }
-            return "\(minutes):\(String(format: "%02d", remaining))"
-        }
-        return "\(seconds)s"
+        .background(VoidColor.panel2)
+        .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
     }
 }
+
+// MARK: - Stepper well
+
+/// Panel-2 well (radius 12): eyebrow label over [−] number [+]. Numbers in `VoidFont.stepper`.
+struct ExerciseStepperWell: View {
+    let label: String
+    @Binding var value: Int
+    var range: ClosedRange<Int>
+    var step: Int = 1
+    var display: (Int) -> String = { String($0) }
+
+    var body: some View {
+        VStack(spacing: VoidSpace.s2) {
+            Text(label)
+                .voidEyebrowSm()
+
+            HStack(spacing: 0) {
+                stepButton(icon: GapIcon.minus, enabled: value - step >= range.lowerBound, name: "Decrease \(label)") {
+                    value = max(range.lowerBound, value - step)
+                }
+
+                Text(display(value))
+                    .font(VoidFont.stepper)
+                    .foregroundStyle(VoidColor.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity)
+
+                stepButton(icon: VoidIcon.plus.systemName, enabled: value + step <= range.upperBound, name: "Increase \(label)") {
+                    value = min(range.upperBound, value + step)
+                }
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity)
+        .background(VoidColor.panel2)
+        .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(label)
+        .accessibilityValue(display(value))
+    }
+
+    private func stepButton(icon: String, enabled: Bool, name: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(enabled ? VoidColor.text : VoidColor.text3)
+                .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(VoidPlainButtonStyle())
+        .disabled(!enabled)
+        .accessibilityLabel(name)
+    }
+}
+
+/// SF Symbols the Void glyph set does not name yet.
+private enum GapIcon {
+    static let minus = "minus"
+}
+
+// MARK: - Previews
 
 #Preview {
     ExerciseConfigSheet(

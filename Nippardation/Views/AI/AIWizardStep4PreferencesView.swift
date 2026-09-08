@@ -2,7 +2,7 @@
 //  AIWizardStep4PreferencesView.swift
 //  Nippardation
 //
-//  Step 4: Free-text preferences, optional strength data, and generate trigger
+//  Step 4: preferences, workout reuse, optional strength data.
 //
 
 import SwiftUI
@@ -13,237 +13,248 @@ struct AIWizardStep4PreferencesView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.lg) {
-                AISectionHeader("Fine-Tune & Generate", subtitle: "Add preferences and generate your program")
+            VStack(alignment: .leading, spacing: VoidSpace.s6) {
+                AISectionHeader("Fine-tune", subtitle: "Add preferences, then generate the plan.")
+                    .padding(.horizontal, VoidSpace.s1)
 
-                // Quota display
-                if let status = viewModel.generationStatus {
-                    AIQuotaBadge(remaining: status.generationsRemaining, limit: status.generationsLimit)
+                quotaSection
+                preferencesSection
+                reuseSection
+                strengthSection
+            }
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s2)
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
 
-                    if !status.hasRemaining {
-                        Text("Resets on \(status.resetsAtFormatted)")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    }
-                } else if viewModel.isLoadingQuota {
-                    HStack(spacing: AppSpacing.xs) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Checking quota...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
+    // MARK: - Quota
 
-                // Free-text preferences
-                VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    Text("Additional Preferences")
-                        .font(.headline)
-
-                    Text("Optional. Describe anything specific you want.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    TextField("e.g., focus on compounds, avoid deadlifts, more arm volume...", text: $viewModel.freeTextPreferences, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .lineLimit(3...5)
-
-                    HStack {
-                        Spacer()
-                        Text("\(viewModel.freeTextPreferences.count)/500")
-                            .font(.caption2)
-                            .foregroundColor(
-                                viewModel.freeTextPreferences.count > 500 ? .red : .secondary
-                            )
-                    }
-                }
-
-                Divider()
-                    .padding(.vertical, AppSpacing.xs)
-
-                // Template reuse section
-                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                    Toggle(isOn: $viewModel.reuseTemplates) {
-                        HStack(spacing: AppSpacing.xs) {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                            Text("Reuse Existing Templates")
-                                .font(.headline)
-                        }
-                    }
-                    .tint(AIColors.accent)
-                    .onChange(of: viewModel.reuseTemplates) { _, isOn in
-                        if isOn && viewModel.availableTemplates.isEmpty {
-                            viewModel.loadTemplates()
-                        }
-                        if !isOn {
-                            viewModel.selectedTemplateIds.removeAll()
-                        }
-                    }
-
-                    if viewModel.reuseTemplates {
-                        Text("Select up to 7 templates for the AI to refresh instead of creating new ones.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        if viewModel.isLoadingTemplates {
-                            HStack(spacing: AppSpacing.xs) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("Loading templates...")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        } else if viewModel.availableTemplates.isEmpty {
-                            Text("No templates found.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            ForEach(viewModel.availableTemplates) { template in
-                                templateReuseRow(template)
-                            }
-                        }
-                    }
-                }
-
-                Divider()
-                    .padding(.vertical, AppSpacing.xs)
-
-                // Strength data section (expandable)
-                VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                    Button {
-                        withAnimation { showStrengthSection.toggle() }
-                    } label: {
-                        HStack {
-                            Text("Strength Data")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            Text("(Optional)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Image(systemName: showStrengthSection ? "chevron.up" : "chevron.down")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if showStrengthSection {
-                        Text("Enter your current lifts to personalize exercise selection and weights.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        if viewModel.isLoadingProfile {
-                            ProgressView("Loading saved profile...")
-                                .font(.caption)
-                        } else {
-                            ForEach($viewModel.strengthEntries) { $entry in
-                                strengthEntryRow(entry: $entry)
-                            }
-                            .onDelete { viewModel.removeStrengthEntry(at: $0) }
-
-                            if viewModel.strengthEntries.count < 20 {
-                                Button {
-                                    viewModel.addStrengthEntry()
-                                } label: {
-                                    Label("Add Exercise", systemImage: "plus.circle.fill")
-                                        .font(.subheadline)
-                                        .foregroundColor(AIColors.accent)
-                                }
-                            }
-                        }
-                    }
+    @ViewBuilder
+    private var quotaSection: some View {
+        if let status = viewModel.generationStatus {
+            VStack(alignment: .leading, spacing: VoidSpace.s2) {
+                AIQuotaBadge(remaining: status.generationsRemaining, limit: status.generationsLimit)
+                if !status.hasRemaining {
+                    WizardHelperText(text: "Resets on \(status.resetsAtFormatted).", color: VoidColor.warning)
                 }
             }
-            .padding(AppSpacing.md)
+            .padding(.horizontal, VoidSpace.s1)
+        } else if viewModel.isLoadingQuota {
+            HStack(spacing: VoidSpace.s2) {
+                ProgressView()
+                    .tint(VoidColor.plasma)
+                    .controlSize(.small)
+                Text("Checking quota")
+                    .font(VoidFont.caption)
+                    .foregroundStyle(VoidColor.text2)
+            }
+            .padding(.horizontal, VoidSpace.s1)
         }
     }
 
-    // MARK: - Template Reuse Row
+    // MARK: - Preferences
+
+    private var preferencesSection: some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s2) {
+            WizardSectionLabel(title: "Preferences")
+            WizardHelperText(text: "Optional. Anything specific you want.")
+
+            WizardTextArea(
+                placeholder: "e.g. focus on compounds, avoid deadlifts, more arm volume",
+                text: $viewModel.freeTextPreferences
+            )
+
+            HStack {
+                Spacer()
+                Text("\(viewModel.freeTextPreferences.count) / 500")
+                    .font(VoidFont.caption2)
+                    .monospacedDigit()
+                    .foregroundStyle(viewModel.freeTextPreferences.count > 500 ? VoidColor.warning : VoidColor.text2)
+            }
+            .padding(.horizontal, VoidSpace.s1)
+        }
+    }
+
+    // MARK: - Reuse workouts
+
+    private var reuseSection: some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s2) {
+            WizardSectionLabel(title: "Reuse workouts")
+
+            WizardOptionCard(isSelected: viewModel.reuseTemplates, action: {
+                viewModel.reuseTemplates.toggle()
+            }) {
+                HStack(spacing: VoidSpace.s3) {
+                    WizardGlyphSquare(icon: .swap)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Reuse existing workouts")
+                            .font(VoidFont.bodyStrong)
+                            .foregroundStyle(VoidColor.text)
+                        Text("Pick up to 7 for the AI to refresh instead of creating new ones.")
+                            .font(VoidFont.caption2)
+                            .foregroundStyle(VoidColor.text2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: VoidSpace.s5)
+                }
+                .padding(14)
+            }
+            .onChange(of: viewModel.reuseTemplates) { _, isOn in
+                if isOn && viewModel.availableTemplates.isEmpty {
+                    viewModel.loadTemplates()
+                }
+                if !isOn {
+                    viewModel.selectedTemplateIds.removeAll()
+                }
+            }
+
+            if viewModel.reuseTemplates {
+                if viewModel.isLoadingTemplates {
+                    HStack(spacing: VoidSpace.s2) {
+                        ProgressView()
+                            .tint(VoidColor.plasma)
+                            .controlSize(.small)
+                        Text("Loading workouts")
+                            .font(VoidFont.caption)
+                            .foregroundStyle(VoidColor.text2)
+                    }
+                    .padding(.horizontal, VoidSpace.s1)
+                } else if viewModel.availableTemplates.isEmpty {
+                    WizardHelperText(text: "No workouts found.")
+                } else {
+                    ForEach(viewModel.availableTemplates) { template in
+                        templateReuseRow(template)
+                    }
+                }
+            }
+        }
+    }
 
     private func templateReuseRow(_ template: Template) -> some View {
         let isSelected = viewModel.selectedTemplateIds.contains(template.serverId)
         let atMax = viewModel.selectedTemplateIds.count >= 7
 
-        return Button {
+        return WizardOptionCard(isSelected: isSelected, isEnabled: isSelected || !atMax, action: {
             viewModel.toggleTemplateSelection(template.serverId)
-        } label: {
-            HStack(spacing: AppSpacing.sm) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? AIColors.accent : .secondary)
+        }) {
+            HStack(spacing: VoidSpace.s3) {
+                WizardGlyphSquare(icon: VoidIcon.workoutGlyph(for: template.name))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(template.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-
-                    Text("\(template.exerciseCount) exercises")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(VoidFont.bodyStrong)
+                        .foregroundStyle(VoidColor.text)
+                        .lineLimit(1)
+                    Text(VoidFormat.exercises(template.exerciseCount)).voidReadout()
                 }
 
-                Spacer()
+                Spacer(minLength: VoidSpace.s2)
 
                 if template.isAiGenerated {
-                    Image(systemName: "sparkles")
-                        .font(.caption2)
-                        .foregroundColor(.purple)
+                    Image(systemName: VoidIcon.sparkle.systemName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(VoidColor.plasma)
+                        .accessibilityLabel("AI generated")
                 }
             }
-            .padding(AppSpacing.sm)
-            .cardStyle()
+            .padding(14)
         }
-        .buttonStyle(.plain)
-        .disabled(!isSelected && atMax)
-        .opacity(!isSelected && atMax ? 0.5 : 1)
     }
 
-    // MARK: - Strength Entry Row
+    // MARK: - Strength data
 
-    private func strengthEntryRow(entry: Binding<StrengthDataEntry>) -> some View {
-        VStack(spacing: AppSpacing.xs) {
-            TextField("Exercise name", text: entry.exerciseName)
-                .textFieldStyle(.roundedBorder)
-
-            HStack(spacing: AppSpacing.xs) {
-                HStack(spacing: AppSpacing.xxs) {
-                    TextField("Weight", value: entry.weight, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .keyboardType(.decimalPad)
-                        .frame(width: 70)
-
-                    Picker("", selection: entry.unit) {
-                        Text("lb").tag("lb")
-                        Text("kg").tag("kg")
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 80)
+    private var strengthSection: some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s2) {
+            Button {
+                showStrengthSection.toggle()
+            } label: {
+                HStack(spacing: VoidSpace.s2) {
+                    Text("Strength data").voidEyebrowSm()
+                    Text("Optional").voidEyebrowSm(VoidColor.text3)
+                    Spacer()
+                    VoidChevron()
+                        .rotationEffect(.degrees(showStrengthSection ? -90 : 90))
                 }
+                .padding(.horizontal, VoidSpace.s1)
+                .frame(minHeight: VoidSize.hitMin)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(VoidPlainButtonStyle())
+            .accessibilityLabel("Strength data, optional")
+            .accessibilityValue(showStrengthSection ? "Expanded" : "Collapsed")
 
-                HStack(spacing: AppSpacing.xxs) {
-                    TextField("Reps", value: entry.reps, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .keyboardType(.numberPad)
-                        .frame(width: 50)
-                    Text("x")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    TextField("Sets", value: entry.sets, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .keyboardType(.numberPad)
-                        .frame(width: 50)
+            if showStrengthSection {
+                WizardHelperText(text: "Enter your current lifts to personalize exercise selection and weights.")
+
+                if viewModel.isLoadingProfile {
+                    HStack(spacing: VoidSpace.s2) {
+                        ProgressView()
+                            .tint(VoidColor.plasma)
+                            .controlSize(.small)
+                        Text("Loading saved profile")
+                            .font(VoidFont.caption)
+                            .foregroundStyle(VoidColor.text2)
+                    }
+                    .padding(.horizontal, VoidSpace.s1)
+                } else {
+                    ForEach($viewModel.strengthEntries) { $entry in
+                        strengthEntryRow(entry: $entry) {
+                            if let index = viewModel.strengthEntries.firstIndex(where: { $0.id == entry.id }) {
+                                viewModel.removeStrengthEntry(at: IndexSet(integer: index))
+                            }
+                        }
+                    }
+
+                    if viewModel.strengthEntries.count < 20 {
+                        VoidPillButton(title: "Add exercise") {
+                            viewModel.addStrengthEntry()
+                        }
+                    }
                 }
             }
         }
-        .padding(AppSpacing.sm)
-        .cardStyle()
+    }
+
+    private func strengthEntryRow(entry: Binding<StrengthDataEntry>, onRemove: @escaping () -> Void) -> some View {
+        VStack(spacing: VoidSpace.s2) {
+            HStack(spacing: VoidSpace.s2) {
+                VoidTextField(placeholder: "Exercise name", text: entry.exerciseName, autocapitalization: .words)
+
+                Button(action: onRemove) {
+                    Image(systemName: VoidIcon.close.systemName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(VoidColor.text2)
+                        .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
+                }
+                .buttonStyle(VoidPlainButtonStyle())
+                .accessibilityLabel("Remove exercise")
+            }
+
+            HStack(spacing: VoidSpace.s2) {
+                WizardDecimalField(placeholder: "Weight", value: entry.weight)
+                VoidSegmentedControl(items: ["lb", "kg"], label: { $0 }, selection: entry.unit)
+            }
+
+            HStack(spacing: VoidSpace.s2) {
+                WizardIntField(placeholder: "Reps", value: entry.reps)
+                Text("×")
+                    .font(VoidFont.caption)
+                    .foregroundStyle(VoidColor.text2)
+                WizardIntField(placeholder: "Sets", value: entry.sets)
+            }
+        }
+        .padding(14)
+        .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2)
     }
 }
 
 #Preview {
     NavigationStack {
         AIWizardStep4PreferencesView(viewModel: AIWizardViewModel())
+            .voidScreen()
     }
     .withDependencies(.preview)
 }

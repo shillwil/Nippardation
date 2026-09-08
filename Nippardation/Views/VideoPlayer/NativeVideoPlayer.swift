@@ -3,6 +3,7 @@
 //  Nippardation
 //
 //  Native video player view using AVPlayer
+//  Void chrome: hull backdrop, radius 12, plasma controls, flat overlays (no gradients).
 //
 
 import SwiftUI
@@ -23,6 +24,10 @@ struct NativeVideoPlayer: View {
 
     private var effectiveAspectRatio: CGFloat {
         overrideAspectRatio ?? viewModel.detectedAspectRatio
+    }
+
+    private var frameShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous)
     }
 
     // MARK: - Initialization
@@ -48,8 +53,8 @@ struct NativeVideoPlayer: View {
             VideoPlayerLayer(player: viewModel.player)
                 .aspectRatio(effectiveAspectRatio, contentMode: .fit)
                 .animation(.easeInOut(duration: 0.25), value: effectiveAspectRatio)
-                .background(Color.black)
-                .cornerRadius(12)
+                .background(VoidColor.hull)
+                .clipShape(frameShape)
 
             // Loading overlay
             if viewModel.isLoading {
@@ -92,123 +97,106 @@ struct NativeVideoPlayer: View {
 
     private var loadingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.3)
+            VoidColor.hull.opacity(0.7)
 
-            VStack(spacing: 12) {
+            VStack(spacing: VoidSpace.s3) {
                 if viewModel.downloadProgress > 0 && viewModel.downloadProgress < 1 {
                     // Download progress
                     ProgressView(value: viewModel.downloadProgress)
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: VoidColor.text))
                         .scaleEffect(1.2)
 
-                    Text("Downloading... \(Int(viewModel.downloadProgress * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.white)
+                    Text("Downloading \(VoidFormat.pad2(Int(viewModel.downloadProgress * 100)))%")
+                        .voidEyebrowSm()
                 } else {
                     // Indeterminate loading
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: VoidColor.text))
                         .scaleEffect(1.2)
 
-                    Text("Loading video...")
-                        .font(.caption)
-                        .foregroundColor(.white)
+                    Text("Loading video")
+                        .voidEyebrowSm()
                 }
             }
         }
-        .cornerRadius(12)
+        .clipShape(frameShape)
     }
 
     private func errorOverlay(message: String) -> some View {
         ZStack {
-            Color.black.opacity(0.5)
+            VoidColor.hull.opacity(0.7)
 
-            VStack(spacing: 12) {
+            VStack(spacing: VoidSpace.s3) {
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.title)
-                    .foregroundColor(.yellow)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(VoidColor.warning)
 
                 Text(message)
-                    .font(.caption)
-                    .foregroundColor(.white)
+                    .font(VoidFont.caption)
+                    .foregroundStyle(VoidColor.text)
                     .multilineTextAlignment(.center)
 
-                Button("Retry") {
+                VoidPillButton(title: "Retry") {
                     Task {
                         await viewModel.loadVideo(exerciseServerId: exerciseServerId, videoUrl: videoUrl)
                     }
                 }
-                .buttonStyle(.bordered)
-                .tint(.white)
+                .frame(width: 120)
             }
             .padding()
         }
-        .cornerRadius(12)
+        .clipShape(frameShape)
     }
 
     private var controlsOverlay: some View {
         VStack {
             Spacer()
 
-            HStack(spacing: 20) {
+            HStack(spacing: VoidSpace.s4) {
                 // Play/Pause button
-                Button {
+                controlButton(
+                    systemName: viewModel.isPlaying ? VoidIcon.pause.systemName : VoidIcon.play.systemName,
+                    size: VoidSize.hitMin,
+                    label: viewModel.isPlaying ? "Pause" : "Play"
+                ) {
                     viewModel.togglePlayPause()
-                } label: {
-                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Color.black.opacity(0.5))
-                        .clipShape(Circle())
                 }
 
                 // Progress bar
                 if viewModel.duration > 0 {
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            // Background
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.white.opacity(0.3))
-                                .frame(height: 4)
-
-                            // Progress
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.white)
-                                .frame(
-                                    width: max(0, min(geometry.size.width, geometry.size.width * CGFloat(viewModel.currentTime / viewModel.duration))),
-                                    height: 4
-                                )
-                        }
-                        .frame(height: 4)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    }
-                    .frame(height: 20)
+                    VoidProgressBar(progress: viewModel.currentTime / viewModel.duration)
+                        .frame(maxWidth: .infinity)
                 }
 
                 // Mute button
-                Button {
+                controlButton(
+                    systemName: viewModel.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                    size: VoidSize.hitMin,
+                    glyphSize: 14,
+                    label: viewModel.isMuted ? "Unmute" : "Mute"
+                ) {
                     viewModel.toggleMute()
-                } label: {
-                    Image(systemName: viewModel.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .font(.body)
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Color.black.opacity(0.5))
-                        .clipShape(Circle())
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [.clear, .black.opacity(0.6)]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s3)
+            .background(VoidColor.hull.opacity(0.7))
         }
-        .cornerRadius(12)
+        .clipShape(frameShape)
+    }
+
+    /// Squared control: panel fill, hairline, plasma glyph. `size` is the tappable square
+    /// (`VoidPanelButtonStyle` clips the hit area to it, so keep it at `VoidSize.hitMin`);
+    /// `glyphSize` lets a secondary control keep a smaller glyph.
+    private func controlButton(systemName: String, size: CGFloat, glyphSize: CGFloat = 17, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: glyphSize, weight: .semibold))
+                .foregroundStyle(VoidColor.plasma)
+                .frame(width: size, height: size)
+        }
+        .buttonStyle(VoidPanelButtonStyle(radius: VoidRadius.control))
+        .accessibilityLabel(label)
     }
 }
 
@@ -258,4 +246,5 @@ class PlayerUIView: UIView {
     )
     .frame(height: 250)
     .padding()
+    .background(VoidColor.hull)
 }

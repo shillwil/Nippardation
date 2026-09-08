@@ -327,6 +327,16 @@ final class ProgramRepository: ProgramRepositoryProtocol {
         return program
     }
 
+    func resetProgram(serverId: String) async throws -> Program {
+        let dto = try await apiService.resetProgram(id: serverId)
+        let program = ProgramMapper.toDomain(dto)
+
+        // Update local cache
+        try? await coreDataManager.cacheProgram(program)
+
+        return program
+    }
+
     // MARK: - Cache Operations
 
     func getCachedPrograms() -> [Program] {

@@ -27,16 +27,28 @@ struct CompactVideoPlayer: View {
                 Button {
                     showFullPlayer = true
                 } label: {
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.white)
-                        .shadow(radius: 4)
+                    Image(systemName: VoidIcon.play.systemName)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(VoidColor.plasma)
+                        .frame(width: 50, height: 50)
+                        .background(VoidColor.panel)
+                        .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous)
+                                .strokeBorder(VoidColor.hairline2, lineWidth: 1)
+                        )
                 }
+                .buttonStyle(VoidScaleButtonStyle())
+                .accessibilityLabel("Play video")
             }
         }
         .aspectRatio(16/9, contentMode: .fit)
-        .background(Color.black)
-        .cornerRadius(8)
+        .background(VoidColor.hull)
+        .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous)
+                .strokeBorder(VoidColor.hairline2, lineWidth: 1)
+        )
         .sheet(isPresented: $showFullPlayer) {
             fullPlayerSheet
         }
@@ -59,7 +71,7 @@ struct CompactVideoPlayer: View {
                     placeholder
                         .overlay(
                             ProgressView()
-                                .tint(.white)
+                                .tint(VoidColor.text)
                         )
                 @unknown default:
                     placeholder
@@ -72,11 +84,11 @@ struct CompactVideoPlayer: View {
 
     private var placeholder: some View {
         Rectangle()
-            .fill(Color.gray.opacity(0.3))
+            .fill(VoidColor.panel2)
             .overlay(
-                Image(systemName: "figure.strengthtraining.traditional")
-                    .font(.largeTitle)
-                    .foregroundColor(.gray)
+                Image(systemName: VoidIcon.workoutDefault.systemName)
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(VoidColor.text3)
             )
     }
 
@@ -90,11 +102,11 @@ struct CompactVideoPlayer: View {
                     videoUrl: videoUrl,
                     showControls: true
                 )
-                .padding(.horizontal)
+                .padding(.horizontal, VoidSpace.insetCard)
 
                 Spacer()
             }
-            .navigationTitle("Exercise Demo")
+            .navigationTitle("Exercise demo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -103,7 +115,7 @@ struct CompactVideoPlayer: View {
                     }
                 }
             }
-            .background(Color.black)
+            .voidScreen()
         }
     }
 }
@@ -127,4 +139,5 @@ struct CompactVideoPlayer: View {
         .frame(width: 200)
     }
     .padding()
+    .background(VoidColor.hull)
 }

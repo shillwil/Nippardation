@@ -162,7 +162,7 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
             } catch {
                 await MainActor.run {
                     self.isSaving = false
-                    self.error = "Failed to save program: \(error.localizedDescription)"
+                    self.error = "Couldn't save the plan: \(error.localizedDescription)"
                 }
             }
         }

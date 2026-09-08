@@ -100,7 +100,8 @@ final class ProgramEditorViewModel: ObservableObject {
             self.daysPerWeek = program.daysPerWeek
             self.durationWeeks = program.durationWeeks
             self.isIndefinite = program.isIndefinite
-            self.workouts = program.workouts.map { workout in
+            // Array position is load-bearing (save() renumbers by index), so never trust the payload order.
+            self.workouts = program.workouts.sorted { $0.dayNumber < $1.dayNumber }.map { workout in
                 EditableWorkout(
                     dayNumber: workout.dayNumber,
                     dayLabel: workout.dayLabel ?? "",
@@ -290,6 +291,79 @@ final class ProgramEditorViewModel: ObservableObject {
         workouts[workoutIndex].dayLabel = label
     }
 
+    // MARK: - Day List Editing (Edit plan)
+
+    /// The rotation is capped at one workout day per weekday, matching the wizard.
+    static let maxWorkouts = 7
+
+    var canAddWorkout: Bool { workouts.count < Self.maxWorkouts }
+
+    /// Appends a new, unassigned day at the end of the rotation.
+    func addWorkout() {
+        guard canAddWorkout else { return }
+        let index = workouts.count
+        workouts.append(EditableWorkout(
+            dayNumber: index,
+            dayLabel: defaultDayLabel(for: index),
+            templateServerId: nil,
+            templateName: nil
+        ))
+        syncDaysPerWeek()
+    }
+
+    /// Removes the day at `index`, keeping rest-day flags, day numbers and "Day N" labels consistent.
+    func removeWorkout(at index: Int) {
+        guard workouts.indices.contains(index) else { return }
+        removeWorkouts(at: IndexSet(integer: index))
+    }
+
+    /// Removes the days at `offsets` (List `.onDelete`).
+    func removeWorkouts(at offsets: IndexSet) {
+        let valid = offsets.filteredIndexSet { workouts.indices.contains($0) }
+        guard !valid.isEmpty else { return }
+        var flagged = flaggedWorkouts()
+        flagged.remove(atOffsets: valid)
+        applyFlaggedWorkouts(flagged)
+        syncDaysPerWeek()
+    }
+
+    /// Moves days (List `.onMove`), carrying rest-day flags with the rows and renumbering.
+    func moveWorkouts(from source: IndexSet, to destination: Int) {
+        var flagged = flaggedWorkouts()
+        flagged.move(fromOffsets: source, toOffset: destination)
+        applyFlaggedWorkouts(flagged)
+    }
+
+    /// Workouts paired with their rest-day flag so both survive a reorder or removal together.
+    private func flaggedWorkouts() -> [(workout: EditableWorkout, isRest: Bool)] {
+        workouts.enumerated().map { (workout: $0.element, isRest: restDays.contains($0.offset)) }
+    }
+
+    private func applyFlaggedWorkouts(_ flagged: [(workout: EditableWorkout, isRest: Bool)]) {
+        var renumbered: [EditableWorkout] = []
+        var newRestDays = Set<Int>()
+        for (index, entry) in flagged.enumerated() {
+            var workout = entry.workout
+            let oldDayNumber = workout.dayNumber
+            workout.dayNumber = index
+            workout.dayLabel = renumberedEditableDayLabel(workout.dayLabel, from: oldDayNumber, to: index)
+            renumbered.append(workout)
+            if entry.isRest {
+                newRestDays.insert(index)
+            }
+        }
+        workouts = renumbered
+        restDays = newRestDays
+    }
+
+    /// Keeps `daysPerWeek` equal to the number of days in the rotation (the wizard's invariant).
+    /// The `$daysPerWeek` observer sees an equal count and leaves the rows alone.
+    private func syncDaysPerWeek() {
+        let count = workouts.count
+        guard count >= 1, count <= Self.maxWorkouts, daysPerWeek != count else { return }
+        daysPerWeek = count
+    }
+
     /// Saves the program (creates new or updates existing)
     func save() {
         guard isValid && isStep2Valid else { return }
@@ -352,6 +426,8 @@ final class ProgramEditorViewModel: ObservableObject {
                             durationWeeks: capturedIsIndefinite ? nil : capturedDurationWeeks,
                             workouts: programWorkouts,
                             isActive: existing.isActive,
+                            // Server-owned: updateProgram sends no progress fields, so a local clamp would be
+                            // discarded anyway. Every reader wraps the index into the rotation length.
                             currentDayIndex: existing.currentDayIndex,
                             timesCompleted: existing.timesCompleted,
                             isPublic: existing.isPublic,

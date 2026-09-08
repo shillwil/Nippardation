@@ -2,7 +2,7 @@
 //  ProgramWizardStep3.swift
 //  Nippardation
 //
-//  Step 3 of the program wizard: review and create
+//  Step 3 of the plan wizard: review before creating.
 //
 
 import SwiftUI
@@ -12,136 +12,118 @@ struct ProgramWizardStep3: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: AppSpacing.lg) {
-                // Step title
-                VStack(spacing: AppSpacing.xs) {
-                    Text("Review Your Program")
-                        .font(.title2)
-                        .fontWeight(.bold)
+            VStack(alignment: .leading, spacing: VoidSpace.s6) {
+                WizardStepHeading(title: "Review", caption: "Check the plan before you create it.")
 
-                    Text("Make sure everything looks good")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                summaryPanel
+
+                VStack(alignment: .leading, spacing: 10) {
+                    WizardSectionLabel(title: "Schedule", trailing: VoidFormat.days(viewModel.workouts.count))
+                    schedulePanel
                 }
 
-                // Program summary
-                summaryCard
-
-                // Schedule overview
-                scheduleCard
-
-                // Stats
-                statsRow
+                Text(VoidFormat.readout([
+                    "\(VoidFormat.pad2(trainingDayCount)) TRAINING",
+                    "\(VoidFormat.pad2(restDayCount)) REST",
+                    VoidFormat.exercises(totalExercises)
+                ]))
+                .voidReadout()
+                .frame(maxWidth: .infinity)
+                .padding(.top, VoidSpace.s1)
             }
-            .padding(AppSpacing.md)
+            .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s2)
         }
     }
 
-    // MARK: - Summary Card
+    // MARK: - Summary
 
-    private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            SectionHeader(title: "Program")
+    private var summaryPanel: some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s2) {
+            Text("Plan").voidEyebrowSm()
 
-            VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                Text(viewModel.name)
-                    .font(.headline)
+            Text(viewModel.name)
+                .font(VoidFont.title)
+                .foregroundStyle(VoidColor.text)
+                .lineLimit(2)
 
-                if !viewModel.description.isEmpty {
-                    Text(viewModel.description)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-
-                HStack(spacing: AppSpacing.md) {
-                    PillBadge(
-                        text: "\(trainingDayCount) days/week",
-                        color: .appTheme,
-                        style: .tinted
-                    )
-
-                    if viewModel.isIndefinite {
-                        PillBadge(text: "Ongoing", color: .green, style: .tinted)
-                    } else {
-                        PillBadge(
-                            text: "\(viewModel.durationWeeks ?? 8) weeks",
-                            color: .purple,
-                            style: .tinted
-                        )
-                    }
-                }
+            if !viewModel.description.isEmpty {
+                Text(viewModel.description)
+                    .font(VoidFont.caption)
+                    .foregroundStyle(VoidColor.text2)
             }
+
+            Text(VoidFormat.readout([
+                "\(trainingDayCount) DAYS / WK",
+                viewModel.isIndefinite ? "ONGOING" : VoidFormat.weeks(viewModel.durationWeeks ?? 8)
+            ]))
+            .voidReadout()
         }
-        .padding(AppSpacing.md)
-        .cardStyle()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(VoidSpace.s4)
+        .voidPanel(radius: VoidRadius.panel, line: VoidColor.hairline)
     }
 
-    // MARK: - Schedule Card
+    // MARK: - Schedule
 
-    private var scheduleCard: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            SectionHeader(title: "Weekly Schedule")
-
+    private var schedulePanel: some View {
+        VStack(spacing: 0) {
             ForEach(Array(viewModel.workouts.enumerated()), id: \.element.id) { index, workout in
                 let isRest = viewModel.restDays.contains(index)
-                HStack {
-                    Text("Day \(index + 1)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 44, alignment: .leading)
 
+                HStack(spacing: VoidSpace.s3) {
                     if isRest {
-                        Text("Rest Day")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        WizardGlyphSquare(icon: .rest, color: VoidColor.text3)
                     } else {
-                        Text(workout.templateName ?? "Unassigned")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+                        WizardGlyphSquare(icon: VoidIcon.workoutGlyph(for: workout.templateName))
                     }
 
-                    Spacer()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(VoidFormat.readout(["DAY \(VoidFormat.pad2(index + 1))", dayOfWeekLabel(index)]))
+                            .voidEyebrowSm(isRest ? VoidColor.text3 : VoidColor.text2)
 
-                    Image(systemName: isRest ? "moon.fill" : "checkmark.circle.fill")
-                        .foregroundColor(isRest ? .purple : .green)
-                        .font(.caption)
+                        if isRest {
+                            Text("Rest day")
+                                .font(VoidFont.bodyStrong)
+                                .foregroundStyle(VoidColor.text3)
+                        } else {
+                            Text(workout.templateName ?? "No workout")
+                                .font(VoidFont.bodyStrong)
+                                .foregroundStyle(workout.templateName == nil ? VoidColor.warning : VoidColor.text)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    Spacer(minLength: VoidSpace.s2)
+
+                    if !isRest && workout.templateName != nil {
+                        Image(systemName: VoidIcon.check.systemName)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(VoidColor.plasma)
+                            .accessibilityHidden(true)
+                    }
                 }
-                .padding(.vertical, AppSpacing.xxs)
+                .frame(height: VoidSize.listRow)
+                .accessibilityElement(children: .combine)
 
                 if index < viewModel.workouts.count - 1 {
-                    Divider()
+                    VoidHairline()
                 }
             }
         }
-        .padding(AppSpacing.md)
-        .cardStyle()
-    }
-
-    // MARK: - Stats Row
-
-    private var statsRow: some View {
-        HStack(spacing: AppSpacing.sm) {
-            statItem(value: "\(trainingDayCount)", label: "Training Days")
-            statItem(value: "\(restDayCount)", label: "Rest Days")
-            statItem(value: "\(totalExercises)", label: "Exercises")
-        }
-    }
-
-    private func statItem(value: String, label: String) -> some View {
-        VStack(spacing: AppSpacing.xxs) {
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(AppSpacing.sm)
-        .cardStyle()
+        .padding(.horizontal, 14)
+        .voidPanel(radius: VoidRadius.panel, line: VoidColor.hairline)
     }
 
     // MARK: - Computed
+
+    private func dayOfWeekLabel(_ index: Int) -> String? {
+        let sortedDays = viewModel.selectedDays.sorted()
+        guard index < sortedDays.count else { return nil }
+        let day = sortedDays[index]
+        guard day >= 0 && day < VoidFormat.weekStripLabels.count else { return nil }
+        return VoidFormat.weekStripLabels[day]
+    }
 
     private var trainingDayCount: Int {
         viewModel.workouts.count - restDayCount
@@ -166,5 +148,6 @@ struct ProgramWizardStep3: View {
 
 #Preview {
     ProgramWizardStep3(viewModel: ProgramEditorViewModel())
+        .voidScreen()
         .withDependencies(.preview)
 }
