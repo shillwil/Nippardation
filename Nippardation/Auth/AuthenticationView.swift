@@ -19,6 +19,7 @@ struct AuthenticationView: View {
     @State private var showForgotPassword = false
     @State private var resetEmail = ""
     @State private var showResetConfirmation = false
+    @State private var showAccountCreated = false
     
     var body: some View {
         ScrollView {
@@ -76,7 +77,7 @@ struct AuthenticationView: View {
                 // Action
                 VoidCTAButton(
                     title: isSignUp ? "Create account" : "Sign in",
-                    isEnabled: isFormValid,
+                    isEnabled: !authManager.isLoading,
                     isLoading: authManager.isLoading,
                     action: handleAuthAction
                 )
@@ -91,6 +92,10 @@ struct AuthenticationView: View {
             }
             .padding(.horizontal, VoidSpace.insetCard)
             .padding(.bottom, VoidSpace.s6)
+        }
+        .onAppear {
+            // Don't greet a fresh sign-in screen with the last session's error.
+            authManager.errorMessage = nil
         }
         .scrollDismissesKeyboard(.interactively)
         .background(VoidColor.hull.ignoresSafeArea())
@@ -118,6 +123,11 @@ struct AuthenticationView: View {
         } message: {
             Text("Check your email for a password reset link.")
         }
+        .alert("Account created", isPresented: $showAccountCreated) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You're signed in and ready to go — no need to log in again.")
+        }
     }
     
     // MARK: - Pieces
@@ -134,19 +144,31 @@ struct AuthenticationView: View {
         .buttonStyle(VoidPlainButtonStyle())
     }
     
-    private var isFormValid: Bool {
-        if isSignUp {
-            return !email.isEmpty && 
-                   !password.isEmpty && 
-                   !confirmPassword.isEmpty && 
-                   password == confirmPassword &&
-                   password.count >= 6
-        } else {
-            return !email.isEmpty && !password.isEmpty
-        }
+    /// Autofill and paste both like to leave a trailing space; Firebase rejects it as an
+    /// invalid email, which reads to the user as "my email doesn't work".
+    private var trimmedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
+
+    /// Why the form can't be submitted yet, or nil when it can. Shown on tap rather than
+    /// leaving an inert button with no explanation.
+    private var validationMessage: String? {
+        if trimmedEmail.isEmpty { return "Enter your email address." }
+        if password.isEmpty { return "Enter your password." }
+        guard isSignUp else { return nil }
+        if password.count < 6 { return "Your password needs to be at least 6 characters." }
+        if confirmPassword.isEmpty { return "Confirm your password." }
+        if password != confirmPassword { return "Those passwords don't match." }
+        return nil
+    }
+
     private func handleAuthAction() {
+        if let validationMessage {
+            authManager.errorMessage = validationMessage
+            return
+        }
+        authManager.errorMessage = nil
+
         Task {
             if isSignUp {
                 await signUp()
@@ -155,18 +177,21 @@ struct AuthenticationView: View {
             }
         }
     }
-    
+
+    /// Creating the account signs the user in as part of the same tap — they never retype
+    /// the credentials they just chose. The alert confirms the account exists.
     private func signUp() async {
         do {
-            try await authManager.signUp(email: email, password: password)
+            try await authManager.signUp(email: trimmedEmail, password: password)
+            showAccountCreated = true
         } catch {
             print(error.localizedDescription)
         }
     }
-    
+
     private func signIn() async {
         do {
-            try await authManager.signIn(email: email, password: password)
+            try await authManager.signIn(email: trimmedEmail, password: password)
         } catch {
             print(error.localizedDescription)
         }
