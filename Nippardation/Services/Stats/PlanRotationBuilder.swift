@@ -3,7 +3,11 @@
 //  Nippardation
 //
 //  Turns the active plan into the rows the Plan tab draws: one per workout day with
-//  a tile state (done / next / later) and a weekday label. Pure, unit-testable.
+//  a tile state (done / skipped / next / later) and a weekday label. Pure, unit-testable.
+//
+//  Done and skipped are both "in the past", and the builder keeps them apart on purpose:
+//  done comes from a logged workout, skipped from an explicit Skip Workout. A completion
+//  always wins over a skip for the same day, so re-doing a day you skipped reads as done.
 //
 
 import Foundation
@@ -22,6 +26,9 @@ struct RotationRow: Identifiable, Equatable {
 
     var isUpNext: Bool { state == .next }
     var isDone: Bool { state == .done }
+    var isSkipped: Bool { state == .skipped }
+    /// Done or skipped — the day is behind the user either way, so the row doesn't open.
+    var isSettled: Bool { state == .done || state == .skipped }
 
     /// The display word: template name, else day label, else "DAY 02".
     var word: String {
@@ -35,10 +42,11 @@ struct RotationRow: Identifiable, Equatable {
         VoidIcon.workoutGlyph(for: template?.name ?? workout.dayLabel)
     }
 
-    /// "MON · DONE" · "▮ TUE · UP NEXT" · "WED"
+    /// "MON · DONE" · "TUE · SKIPPED" · "▮ WED · UP NEXT" · "THU"
     var eyebrow: String {
         switch state {
         case .done: return "\(weekday)\(VoidFormat.dot)DONE"
+        case .skipped: return "\(weekday)\(VoidFormat.dot)SKIPPED"
         case .next: return VoidGlyphs.upNext("\(weekday)\(VoidFormat.dot)UP NEXT")
         case .later: return weekday
         }
@@ -56,6 +64,7 @@ enum PlanRotationBuilder {
     ///   - program: the active plan (rows follow `dayNumber` order)
     ///   - templates: resolved templates (matched by serverId; falls back to the embedded template)
     ///   - completedWorkouts: completed workouts; only this week's matter for `done`
+    ///   - skippedWorkouts: days the user explicitly skipped; only this week's matter for `skipped`
     ///   - todayOverride: today's Swap Workout / Rest day override. A Rest day skips today, so the
     ///     up-next row (and the rows projected from it) read as tomorrow.
     ///   - now: today
@@ -63,6 +72,7 @@ enum PlanRotationBuilder {
         for program: Program,
         templates: [Template] = [],
         completedWorkouts: [TrackedWorkout] = [],
+        skippedWorkouts: [SkippedWorkout] = [],
         todayOverride: TodayOverride? = nil,
         now: Date = Date(),
         calendar: Calendar = VoidCalendar.current
@@ -78,6 +88,11 @@ enum PlanRotationBuilder {
         // and earlier rotation rows take the earlier completion dates.
         var pool = completedWorkouts
             .filter { $0.isCompleted && week.containsHalfOpen($0.date) }
+            .sorted { $0.date < $1.date }
+        // This week's skips, consumed one per row the same way, so a plan that repeats a
+        // template marks only the days actually skipped.
+        var skipPool = skippedWorkouts
+            .filter { week.containsHalfOpen($0.date) }
             .sorted { $0.date < $1.date }
         let today = calendar.startOfDay(for: now)
         // Rest day: today is skipped, the up-next workout is unchanged and shows tomorrow.
@@ -100,6 +115,10 @@ enum PlanRotationBuilder {
             } else if let match = pool.firstIndex(where: { names.contains(normalized($0.workoutTemplate)) }) {
                 state = .done
                 date = pool.remove(at: match).date
+            } else if let match = skipPool.firstIndex(where: { $0.matches(workout) }) {
+                // Checked after completions so a day that was skipped and then done reads as done.
+                state = .skipped
+                date = skipPool.remove(at: match).date
             } else {
                 state = .later
                 // Project onto the calendar around the up-next day: rows below the up-next row read as

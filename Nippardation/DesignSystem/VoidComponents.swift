@@ -119,6 +119,9 @@ enum WorkoutTileState: Equatable {
     case next
     /// Panel + hairline, glyph text-3, plasma check badge.
     case done
+    /// The day went by undone. Panel + hairline, glyph text-3, muted skip badge —
+    /// deliberately never the plasma check, so skipped never reads as done.
+    case skipped
 }
 
 /// Square tile holding a workout glyph. The fill/badge tells you if the workout is done,
@@ -151,7 +154,7 @@ struct WorkoutTile: View {
     private var glyphColor: Color {
         switch state {
         case .next: return VoidColor.onPlasma
-        case .done: return VoidColor.text3
+        case .done, .skipped: return VoidColor.text3
         case .later: return (hero || raised) ? VoidColor.text : VoidColor.textSoft
         }
     }
@@ -173,11 +176,31 @@ struct WorkoutTile: View {
         }
         .frame(width: size, height: size)
         .overlay(alignment: .bottomTrailing) {
-            if state == .done {
-                DoneBadge().offset(x: 4, y: 4)
+            switch state {
+            case .done: DoneBadge().offset(x: 4, y: 4)
+            case .skipped: SkippedBadge().offset(x: 4, y: 4)
+            case .next, .later: EmptyView()
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// The `DoneBadge` twin for a skipped day: same square, muted fill, a skip-ahead glyph
+/// instead of the check. Reads as "the plan moved past this", not as an achievement.
+struct SkippedBadge: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: VoidRadius.badge + 3, style: .continuous)
+                .fill(VoidColor.hull)
+                .frame(width: VoidSize.badge + 6, height: VoidSize.badge + 6)
+            RoundedRectangle(cornerRadius: VoidRadius.badge, style: .continuous)
+                .fill(VoidColor.text2)
+                .frame(width: VoidSize.badge, height: VoidSize.badge)
+            Image(systemName: VoidIcon.skip.systemName)
+                .font(.system(size: 9, weight: .black))
+                .foregroundStyle(VoidColor.hull)
+        }
     }
 }
 

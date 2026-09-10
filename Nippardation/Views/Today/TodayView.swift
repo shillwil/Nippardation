@@ -113,7 +113,9 @@ struct TodayView: View {
                 SwapWorkoutSheet(
                     program: program,
                     templates: Array(viewModel.planTemplates.values),
-                    overrideStore: overrideStore
+                    overrideStore: overrideStore,
+                    nextAfterSkipName: viewModel.nextAfterSkipName,
+                    onSkip: viewModel.canSkipScheduledWorkout ? skipTapped : nil
                 )
             }
         }
@@ -278,6 +280,12 @@ struct TodayView: View {
                 viewModel.didStart(tracked, plan: plan)
                 showActiveWorkout = true
             }
+        }
+    }
+
+    private func skipTapped() {
+        Task { @MainActor in
+            await viewModel.skipScheduledWorkout()
         }
     }
 

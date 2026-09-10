@@ -49,6 +49,8 @@ final class PlanViewModel: ObservableObject {
 
     /// Completed workouts used for the done state and the week readout.
     private var completedWorkouts: [TrackedWorkout]
+    /// Days the user skipped, used for the skipped state.
+    private let skippedStore: SkippedWorkoutStore
     /// Preview support: a frozen view model never touches a repository.
     private var isFrozen = false
 
@@ -61,10 +63,12 @@ final class PlanViewModel: ObservableObject {
         programRepository: (any ProgramRepositoryProtocol)? = nil,
         templateRepository: (any TemplateRepositoryProtocol)? = nil,
         workoutManager: WorkoutManager? = nil,
-        completedWorkouts: [TrackedWorkout]? = nil
+        completedWorkouts: [TrackedWorkout]? = nil,
+        skippedStore: SkippedWorkoutStore? = nil
     ) {
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
         self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
+        self.skippedStore = skippedStore ?? .shared
 
         if let completedWorkouts {
             self.completedWorkouts = completedWorkouts
@@ -79,6 +83,11 @@ final class PlanViewModel: ObservableObject {
                 }
                 .store(in: &cancellables)
         }
+
+        self.skippedStore.$skipped
+            .dropFirst()
+            .sink { [weak self] _ in self?.rebuild() }
+            .store(in: &cancellables)
     }
 
     // MARK: - Derived
@@ -151,7 +160,12 @@ final class PlanViewModel: ObservableObject {
             stats = ProgressStats()
             return
         }
-        rows = PlanRotationBuilder.rows(for: program, templates: templates, completedWorkouts: completedWorkouts)
+        rows = PlanRotationBuilder.rows(
+            for: program,
+            templates: templates,
+            completedWorkouts: completedWorkouts,
+            skippedWorkouts: skippedStore.skipped
+        )
         stats = ProgressStatsCalculator.compute(workouts: completedWorkouts, program: program)
     }
 
@@ -177,6 +191,8 @@ final class PlanViewModel: ObservableObject {
                 guard let self else { return }
                 do {
                     let updated = try await self.programRepository.resetProgram(serverId: program.serverId)
+                    // Day 1 again: last cycle's skipped days are not this cycle's.
+                    self.skippedStore.clear(programServerId: program.serverId)
                     self.program = self.merged(updated, keeping: program)
                     self.rebuild()
                     self.planMutation &+= 1
@@ -302,6 +318,7 @@ final class PlanViewModel: ObservableObject {
     // MARK: - Helpers
 
     private func finishDelete() {
+        if let program { skippedStore.clear(programServerId: program.serverId) }
         program = nil
         templates = []
         rebuild()

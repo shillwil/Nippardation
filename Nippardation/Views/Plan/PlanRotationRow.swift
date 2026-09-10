@@ -3,7 +3,7 @@
 //  Nippardation
 //
 //  One 94pt row of the Plan rotation: [52pt tile] 14 [eyebrow-sm over word] … [16pt chevron].
-//  The tile carries the state (done / next / later); the up-next row also draws the 3×36 plasma
+//  The tile carries the state (done / skipped / next / later); the up-next row also draws the 3×36 plasma
 //  mark flush to the left screen edge. Separators are drawn by the list, not the row.
 //
 
@@ -16,7 +16,7 @@ struct PlanRotationRow: View {
 
     private var eyebrowColor: Color {
         switch row.state {
-        case .done: return VoidColor.text3
+        case .done, .skipped: return VoidColor.text3
         case .next: return VoidColor.warning
         case .later: return VoidColor.text2
         }
@@ -24,7 +24,7 @@ struct PlanRotationRow: View {
 
     private var wordColor: Color {
         switch row.state {
-        case .done: return VoidColor.text3
+        case .done, .skipped: return VoidColor.text3
         case .next: return VoidColor.text
         case .later: return VoidColor.textSoft
         }
@@ -47,7 +47,7 @@ struct PlanRotationRow: View {
 
                 Spacer(minLength: VoidSpace.s2)
 
-                if !row.isDone && showsChevron {
+                if !row.isSettled && showsChevron {
                     VoidChevron(color: row.isUpNext ? VoidColor.plasma : VoidColor.text3)
                 }
             }
@@ -70,6 +70,7 @@ extension RotationRow {
         let status: String
         switch state {
         case .done: status = "done"
+        case .skipped: status = "skipped"
         case .next: status = "up next"
         case .later: status = "later"
         }
@@ -83,7 +84,15 @@ extension RotationRow {
     let program = MockProgramRepository.samplePrograms[0]
     let templates = MockTemplateRepository.sampleTemplates
     let done = TrackedWorkout(date: Date(), workoutTemplate: "Push Day", trackedExercises: [], isCompleted: true)
-    let rows = PlanRotationBuilder.rows(for: program, templates: templates, completedWorkouts: [done])
+    let skipped = program.workouts.sorted { $0.dayNumber < $1.dayNumber }.dropFirst().first.map {
+        [SkippedWorkout(programServerId: program.serverId, workoutId: $0.id, templateServerId: $0.templateServerId)]
+    } ?? []
+    let rows = PlanRotationBuilder.rows(
+        for: program,
+        templates: templates,
+        completedWorkouts: [done],
+        skippedWorkouts: skipped
+    )
 
     return ZStack {
         VoidColor.hull.ignoresSafeArea()

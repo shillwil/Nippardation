@@ -54,6 +54,16 @@ enum VoidFixtures {
         TrackedWorkout(date: date, workoutTemplate: name, trackedExercises: exercises, isCompleted: completed)
     }
 
+    /// A skip record for a plan day, matched the way the rotation matches it.
+    static func skip(_ workout: ProgramWorkout, program: Program, on date: Date = now) -> SkippedWorkout {
+        SkippedWorkout(
+            programServerId: program.serverId,
+            workoutId: workout.id,
+            templateServerId: workout.templateServerId,
+            date: date
+        )
+    }
+
     // MARK: - Templates & programs
 
     static func libraryItem(_ name: String, serverId: String = "ex_1") -> ExerciseLibraryItem {

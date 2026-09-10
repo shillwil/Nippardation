@@ -2,9 +2,11 @@
 //  SwapWorkoutSheet.swift
 //  Nippardation
 //
-//  Swap Workout: a bottom sheet listing every workout in the plan plus a final Rest day row.
-//  Picking a workout runs it today in place of the scheduled one (which stays next in the
-//  rotation); Rest day skips today. Selecting dismisses immediately.
+//  Swap Workout: a bottom sheet listing every workout in the plan plus a Rest day and a
+//  Skip workout row. Picking a workout runs it today in place of the scheduled one (which
+//  stays next in the rotation); Rest day pushes today's workout to tomorrow; Skip workout
+//  drops it and moves the plan on, so the rotation records it as SKIPPED rather than DONE.
+//  Selecting dismisses immediately.
 //
 
 import SwiftUI
@@ -13,15 +15,28 @@ struct SwapWorkoutSheet: View {
     let program: Program
     /// Resolved templates for the plan's workouts (names fall back to the embedded template / day label).
     var templates: [Template] = []
+    /// Runs the skip. Nil hides the Skip workout row (nothing to skip, or a workout is running).
+    var onSkip: (() -> Void)?
+    /// The workout the plan moves to after a skip, for the confirmation copy.
+    var nextAfterSkipName: String = ""
     @ObservedObject private var overrideStore: TodayOverrideStore
     @Environment(\.dismiss) private var dismiss
+    @State private var showSkipConfirmation = false
 
     /// HANDOFF: swap rows are 58pt (no VoidSize token).
     private static let rowHeight: CGFloat = 58
 
-    init(program: Program, templates: [Template] = [], overrideStore: TodayOverrideStore = .shared) {
+    init(
+        program: Program,
+        templates: [Template] = [],
+        overrideStore: TodayOverrideStore = .shared,
+        nextAfterSkipName: String = "",
+        onSkip: (() -> Void)? = nil
+    ) {
         self.program = program
         self.templates = templates
+        self.nextAfterSkipName = nextAfterSkipName
+        self.onSkip = onSkip
         _overrideStore = ObservedObject(wrappedValue: overrideStore)
     }
 
@@ -73,7 +88,8 @@ struct SwapWorkoutSheet: View {
     private var detents: Set<PresentationDetent> {
         let grabber: CGFloat = 10 + VoidSize.grabber.height + 22
         let header: CGFloat = 16 + VoidSpace.s4
-        let rows = CGFloat(workouts.count + 1) * Self.rowHeight + CGFloat(workouts.count)
+        let extraRows = onSkip == nil ? 1 : 2
+        let rows = CGFloat(workouts.count + extraRows) * Self.rowHeight + CGFloat(workouts.count + extraRows - 1)
         let height = grabber + header + rows + 34
         return height > 560 ? [.medium, .large] : [.height(height)]
     }
@@ -97,6 +113,10 @@ struct SwapWorkoutSheet: View {
                             VoidHairline()
                         }
                         restRow
+                        if onSkip != nil {
+                            VoidHairline()
+                            skipRow
+                        }
                     }
                 }
                 .scrollBounceBehavior(.basedOnSize)
@@ -106,6 +126,25 @@ struct SwapWorkoutSheet: View {
         .background(VoidColor.panel)
         .voidSheet()
         .presentationDetents(detents)
+        .confirmationDialog(
+            "Skip \(scheduledName)?",
+            isPresented: $showSkipConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Skip workout", role: .destructive) {
+                onSkip?()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text(skipConfirmationMessage)
+        }
+    }
+
+    /// Says plainly what a skip costs — it is not a rest day, and it is not a completion.
+    private var skipConfirmationMessage: String {
+        let next = nextAfterSkipName.isEmpty ? "the next workout" : nextAfterSkipName
+        return "This won't be logged and won't count toward your streak. Your plan moves on to \(next)."
     }
 
     // MARK: - Rows
@@ -169,6 +208,35 @@ struct SwapWorkoutSheet: View {
         .accessibilityLabel(isRestSelected ? "Rest day, today" : "Rest day")
     }
 
+    private var skipRow: some View {
+        Button {
+            showSkipConfirmation = true
+        } label: {
+            HStack(spacing: VoidSpace.s3) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Skip workout")
+                        .font(VoidFont.title)
+                        .foregroundStyle(VoidColor.text)
+                    Text("Don't do it\(VoidFormat.dot)Plan moves on, nothing logged")
+                        .font(VoidFont.caption2)
+                        .foregroundStyle(VoidColor.text2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                Spacer(minLength: VoidSpace.s2)
+                Image(systemName: VoidIcon.skip.systemName)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(VoidColor.text3)
+                    .accessibilityHidden(true)
+            }
+            .frame(height: Self.rowHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(VoidRowButtonStyle())
+        .accessibilityLabel("Skip workout")
+        .accessibilityHint("Moves the plan past \(scheduledName) without logging it")
+    }
+
     /// "Today" + a plasma check. The check is a glyph colour, not a fill.
     private var todayMark: some View {
         HStack(spacing: VoidSpace.s2) {
@@ -204,6 +272,12 @@ struct SwapWorkoutSheet: View {
     VoidColor.hull
         .ignoresSafeArea()
         .sheet(isPresented: .constant(true)) {
-            SwapWorkoutSheet(program: MockData.activeProgram, templates: MockData.templates, overrideStore: store)
+            SwapWorkoutSheet(
+                program: MockData.activeProgram,
+                templates: MockData.templates,
+                overrideStore: store,
+                nextAfterSkipName: "Legs",
+                onSkip: { }
+            )
         }
 }

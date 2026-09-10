@@ -192,6 +192,7 @@ enum VoidIcon: String {
     case trash = "trash"
     case pause = "pause"
     case restart = "arrow.counterclockwise"
+    case skip = "forward.fill"
     case swap = "arrow.triangle.2.circlepath"
     case library = "list.bullet.clipboard"
     case edit = "pencil"

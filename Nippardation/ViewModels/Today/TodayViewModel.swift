@@ -50,6 +50,7 @@ final class TodayViewModel: ObservableObject {
     private let programRepository: any ProgramRepositoryProtocol
     private let templateRepository: any TemplateRepositoryProtocol
     private let overrideStore: TodayOverrideStore
+    private let skippedStore: SkippedWorkoutStore
     private let workoutManager: WorkoutManager
     /// The scheduled workout Today started and has not yet advanced for. Survives relaunch.
     private let pendingAdvance: UserScopedDefaults
@@ -63,11 +64,13 @@ final class TodayViewModel: ObservableObject {
         programRepository: (any ProgramRepositoryProtocol)? = nil,
         templateRepository: (any TemplateRepositoryProtocol)? = nil,
         overrideStore: TodayOverrideStore? = nil,
+        skippedStore: SkippedWorkoutStore? = nil,
         workoutManager: WorkoutManager = .shared
     ) {
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
         self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
         self.overrideStore = overrideStore ?? .shared
+        self.skippedStore = skippedStore ?? .shared
         self.workoutManager = workoutManager
         self.pendingAdvance = UserScopedDefaults(
             namespace: "todayPendingAdvance",
@@ -319,6 +322,58 @@ final class TodayViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Skip
+
+    /// True when there is a scheduled workout to skip. Skipping is about the plan's day, so it
+    /// is offered on a swapped or rest day too — and never while a workout is running.
+    var canSkipScheduledWorkout: Bool {
+        scheduledWorkout != nil && activeProgram != nil && !workoutManager.isWorkoutInProgress
+    }
+
+    /// The workout the plan moves to once today's is skipped.
+    var nextAfterSkipName: String {
+        guard let program = activeProgram, !program.workouts.isEmpty else { return scheduledName }
+        let ordered = program.workouts.sorted { $0.dayNumber < $1.dayNumber }
+        let next = ordered[(scheduledIndex + 1) % ordered.count]
+        return Self.word(
+            workout: next,
+            template: planTemplates[next.templateServerId] ?? next.template,
+            index: (scheduledIndex + 1) % ordered.count
+        )
+    }
+
+    /// Skips today's scheduled workout: records the skip and moves the plan on, logging nothing.
+    /// Because no `TrackedWorkout` is written, a skip never reaches the streak, volume or PRs —
+    /// it reads as SKIPPED in the rotation, which is the whole point of the distinction.
+    func skipScheduledWorkout(now: Date = Date()) async {
+        guard let program = activeProgram, let workout = scheduledWorkout else { return }
+
+        let skip = SkippedWorkout(
+            programServerId: program.serverId,
+            workoutId: workout.id,
+            templateServerId: workout.templateServerId,
+            date: now
+        )
+        skippedStore.record(skip)
+        // Today is spent: whatever was pending or swapped in for it no longer applies.
+        pendingAdvance.clear()
+
+        do {
+            let updated = try await programRepository.advanceToNextWorkout(serverId: program.serverId)
+            overrideStore.clear()
+            overrideDidChange(nil)
+            applyProgram(updated)
+            await resolvePlanTemplates()
+            refreshStreak()
+            planAdvanceCount += 1
+        } catch {
+            // The plan did not move, so the day is still up next — take the skip back
+            // rather than leave a SKIPPED row above an UP NEXT row for the same day.
+            skippedStore.remove(id: skip.id)
+            self.error = "Couldn't skip this workout: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Completion → auto-advance
 
     /// Call on "WorkoutDataUpdated". Advances the plan once if the scheduled workout started from Today completed.
@@ -420,11 +475,20 @@ private struct PendingAdvanceRecord: Codable, Equatable {
 #if DEBUG
 extension TodayViewModel {
     /// A frozen view model for previews: never loads, state seeded from sample data.
-    static func preview(program: Program?, store: TodayOverrideStore, streakWeeks: Int = 3) -> TodayViewModel {
+    static func preview(
+        program: Program?,
+        store: TodayOverrideStore,
+        skippedStore: SkippedWorkoutStore? = nil,
+        streakWeeks: Int = 3
+    ) -> TodayViewModel {
         let viewModel = TodayViewModel(
             programRepository: MockProgramRepository(),
             templateRepository: MockTemplateRepository(),
-            overrideStore: store
+            overrideStore: store,
+            skippedStore: skippedStore ?? SkippedWorkoutStore(
+                defaults: UserDefaults(suiteName: "today.preview.skips") ?? .standard,
+                userIdProvider: { "preview" }
+            )
         )
         viewModel.isFrozenForPreview = true
         viewModel.applyProgram(program)
