@@ -131,14 +131,17 @@ class AuthManager: ObservableObject {
                 isLoading = false
             }
         } catch {
+            // NSLog, not print: this is the one record of why a sign-in failed on someone
+            // else's phone, and print() does not reach the device console in a release build.
+            NSLog("Sign-in failed: \(Self.diagnostic(for: error))")
             await MainActor.run {
                 isLoading = false
-                errorMessage = error.localizedDescription
+                errorMessage = Self.authMessage(for: error)
             }
             throw error
         }
     }
-    
+
     /// Creates the account and leaves the user signed in.
     ///
     /// `createUser` already establishes a session, so the normal path needs no second call.
@@ -169,14 +172,15 @@ class AuthManager: ObservableObject {
             }
             return outcome
         } catch {
+            NSLog("Sign-up failed: \(Self.diagnostic(for: error))")
             await MainActor.run {
                 isLoading = false
-                errorMessage = error.localizedDescription
+                errorMessage = Self.authMessage(for: error)
             }
             throw error
         }
     }
-    
+
     func sendPasswordReset(email: String) async throws {
         await MainActor.run {
             isLoading = true
@@ -191,7 +195,7 @@ class AuthManager: ObservableObject {
         } catch {
             await MainActor.run {
                 isLoading = false
-                errorMessage = error.localizedDescription
+                errorMessage = Self.authMessage(for: error)
             }
             throw error
         }
@@ -280,6 +284,88 @@ class AuthManager: ObservableObject {
         }
     }
     
+    // MARK: - Firebase error copy
+
+    /// Plain, actionable wording for the Firebase Auth failures a person can actually hit on
+    /// the sign-in screen.
+    ///
+    /// `error.localizedDescription` is Firebase's own copy, and on the two failures that matter
+    /// most here it is actively misleading. A single trailing space — which autofill and paste
+    /// both like to leave behind — comes back as "The email address is badly formatted", which
+    /// reads as *my email address is wrong* when the address is perfectly fine. And since email
+    /// enumeration protection was turned on, a wrong password no longer says so: it arrives as
+    /// `invalidCredential`, whose stock text is "The supplied auth credential is malformed or
+    /// has expired." Neither tells the person what to do next, and a first-time user with no
+    /// account yet has nothing else to go on.
+    ///
+    /// Anything unrecognised falls through to Firebase's own text rather than a generic
+    /// apology, so an unusual failure is still diagnosable from a screenshot.
+    static func authMessage(for error: Error) -> String {
+        let nsError = error as NSError
+        // Match on the domain as well as the code: `URLError.notConnectedToInternet` and
+        // friends carry their own numbering, and nothing good comes of reading one of those
+        // as an `AuthErrorCode` that happens to share an integer.
+        guard nsError.domain == AuthErrors.domain,
+              let code = AuthErrorCode(rawValue: nsError.code) else {
+            return nsError.localizedDescription
+        }
+
+        switch code {
+        case .invalidEmail:
+            return "That doesn't look like an email address. Check it for a stray space and try again."
+        case .emailAlreadyInUse:
+            return "That email already has an account. Sign in instead, or reset the password."
+        case .weakPassword:
+            return "Choose a password with at least 6 characters."
+        case .wrongPassword, .invalidCredential, .userNotFound:
+            return "That email and password don't match an account. Check them, or use “Forgot password?”."
+        case .networkError:
+            return "Couldn't reach the network. Check your connection and try again."
+        case .tooManyRequests:
+            return "Too many attempts from this device. Wait a minute and try again."
+        case .userDisabled:
+            return "That account has been disabled."
+        case .operationNotAllowed:
+            return "Email sign-in is switched off for this app right now."
+        case .invalidAPIKey, .appNotAuthorized:
+            return "This version of the app can't reach the sign-in service. Please update to the latest build."
+        case .requiresRecentLogin:
+            return "Sign in again to finish that change."
+        default:
+            return nsError.localizedDescription
+        }
+    }
+
+    /// The error, named so a device log is worth reading.
+    ///
+    /// Firebase attaches its own short name for the failure — `ERROR_EMAIL_ALREADY_IN_USE`
+    /// and the like — under `AuthErrors.userInfoNameKey`, which is a steadier label than
+    /// reflecting over an `@objc` enum. The domain and code are always included so the line
+    /// stays greppable even when that name is absent.
+    ///
+    /// Deliberately never includes the email or the password: this goes to the system log,
+    /// which is not the place for someone's address.
+    static func diagnostic(for error: Error) -> String {
+        let nsError = error as NSError
+        let location = "\(nsError.domain) \(nsError.code)"
+        guard let name = nsError.userInfo[AuthErrors.userInfoNameKey] as? String,
+              !name.isEmpty else {
+            return location
+        }
+        return "\(name) (\(location))"
+    }
+
+    /// Whether a sign-up failed only because the address is already taken.
+    ///
+    /// Worth singling out: it is the one sign-up failure where the person is *already* done —
+    /// the account exists and they just need the other half of the screen. Left as a plain
+    /// error it becomes a loop, where sign-up keeps refusing an address that would sign in fine.
+    static func isEmailAlreadyInUse(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == AuthErrors.domain
+            && AuthErrorCode(rawValue: nsError.code) == .emailAlreadyInUse
+    }
+
     /// A message worth showing: the backend's own wording where it sends one, and a plain
     /// sentence for the status codes that used to surface as "error 429."
     static func backendMessage(from data: Data, statusCode: Int) -> String {

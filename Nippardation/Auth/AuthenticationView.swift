@@ -180,12 +180,21 @@ struct AuthenticationView: View {
 
     /// Creating the account signs the user in as part of the same tap — they never retype
     /// the credentials they just chose. The alert confirms the account exists.
+    ///
+    /// The one failure worth handling rather than just reporting is an address that already
+    /// has an account: on its own that is a loop, where the only button on screen keeps
+    /// refusing an address that would sign in fine. So we move them to the other half of the
+    /// screen, keep the email they typed, and let the message explain why the form changed.
     private func signUp() async {
         do {
             try await authManager.signUp(email: trimmedEmail, password: password)
             showAccountCreated = true
         } catch {
-            print(error.localizedDescription)
+            if AuthManager.isEmailAlreadyInUse(error) {
+                isSignUp = false
+                password = ""
+                confirmPassword = ""
+            }
         }
     }
 
