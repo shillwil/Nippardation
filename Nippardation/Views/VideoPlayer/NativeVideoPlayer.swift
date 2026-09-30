@@ -2,249 +2,180 @@
 //  NativeVideoPlayer.swift
 //  Nippardation
 //
-//  Native video player view using AVPlayer
-//  Void chrome: hull backdrop, radius 12, plasma controls, flat overlays (no gradients).
+//  Exercise demo player. The video and its controls are AVKit's system `VideoPlayer`
+//  (an AVPlayerViewController underneath), so the transport controls, their Liquid Glass
+//  look and their VoiceOver support come from iOS. SwiftUI's VideoPlayer shows no
+//  full-screen or Picture in Picture button. Void adds only the 12pt frame, the hull
+//  backdrop behind the loading and error states, and the plasma tint.
+//
+//  Loading through the video cache, download progress, aspect-ratio detection, muting,
+//  looping, and when a demo may start by itself (Auto-Play Video Previews, a pause made with
+//  the controls) live in `VideoPlayerViewModel`.
+//
+//  Audio: the demo files carry a silent audio track, so AVPlayer activates the app's audio
+//  session even while muted. The session category is Ambient (`AppAudioSession`), or every
+//  demo would stop the music people are working out to.
 //
 
 import SwiftUI
-import AVFoundation
 import AVKit
 
-/// Native video player view using AVPlayer
+/// Muted, looping exercise demo, loaded through the video cache. It plays by itself while
+/// Auto-Play Video Previews is on.
 struct NativeVideoPlayer: View {
 
     // MARK: - Properties
 
-    @StateObject private var viewModel: VideoPlayerViewModel
-
     let exerciseServerId: String
     let videoUrl: URL?
-    let overrideAspectRatio: CGFloat?
-    let showControls: Bool
 
-    private var effectiveAspectRatio: CGFloat {
-        overrideAspectRatio ?? viewModel.detectedAspectRatio
-    }
+    @StateObject private var viewModel = VideoPlayerViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     private var frameShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous)
     }
 
+    /// A change to either value (a swapped movement, a refreshed URL) loads the new video.
+    private struct Source: Equatable {
+        let exerciseServerId: String
+        let videoUrl: URL?
+    }
+
     // MARK: - Initialization
 
-    init(
-        exerciseServerId: String,
-        videoUrl: URL?,
-        overrideAspectRatio: CGFloat? = nil,
-        showControls: Bool = true
-    ) {
+    init(exerciseServerId: String, videoUrl: URL?) {
         self.exerciseServerId = exerciseServerId
         self.videoUrl = videoUrl
-        self.overrideAspectRatio = overrideAspectRatio
-        self.showControls = showControls
-        self._viewModel = StateObject(wrappedValue: VideoPlayerViewModel())
     }
 
     // MARK: - Body
 
     var body: some View {
+        // A plain container, so switching between the player and the error state
+        // doesn't restart the task or fire onDisappear.
         ZStack {
-            // Video layer
-            VideoPlayerLayer(player: viewModel.player)
-                .aspectRatio(effectiveAspectRatio, contentMode: .fit)
-                .animation(.easeInOut(duration: 0.25), value: effectiveAspectRatio)
-                .background(VoidColor.hull)
-                .clipShape(frameShape)
-
-            // Loading overlay
-            if viewModel.isLoading {
-                loadingOverlay
-            }
-
-            // Error overlay
-            if let error = viewModel.error {
-                errorOverlay(message: error)
-            }
-
-            // Controls overlay
-            if showControls && !viewModel.isLoading && viewModel.error == nil {
-                controlsOverlay
+            if let message = viewModel.error {
+                errorView(message: message)
+            } else {
+                player
             }
         }
-        .task {
+        // Runs on appear and again whenever the source changes, so a swap loads exactly once.
+        .task(id: Source(exerciseServerId: exerciseServerId, videoUrl: videoUrl)) {
             await viewModel.loadVideo(exerciseServerId: exerciseServerId, videoUrl: videoUrl)
         }
-        .onChange(of: exerciseServerId) { oldId, newId in
-            // Only reload if the ID actually changed
-            guard oldId != newId else { return }
-            Task {
-                await viewModel.loadVideo(exerciseServerId: newId, videoUrl: videoUrl)
-            }
-        }
-        .onChange(of: videoUrl) { oldUrl, newUrl in
-            // Reload if video URL changes (even with same exercise ID)
-            guard oldUrl != newUrl else { return }
-            Task {
-                await viewModel.loadVideo(exerciseServerId: exerciseServerId, videoUrl: newUrl)
+        // Scrolling the sheet (or lowering it to a small detent) hides the demo without
+        // removing it. Pause while it's off screen; resume when it comes back, unless it was
+        // paused with the controls.
+        .onScrollVisibilityChange(threshold: 0.2) { isVisible in
+            if isVisible {
+                viewModel.play()
+            } else {
+                viewModel.pause()
             }
         }
         .onDisappear {
             viewModel.pause()
         }
+        // iOS pauses the player when the app leaves the foreground (the phone locked between
+        // sets, say), and nothing above fires on return. Leaving doesn't count as going off
+        // screen, so the view model still knows whether to resume.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                viewModel.resumeIfWanted()
+            }
+        }
     }
 
-    // MARK: - Subviews
+    // MARK: - Player
 
-    private var loadingOverlay: some View {
+    private var player: some View {
+        VideoPlayer(player: viewModel.player)
+            // Keep VoiceOver off the system controls while the loading state covers them.
+            .accessibilityHidden(viewModel.isLoading)
+            // Required: in a scroll view the player has no height of its own. Sizing it to
+            // the video's own ratio also means the video is never letterboxed.
+            .aspectRatio(viewModel.detectedAspectRatio, contentMode: .fit)
+            .overlay {
+                if viewModel.isLoading {
+                    loadingView
+                }
+            }
+            .clipShape(frameShape)
+            .animation(.easeInOut(duration: 0.25), value: viewModel.detectedAspectRatio)
+    }
+
+    // MARK: - States
+
+    /// Opaque hull while the file loads, so the player's black backdrop never shows.
+    private var loadingView: some View {
         ZStack {
-            VoidColor.hull.opacity(0.7)
+            VoidColor.hull
 
-            VStack(spacing: VoidSpace.s3) {
-                if viewModel.downloadProgress > 0 && viewModel.downloadProgress < 1 {
-                    // Download progress
-                    ProgressView(value: viewModel.downloadProgress)
-                        .progressViewStyle(CircularProgressViewStyle(tint: VoidColor.text))
-                        .scaleEffect(1.2)
-
-                    Text("Downloading \(VoidFormat.pad2(Int(viewModel.downloadProgress * 100)))%")
-                        .voidEyebrowSm()
-                } else {
-                    // Indeterminate loading
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: VoidColor.text))
-                        .scaleEffect(1.2)
-
-                    Text("Loading video")
-                        .voidEyebrowSm()
+            if let fraction = downloadFraction {
+                ProgressView(value: fraction) {
+                    Text("Downloading video")
+                        .font(VoidFont.caption)
+                        .foregroundStyle(VoidColor.text2)
+                } currentValueLabel: {
+                    Text(fraction, format: .percent.precision(.fractionLength(0)))
+                        .font(VoidFont.caption2)
+                        .foregroundStyle(VoidColor.text2)
                 }
+                .tint(VoidColor.plasma)
+                .padding(.horizontal, VoidSpace.s6)
+            } else {
+                ProgressView()
+                    .controlSize(.large)
+                    .accessibilityLabel("Loading video")
             }
         }
-        .clipShape(frameShape)
     }
 
-    private func errorOverlay(message: String) -> some View {
-        ZStack {
-            VoidColor.hull.opacity(0.7)
+    /// Download progress while a download is under way; nil shows the spinner instead.
+    private var downloadFraction: Double? {
+        let progress = viewModel.downloadProgress
+        return (progress > 0 && progress < 1) ? progress : nil
+    }
 
-            VStack(spacing: VoidSpace.s3) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(VoidColor.warning)
-
-                Text(message)
-                    .font(VoidFont.caption)
-                    .foregroundStyle(VoidColor.text)
-                    .multilineTextAlignment(.center)
-
-                VoidPillButton(title: "Retry") {
-                    Task {
-                        await viewModel.loadVideo(exerciseServerId: exerciseServerId, videoUrl: videoUrl)
-                    }
+    private func errorView(message: String) -> some View {
+        ContentUnavailableView {
+            Label("Video unavailable", systemImage: "video.slash")
+        } description: {
+            Text(message)
+        } actions: {
+            Button {
+                Task {
+                    await viewModel.loadVideo(exerciseServerId: exerciseServerId, videoUrl: videoUrl)
                 }
-                .frame(width: 120)
+            } label: {
+                // Side by side: iOS 26 stacks an action's icon over its title by default.
+                Label("Retry", systemImage: "arrow.clockwise")
+                    .labelStyle(.titleAndIcon)
             }
-            .padding()
+            .buttonStyle(.bordered)
+            // Neutral: plasma text on the light hull falls short of contrast.
+            .tint(VoidColor.text)
+            .fixedSize()
         }
+        // Its own height, not whatever the row offers: a stretched state stretches the button.
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity)
+        .background(VoidColor.hull)
         .clipShape(frameShape)
-    }
-
-    private var controlsOverlay: some View {
-        VStack {
-            Spacer()
-
-            HStack(spacing: VoidSpace.s4) {
-                // Play/Pause button
-                controlButton(
-                    systemName: viewModel.isPlaying ? VoidIcon.pause.systemName : VoidIcon.play.systemName,
-                    size: VoidSize.hitMin,
-                    label: viewModel.isPlaying ? "Pause" : "Play"
-                ) {
-                    viewModel.togglePlayPause()
-                }
-
-                // Progress bar
-                if viewModel.duration > 0 {
-                    VoidProgressBar(progress: viewModel.currentTime / viewModel.duration)
-                        .frame(maxWidth: .infinity)
-                }
-
-                // Mute button
-                controlButton(
-                    systemName: viewModel.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                    size: VoidSize.hitMin,
-                    glyphSize: 14,
-                    label: viewModel.isMuted ? "Unmute" : "Mute"
-                ) {
-                    viewModel.toggleMute()
-                }
-            }
-            .padding(.horizontal, VoidSpace.insetCard)
-            .padding(.vertical, VoidSpace.s3)
-            .background(VoidColor.hull.opacity(0.7))
-        }
-        .clipShape(frameShape)
-    }
-
-    /// Squared control: panel fill, hairline, plasma glyph. `size` is the tappable square
-    /// (`VoidPanelButtonStyle` clips the hit area to it, so keep it at `VoidSize.hitMin`);
-    /// `glyphSize` lets a secondary control keep a smaller glyph.
-    private func controlButton(systemName: String, size: CGFloat, glyphSize: CGFloat = 17, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: glyphSize, weight: .semibold))
-                .foregroundStyle(VoidColor.plasma)
-                .frame(width: size, height: size)
-        }
-        .buttonStyle(VoidPanelButtonStyle(radius: VoidRadius.control))
-        .accessibilityLabel(label)
-    }
-}
-
-// MARK: - Video Player Layer
-
-/// UIViewRepresentable wrapper for AVPlayerLayer
-struct VideoPlayerLayer: UIViewRepresentable {
-    let player: AVPlayer
-    var videoGravity: AVLayerVideoGravity = .resizeAspect
-
-    func makeUIView(context: Context) -> PlayerUIView {
-        let view = PlayerUIView()
-        view.player = player
-        view.playerLayer.videoGravity = videoGravity
-        return view
-    }
-
-    func updateUIView(_ uiView: PlayerUIView, context: Context) {
-        uiView.player = player
-        uiView.playerLayer.videoGravity = videoGravity
-    }
-}
-
-/// UIView that hosts an AVPlayerLayer
-class PlayerUIView: UIView {
-
-    override class var layerClass: AnyClass {
-        AVPlayerLayer.self
-    }
-
-    var playerLayer: AVPlayerLayer {
-        layer as! AVPlayerLayer
-    }
-
-    var player: AVPlayer? {
-        get { playerLayer.player }
-        set { playerLayer.player = newValue }
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    NativeVideoPlayer(
-        exerciseServerId: "test-exercise",
-        videoUrl: URL(string: "https://pub-bd9be4594e0b4c538a1e72055ea5b6fc.r2.dev/exercises/bench-press.mp4")
-    )
-    .frame(height: 250)
-    .padding()
-    .background(VoidColor.hull)
+    ScrollView {
+        NativeVideoPlayer(
+            exerciseServerId: "test-exercise",
+            videoUrl: URL(string: "https://pub-383015826a924878acc220637944c283.r2.dev/Dips.mp4")
+        )
+        .frame(maxHeight: 400)
+        .padding(.horizontal, VoidSpace.insetCard)
+    }
 }

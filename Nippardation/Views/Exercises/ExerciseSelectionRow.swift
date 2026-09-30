@@ -2,52 +2,36 @@
 //  ExerciseSelectionRow.swift
 //  Nippardation
 //
-//  66pt browser row: 44pt glyph / thumbnail tile · name · "Chest · Barbell" · check or chevron.
+//  Browser row content: 44pt glyph / thumbnail tile · name · "Chest · Barbell".
+//  The List supplies everything interactive: a Button around it when picking one exercise,
+//  the system selection circle when picking several.
 //
 
 import SwiftUI
 
 struct ExerciseSelectionRow: View {
     let exercise: ExerciseLibraryItem
-    let isSelected: Bool?
-    let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: VoidSpace.s3) {
-                ExerciseGlyphTile(exercise: exercise)
+        HStack(spacing: VoidSpace.s3) {
+            ExerciseGlyphTile(exercise: exercise)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(exercise.name)
-                        .font(VoidFont.bodyStrong)
-                        .foregroundStyle(VoidColor.text)
-                        .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(exercise.name)
+                    .font(VoidFont.bodyStrong)
+                    .foregroundStyle(VoidColor.text)
+                    .lineLimit(1)
 
-                    Text(caption)
-                        .font(VoidFont.caption2)
-                        .foregroundStyle(VoidColor.text2)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: VoidSpace.s2)
-
-                if let selected = isSelected {
-                    SelectionCheck(isOn: selected)
-                } else {
-                    VoidChevron()
-                }
+                Text(caption)
+                    .font(VoidFont.caption2)
+                    .foregroundStyle(VoidColor.text2)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, VoidSpace.insetText)
-            .frame(height: VoidSize.listRow)
-            .contentShape(Rectangle())
+
+            Spacer(minLength: 0)
         }
-        .buttonStyle(VoidRowButtonStyle())
-        .overlay(alignment: .bottom) {
-            VoidHairline()
-                .padding(.horizontal, VoidSpace.insetText)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isSelected == true ? [.isSelected] : [])
+        .padding(.vertical, VoidSpace.s1)
+        .contentShape(Rectangle())
     }
 
     /// "Chest, Triceps · Barbell"
@@ -115,50 +99,17 @@ struct ExerciseGlyphTile: View {
     }
 }
 
-// MARK: - Selection check
-
-/// 22pt squared check (radius 6): plasma with an on-plasma check when on, text-3 outline when off.
-struct SelectionCheck: View {
-    let isOn: Bool
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: VoidRadius.mark, style: .continuous)
-                .fill(isOn ? VoidColor.plasma : Color.clear)
-            RoundedRectangle(cornerRadius: VoidRadius.mark, style: .continuous)
-                .strokeBorder(isOn ? Color.clear : VoidColor.text3, lineWidth: 1)
-            if isOn {
-                Image(systemName: VoidIcon.check.systemName)
-                    .font(.system(size: 12, weight: .black))
-                    .foregroundStyle(VoidColor.onPlasma)
-            }
-        }
-        .frame(width: 22, height: 22)
-        .accessibilityHidden(true)
-    }
-}
-
 // MARK: - Previews
 
 #Preview {
-    ZStack {
-        VoidColor.hull.ignoresSafeArea()
-        VStack(spacing: 0) {
-            ExerciseSelectionRow(
-                exercise: MockExerciseRepository.sampleExercises[0],
-                isSelected: nil,
-                onTap: {}
-            )
-            ExerciseSelectionRow(
-                exercise: MockExerciseRepository.sampleExercises[1],
-                isSelected: true,
-                onTap: {}
-            )
-            ExerciseSelectionRow(
-                exercise: MockExerciseRepository.sampleExercises[3],
-                isSelected: false,
-                onTap: {}
-            )
-        }
+    List {
+        ExerciseSelectionRow(exercise: MockExerciseRepository.sampleExercises[0])
+            .listRowBackground(VoidColor.panel)
+        ExerciseSelectionRow(exercise: MockExerciseRepository.sampleExercises[1])
+            .listRowBackground(VoidColor.panel)
+        ExerciseSelectionRow(exercise: MockExerciseRepository.sampleExercises[3])
+            .listRowBackground(VoidColor.panel)
     }
+    .listStyle(.insetGrouped)
+    .voidScreen()
 }

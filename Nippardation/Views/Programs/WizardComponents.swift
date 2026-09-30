@@ -2,130 +2,99 @@
 //  WizardComponents.swift
 //  Nippardation
 //
-//  Shared Void building blocks for the plan wizard (Build) and the AI plan wizard:
-//  selectable option cards, chips and square tiles, text and number wells,
-//  the step heading, the footer (Back pill + one CTA) and the busy overlay.
+//  Shared building blocks for the plan wizard (Build) and the AI plan wizard: the step chrome
+//  (title, Cancel, step progress, one pinned primary action), Void colours for the grouped form
+//  rows, the day tile, text and number wells, and the small labels.
+//
+//  Both wizards push their steps onto their own NavigationStack, so the system back button and
+//  edge swipe step back; the choices themselves are system pickers, toggles and steppers.
 //
 
 import SwiftUI
 import UIKit
 
-// MARK: - Option card
+// MARK: - Step chrome
 
-/// Selectable panel: radius 12, panel + hairline-2.
-/// Selected = panel-2 fill, 1pt plasma line, plasma check glyph top-right. Press: panel-2 fill.
-struct WizardOptionCard<Content: View>: View {
-    var isSelected: Bool
-    var isEnabled: Bool = true
-    var radius: CGFloat = VoidRadius.tile
-    var checkInset: CGFloat = 10
-    let action: () -> Void
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        Button(action: action) {
-            content()
-                .frame(maxWidth: .infinity)
-                .overlay(alignment: .topTrailing) {
-                    if isSelected {
-                        Image(systemName: VoidIcon.check.systemName)
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(VoidColor.plasma)
-                            .padding(checkInset)
-                            .accessibilityHidden(true)
-                    }
-                }
-        }
-        .buttonStyle(VoidPanelButtonStyle(
-            radius: radius,
-            line: isSelected ? VoidColor.plasma : VoidColor.hairline2,
-            fill: isSelected ? VoidColor.panel2 : VoidColor.panel
+extension View {
+    /// The chrome every wizard step shares: an inline title, a Cancel that leaves the whole wizard,
+    /// the step's progress, and its one primary action pinned to the bottom.
+    ///
+    /// - Parameters:
+    ///   - step: The step's position, 0-based.
+    ///   - onCancel: Dismisses the wizard. Leaving throws away what was picked, so it is a Cancel.
+    func wizardStep<Action: View>(
+        _ title: String,
+        step: Int,
+        of totalSteps: Int,
+        onCancel: @escaping () -> Void,
+        @ViewBuilder action: () -> Action
+    ) -> some View {
+        modifier(WizardStepChrome(
+            title: title,
+            step: step,
+            totalSteps: totalSteps,
+            onCancel: onCancel,
+            action: action()
         ))
-        .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.5)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    /// Void colours for the rows of a grouped wizard form: panel fill, hairline separators.
+    func wizardFormRows() -> some View {
+        self
+            .listRowBackground(VoidColor.panel)
+            .listRowSeparatorTint(VoidColor.hairline)
     }
 }
 
-// MARK: - Chip
-
-/// Selectable chip: 36pt, radius 8, panel + hairline-2, chip label. Selected = panel-2 + plasma line + check.
-struct WizardChip: View {
+/// See `View.wizardStep(_:step:of:onCancel:action:)`.
+///
+/// On iOS 26 the step also reads "Step n of total" as the navigation subtitle, and the bottom bar is a
+/// `safeAreaBar`, so rows scroll under it with the system scroll-edge effect. Before iOS 26 the bar sits
+/// on an opaque hull strip, so rows scroll out of sight instead of behind a floating button.
+private struct WizardStepChrome<Action: View>: ViewModifier {
     let title: String
-    var isSelected: Bool
-    let action: () -> Void
+    let step: Int
+    let totalSteps: Int
+    let onCancel: () -> Void
+    let action: Action
 
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if isSelected {
-                    Image(systemName: VoidIcon.check.systemName)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(VoidColor.plasma)
-                        .accessibilityHidden(true)
-                }
-                Text(title).voidChipLabel()
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 36)
-        }
-        .buttonStyle(VoidPanelButtonStyle(
-            radius: VoidRadius.control,
-            line: isSelected ? VoidColor.plasma : VoidColor.hairline2,
-            fill: isSelected ? VoidColor.panel2 : VoidColor.panel
-        ))
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-}
-
-// MARK: - Square tile
-
-/// 44pt squared selector tile: plasma / on-plasma when selected, panel + hairline-2 otherwise.
-struct WizardSquareTile: View {
-    enum Style {
-        /// Eyebrow-sm label (MON, TUE …).
-        case eyebrow
-        /// SF 17 semibold label (a count).
-        case number
-    }
-
-    let label: String
-    var isSelected: Bool
-    var style: Style = .eyebrow
-    var accessibilityLabel: String? = nil
-    let action: () -> Void
-
-    private var ink: Color { isSelected ? VoidColor.onPlasma : VoidColor.text }
-
-    var body: some View {
-        Button(action: action) {
-            Group {
-                switch style {
-                case .eyebrow:
-                    Text(label).voidEyebrowSm(ink)
-                case .number:
-                    Text(label).font(VoidFont.buttonLg).foregroundStyle(ink)
+    func body(content: Content) -> some View {
+        let titled = content
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel, action: onCancel)
                 }
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .frame(maxWidth: .infinity)
-            .frame(height: VoidSize.pill)
+
+        if #available(iOS 26.0, *) {
+            titled
+                .navigationSubtitle("Step \(step + 1) of \(totalSteps)")
+                .safeAreaBar(edge: .bottom) { bar }
+        } else {
+            titled
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    bar.background(VoidColor.hull.ignoresSafeArea(edges: .bottom))
+                }
         }
-        .buttonStyle(VoidPanelButtonStyle(
-            radius: VoidRadius.tile,
-            line: isSelected ? Color.clear : VoidColor.hairline2,
-            fill: isSelected ? VoidColor.plasma : VoidColor.panel,
-            pressedFill: isSelected ? VoidColor.plasma : VoidColor.panel2
-        ))
-        .accessibilityLabel(accessibilityLabel ?? label)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    /// The step's progress above its primary action.
+    private var bar: some View {
+        VStack(spacing: VoidSpace.s3) {
+            StepIndicator(totalSteps: totalSteps, currentStep: step)
+            action
+        }
+        .padding(.horizontal, VoidSpace.insetCard)
+        .padding(.top, VoidSpace.s3)
+        .padding(.bottom, VoidSpace.s2)
     }
 }
 
 // MARK: - Text wells
 
-/// Multi-line text well: panel-2 fill, radius 12, SF 15, grows between `lines`.
+/// Multi-line text well: panel-2 fill, radius 12, grows between `lines`.
 struct WizardTextArea: View {
     let placeholder: String
     @Binding var text: String
@@ -143,11 +112,15 @@ struct WizardTextArea: View {
     }
 }
 
-/// Integer well: centered digits, number pad.
+/// Integer well: centered digits, number pad. The number pad has no return key, so the field puts
+/// a Done button above the keyboard while it is being edited.
 struct WizardIntField: View {
     let placeholder: String
     @Binding var value: Int
+    /// Minimum height; the well grows with Dynamic Type.
     var height: CGFloat = VoidSize.pill
+
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         TextField(placeholder, value: $value, format: .number)
@@ -155,17 +128,22 @@ struct WizardIntField: View {
             .foregroundStyle(VoidColor.text)
             .keyboardType(.numberPad)
             .multilineTextAlignment(.center)
+            .focused($isFocused)
             .padding(.horizontal, 8)
-            .frame(height: height)
+            .frame(minHeight: height)
             .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2, fill: VoidColor.panel2)
+            .keyboardDoneButton(isFocused: $isFocused)
     }
 }
 
-/// Decimal well: centered digits, decimal pad.
+/// Decimal well: centered digits, decimal pad, with the same keyboard Done as `WizardIntField`.
 struct WizardDecimalField: View {
     let placeholder: String
     @Binding var value: Double
+    /// Minimum height; the well grows with Dynamic Type.
     var height: CGFloat = VoidSize.pill
+
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         TextField(placeholder, value: $value, format: .number)
@@ -173,9 +151,26 @@ struct WizardDecimalField: View {
             .foregroundStyle(VoidColor.text)
             .keyboardType(.decimalPad)
             .multilineTextAlignment(.center)
+            .focused($isFocused)
             .padding(.horizontal, 8)
-            .frame(height: height)
+            .frame(minHeight: height)
             .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2, fill: VoidColor.panel2)
+            .keyboardDoneButton(isFocused: $isFocused)
+    }
+}
+
+private extension View {
+    /// A keyboard-toolbar Done that ends editing. Only the focused field contributes it, so a screen
+    /// full of number wells still shows a single Done.
+    func keyboardDoneButton(isFocused: FocusState<Bool>.Binding) -> some View {
+        toolbar {
+            if isFocused.wrappedValue {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { isFocused.wrappedValue = false }
+                }
+            }
+        }
     }
 }
 
@@ -197,31 +192,10 @@ struct WizardGlyphSquare: View {
     }
 }
 
-// MARK: - Headings and labels
+// MARK: - Labels
 
-/// Step heading: SF 20 bold title + SF 13 text-2 caption.
-struct WizardStepHeading: View {
-    let title: String
-    var caption: String? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: VoidSpace.s1) {
-            Text(title)
-                .font(VoidFont.title)
-                .foregroundStyle(VoidColor.text)
-            if let caption {
-                Text(caption)
-                    .font(VoidFont.caption)
-                    .foregroundStyle(VoidColor.text2)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, VoidSpace.s1)
-    }
-}
-
-/// Eyebrow-sm section label with an optional trailing readout, nudged 4pt so it sits on the 20pt text grid
-/// inside a 16pt card column.
+/// Eyebrow-sm label with an optional trailing readout, nudged 4pt so it sits on the 20pt text grid
+/// inside a 16pt card column. For content outside a list; list sections use their native header.
 struct WizardSectionLabel: View {
     let title: String
     var trailing: String? = nil
@@ -239,7 +213,7 @@ struct WizardSectionLabel: View {
     }
 }
 
-/// Helper text: SF 13 text-2.
+/// Helper text: text-2 caption.
 struct WizardHelperText: View {
     let text: String
     var color: Color = VoidColor.text2
@@ -253,106 +227,35 @@ struct WizardHelperText: View {
     }
 }
 
-// MARK: - Footer
-
-/// Wizard footer: an optional Back pill and the one CTA for the screen.
-struct WizardFooter<CTA: View>: View {
-    var showBack: Bool
-    let onBack: () -> Void
-    @ViewBuilder let cta: () -> CTA
-
-    var body: some View {
-        HStack(spacing: 10) {
-            if showBack {
-                VoidPillButton(title: "Back", action: onBack)
-                    .frame(width: 112)
-            }
-            cta()
-        }
-        .padding(.horizontal, VoidSpace.insetCard)
-        .padding(.top, VoidSpace.s3)
-        .padding(.bottom, VoidSpace.s4)
-    }
-}
-
-// MARK: - Busy overlay
-
-/// Scrim + panel: eyebrow, optional message (SF 15), plasma spinner, optional Cancel pill.
-struct WizardBusyOverlay: View {
-    let eyebrow: String
-    var message: String? = nil
-    var onCancel: (() -> Void)? = nil
-
-    var body: some View {
-        ZStack {
-            VoidColor.scrim.ignoresSafeArea()
-            VStack(spacing: VoidSpace.s4) {
-                Text(eyebrow).voidEyebrow()
-                if let message {
-                    Text(message)
-                        .font(VoidFont.body)
-                        .foregroundStyle(VoidColor.text)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                ProgressView()
-                    .tint(VoidColor.plasma)
-                if let onCancel {
-                    VoidPillButton(title: "Cancel", action: onCancel)
-                }
-            }
-            .padding(VoidSpace.s5)
-            .frame(maxWidth: 320)
-            .voidPanel(radius: VoidRadius.tabBar, line: VoidColor.hairline2)
-            .padding(.horizontal, VoidSpace.s6)
-        }
-        .accessibilityAddTraits(.isModal)
-    }
-}
-
 // MARK: - Previews
 
 #Preview("Wizard components") {
-    ZStack {
-        VoidColor.hull.ignoresSafeArea()
-        VStack(spacing: 16) {
-            WizardStepHeading(title: "The basics", caption: "Name the plan and pick the days")
-            WizardSectionLabel(title: "Duration", trailing: "08 WK")
-            HStack(spacing: 10) {
-                WizardOptionCard(isSelected: true, action: {}) {
-                    Text("Ongoing").font(VoidFont.bodyStrong).foregroundStyle(VoidColor.text)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
-                }
-                WizardOptionCard(isSelected: false, action: {}) {
-                    Text("Fixed length").font(VoidFont.bodyStrong).foregroundStyle(VoidColor.text)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
-                }
+    NavigationStack {
+        Form {
+            Section {
+                Toggle("Fixed length", isOn: .constant(true))
+            } header: {
+                Text("Length")
             }
-            HStack(spacing: 8) {
-                WizardChip(title: "Push Pull Legs", isSelected: true) {}
-                WizardChip(title: "Upper Lower", isSelected: false) {}
-            }
-            HStack(spacing: 8) {
-                WizardSquareTile(label: "MON", isSelected: true) {}
-                WizardSquareTile(label: "TUE", isSelected: false) {}
-                WizardSquareTile(label: "4", isSelected: true, style: .number) {}
-            }
-            WizardTextArea(placeholder: "Anything specific", text: .constant(""))
-            HStack(spacing: 8) {
-                WizardIntField(placeholder: "Sets", value: .constant(3))
-                WizardDecimalField(placeholder: "Weight", value: .constant(135))
-            }
-            WizardFooter(showBack: true, onBack: {}) {
-                VoidCTAButton(title: "Continue") {}
-            }
-        }
-        .padding(16)
-    }
-}
+            .wizardFormRows()
 
-#Preview("Busy overlay") {
-    ZStack {
-        VoidColor.hull.ignoresSafeArea()
-        WizardBusyOverlay(eyebrow: "Generating", message: "Selecting exercises", onCancel: {})
+            Section {
+                WizardHelperText(text: "2 days selected")
+            }
+            .listRowBackground(Color.clear)
+
+            Section {
+                WizardTextArea(placeholder: "Anything specific", text: .constant(""))
+                HStack(spacing: 8) {
+                    WizardIntField(placeholder: "Sets", value: .constant(3))
+                    WizardDecimalField(placeholder: "Weight", value: .constant(135))
+                }
+            }
+            .listRowBackground(Color.clear)
+        }
+        .voidScreen()
+        .wizardStep("Basics", step: 0, of: 3, onCancel: {}) {
+            VoidCTAButton(title: "Continue") {}
+        }
     }
 }

@@ -2,7 +2,9 @@
 //  ProgramWizardStep2.swift
 //  Nippardation
 //
-//  Step 2 of the plan wizard: assign a workout to each training day.
+//  Step 2 of the plan wizard: assign a workout to each training day, or make it a rest day.
+//  The step's title lives in the navigation bar; the days are rows of an inset-grouped list whose
+//  header counts the days set.
 //
 
 import SwiftUI
@@ -13,40 +15,37 @@ struct ProgramWizardStep2: View {
     @State private var showTemplatePicker = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: VoidSpace.s6) {
-                WizardStepHeading(title: "Your schedule", caption: "Pick a workout for each training day, or make it a rest day.")
-
-                VStack(alignment: .leading, spacing: 10) {
-                    WizardSectionLabel(
-                        title: "Schedule",
-                        trailing: "DAYS \(VoidFormat.ratio(assignedCount, viewModel.workouts.count))"
+        List {
+            Section {
+                ForEach(Array(viewModel.workouts.enumerated()), id: \.element.id) { index, workout in
+                    DayScheduleCard(
+                        dayNumber: dayNumberForWorkout(index),
+                        dayIndex: index,
+                        templateName: workout.templateName,
+                        exerciseCount: exerciseCount(for: workout),
+                        isRest: viewModel.restDays.contains(index),
+                        onSelectTemplate: {
+                            selectedWorkoutIndex = index
+                            showTemplatePicker = true
+                        },
+                        onToggleRest: {
+                            viewModel.toggleRestDay(at: index)
+                        }
                     )
-
-                    VoidProgressBar(progress: Double(assignedCount) / Double(max(viewModel.workouts.count, 1)))
-                        .padding(.horizontal, VoidSpace.s1)
-
-                    ForEach(Array(viewModel.workouts.enumerated()), id: \.element.id) { index, workout in
-                        DayScheduleCard(
-                            dayNumber: dayNumberForWorkout(index),
-                            dayIndex: index,
-                            templateName: workout.templateName,
-                            exerciseCount: exerciseCount(for: workout),
-                            isRest: viewModel.restDays.contains(index),
-                            onSelectTemplate: {
-                                selectedWorkoutIndex = index
-                                showTemplatePicker = true
-                            },
-                            onToggleRest: {
-                                viewModel.toggleRestDay(at: index)
-                            }
-                        )
-                    }
                 }
+            } header: {
+                HStack {
+                    Text("Days")
+                    Spacer()
+                    Text("\(assignedCount) of \(viewModel.workouts.count) set")
+                }
+                .accessibilityElement(children: .combine)
+            } footer: {
+                Text("Pick a workout for each training day, or make it a rest day.")
             }
-            .padding(.horizontal, VoidSpace.insetCard)
-            .padding(.vertical, VoidSpace.s2)
+            .wizardFormRows()
         }
+        .listStyle(.insetGrouped)
         .sheet(isPresented: $showTemplatePicker) {
             TemplateSelectorSheet(
                 templates: viewModel.availableTemplates,
@@ -83,7 +82,11 @@ struct ProgramWizardStep2: View {
 }
 
 #Preview {
-    ProgramWizardStep2(viewModel: ProgramEditorViewModel())
-        .voidScreen()
-        .withDependencies(.preview)
+    NavigationStack {
+        ProgramWizardStep2(viewModel: ProgramEditorViewModel())
+            .voidScreen()
+            .navigationTitle("Schedule")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+    .withDependencies(.preview)
 }

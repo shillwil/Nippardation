@@ -2,8 +2,10 @@
 //  ProgressTabView.swift
 //  Nippardation
 //
-//  The Progress tab (Void screen 3): streak hero, 2×2 stat grid, workouts-per-week chart.
-//  Me is live; Crew is a placeholder panel until the friends leaderboard ships.
+//  The Progress tab (Void screen 3): streak hero, 2×2 stat grid, workouts-per-week chart,
+//  as rows of a grouped list under a large "Progress" title. The Me / Crew switch is a
+//  segmented control in the navigation bar. Me is live; Crew shows the standard empty
+//  state until the friends leaderboard ships.
 //  Named ProgressTabView because ProgressView is SwiftUI's spinner.
 //
 
@@ -27,26 +29,26 @@ struct ProgressTabView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                VoidEyebrowRow("Progress") {
-                    VoidSegmentedControl(
-                        items: [ProgressScope.me, .crew],
-                        label: { $0.label },
-                        selection: $viewModel.scope
-                    )
-                }
-
-                switch viewModel.scope {
-                case .me:
-                    meContent
-                case .crew:
-                    crewContent
-                }
+        List {
+            if viewModel.scope == .me {
+                meSection
             }
-            .padding(.bottom, VoidSpace.s6)
         }
-        .voidRootScreen()
+        .listStyle(.insetGrouped)
+        .overlay {
+            if viewModel.scope == .crew {
+                crewUnavailable
+            }
+        }
+        .navigationTitle("Progress")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            // The Phone app's Recents pattern: the scope switch in the bar, the large title below.
+            ToolbarItem(placement: .principal) {
+                scopePicker
+            }
+        }
+        .voidScreen()
         .onAppear {
             workoutManager.loadCompletedWorkouts()
             viewModel.refresh()
@@ -65,21 +67,32 @@ struct ProgressTabView: View {
         }
     }
 
+    // MARK: - Scope
+
+    private var scopePicker: some View {
+        Picker("Progress scope", selection: $viewModel.scope) {
+            ForEach(ProgressScope.allCases, id: \.self) { scope in
+                Text(scope.label).tag(scope)
+            }
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+    }
+
     // MARK: - Me
 
-    private var meContent: some View {
-        VStack(spacing: 0) {
+    /// The dashboard pieces draw their own panels, so each is a bare list row: no cell
+    /// background, no separator, edges on the list's margins (in line with the large title).
+    private var meSection: some View {
+        Section {
             streakHero
-                .padding(.top, 26)
-                .padding(.horizontal, VoidSpace.insetText)
+                .dashboardRow(top: 0)
 
             statGrid
-                .padding(.top, VoidSpace.s6)
-                .padding(.horizontal, VoidSpace.insetCard)
+                .dashboardRow(top: VoidSpace.s6)
 
             chartCard
-                .padding(.top, 10)
-                .padding(.horizontal, VoidSpace.insetCard)
+                .dashboardRow(top: 10)
         }
     }
 
@@ -87,7 +100,7 @@ struct ProgressTabView: View {
     private var streakHero: some View {
         HStack(spacing: VoidSpace.s4) {
             ZStack {
-                // Hero panels share the 16pt radius with the tab bar.
+                // Hero panels use the 16pt radius.
                 RoundedRectangle(cornerRadius: VoidRadius.tabBar, style: .continuous)
                     .fill(VoidColor.panel)
                 RoundedRectangle(cornerRadius: VoidRadius.tabBar, style: .continuous)
@@ -141,6 +154,8 @@ struct ProgressTabView: View {
                     label: viewModel.planLabel,
                     progress: viewModel.planProgress
                 )
+                // Plain style: the tile draws itself, and inside a list row only the tile
+                // (not the whole row of tiles) takes the tap.
                 Button {
                     showBodyWeightSheet = true
                 } label: {
@@ -150,7 +165,7 @@ struct ProgressTabView: View {
                         label: viewModel.bodyLabel(latest: bodyWeight.latest, delta: bodyWeight.delta)
                     )
                 }
-                .buttonStyle(VoidPlainButtonStyle())
+                .buttonStyle(.plain)
                 .accessibilityHint("Opens the body weight log")
             }
         }
@@ -161,6 +176,7 @@ struct ProgressTabView: View {
         VStack(alignment: .leading, spacing: VoidSpace.s3) {
             HStack {
                 Text("Workouts / week").voidEyebrowSm()
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text(viewModel.chartWeeksLabel).voidEyebrowSm()
             }
@@ -178,12 +194,24 @@ struct ProgressTabView: View {
 
     // MARK: - Crew
 
-    private var crewContent: some View {
-        VoidListPanel {
-            VoidPlaceholder(eyebrow: "CREW · COMING SOON", caption: "Friends leaderboard.")
-        }
-        .opacity(0.45)
-        .padding(.top, 26)
+    /// Crew fills the tab until the friends leaderboard ships, so it is a whole-screen empty state.
+    private var crewUnavailable: some View {
+        ContentUnavailableView(
+            "Crew is coming soon",
+            systemImage: "person.2",
+            description: Text("Friends leaderboard.")
+        )
+    }
+}
+
+private extension View {
+    /// A Progress dashboard row: content that draws its own panel, sitting `top` points below
+    /// the row above, with no list cell background or separator.
+    func dashboardRow(top: CGFloat) -> some View {
+        self
+            .listRowInsets(EdgeInsets(top: top, leading: 0, bottom: 0, trailing: 0))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
     }
 }
 

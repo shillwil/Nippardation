@@ -9,7 +9,7 @@ Nippardation is a native iOS fitness tracking application built with SwiftUI and
 **Key Features:**
 - Real-time workout tracking with persistent state
 - 5 predefined workout templates (Pull/Push/Legs hypertrophy, Upper/Lower strength)
-- Exercise video demonstrations via YouTube integration
+- Exercise video demonstrations in AVKit's system `VideoPlayer` (muted, looping; legacy YouTube embeds as a fallback)
 - Volume tracking with multiple unit systems (lbs, kg, pyramid blocks)
 - Statistics dashboard with workout history and analytics
 - Crash-resistant data persistence with dual-layer caching
@@ -108,11 +108,11 @@ User Action → View → ViewModel → Manager → Core Data/Cache
 
 ### View Architecture
 
-The UI is the **Void** design system (spec: `~/Downloads/void-ds/HANDOFF.md`; tokens in `DesignSystem/VoidTheme.swift`, components in `DesignSystem/VoidComponents.swift`, floating tab bar in `DesignSystem/VoidTabBar.swift`). Fonts Michroma / Chakra Petch are bundled under `Resources/Fonts` (UIAppFonts). Icons are SF Symbols via `VoidIcon` — never the void-ds SVGs. User-facing vocabulary: **plan** (model `Program`), **workout** (model `Template`).
+The UI is the **Void** design system (spec: `~/Downloads/void-ds/HANDOFF.md`; tokens in `DesignSystem/VoidTheme.swift`, components in `DesignSystem/VoidComponents.swift`, tab identity in `DesignSystem/VoidTabBar.swift`). **Apple's HIG and built-in components come first; the Void spec comes second** — when the spec describes something iOS provides (tab bar, sheets, navigation bars, lists, buttons, pickers, video player), use the native component and apply only Void's colors, tint and fonts on top. When in doubt, ask. Fonts Michroma / Chakra Petch are bundled under `Resources/Fonts` (UIAppFonts) and are the approved exception. Icons are SF Symbols via `VoidIcon` — never the void-ds SVGs. User-facing vocabulary: **plan** (model `Program`), **workout** (model `Template`).
 
 #### Primary Navigation Flow
 ```
-MainTabView (Today · Plan · Progress, custom floating VoidTabBar)
+MainTabView (Today · Plan · Progress, the system TabView / Tab)
   Today  → TodayView → ActiveWorkoutView (fullScreenCover) → ActiveExerciseDetailView (sheet)
                       → WorkoutPreviewView (Preview Exercises) · SwapWorkoutSheet
   Plan   → PlanView (rotation) → TemplateEditorView · ProgramEditorView (Edit plan) · PlansHubView
@@ -128,14 +128,14 @@ MainTabView (Today · Plan · Progress, custom floating VoidTabBar)
 - **PlansHubView**: create (AI / starter / build), Sent to you (`ReceivedPlansStore`), Your plans, Community placeholder
 - **ProgressTabView**: streak, volume, PRs, plan progress, body weight, workouts/week (`ProgressStatsCalculator`)
 - **ActiveWorkoutView**: Real-time workout tracking interface
-- **ActiveExerciseDetailView**: Individual exercise tracking with video guidance
+- **ActiveExerciseDetailView**: Individual exercise logging sheet — video guidance, sets, and a bottom Add set / Complete exercise pair. Complete marks the exercise done (`TrackedExercise.completedAt`) and the presenter opens the next unfinished one (`ExerciseProgression`); the system close button returns to the workout list
 - **TemplateListView / TemplateEditorView**: the workout library and editor
 
 #### View Features
 - **Adaptive Presentations**: ActiveExerciseDetailView uses multiple presentation detents
 - **Real-time Updates**: Views subscribe to WorkoutManager for live data
 - **State Persistence**: Active workout state survives app lifecycle events
-- **WebView Integration**: YouTube video demonstrations for exercises
+- **Video**: AVKit `VideoPlayer` for exercise demos (`NativeVideoPlayer`); the app's audio session is Ambient (`AppAudioSession`) so demos never pause the user's music; `YouTubeEmbedView` only for legacy `<iframe>` examples
 - **Debug preview mode**: `xcrun simctl launch booted com.shillwil.recess-fitness --void-preview [--void-tab plan] [--void-empty] [--void-share]` shows the app with mock data and no sign-in (DEBUG only, see `Configuration/VoidPreviewMode.swift`)
 
 ### Workout Template System
@@ -163,12 +163,11 @@ The app includes 5 predefined workout templates based on Jeff Nippard's programs
 
 #### Volume Unit System
 - Multiple unit support: pounds, kilograms, pyramid blocks
-- Tap-to-cycle functionality for unit conversion
+- A unit menu (tap the volume readout) for unit conversion
 - Consistent conversion factors across the app
 
 #### Helper Classes
 - `StringArrayTransformer`: Core Data array persistence
-- `WebViewRepresentable`: UIKit WebView integration for SwiftUI
 - `IdentifiableIndex`: Wrapper for making array indices identifiable
 
 ### Important Patterns and Conventions

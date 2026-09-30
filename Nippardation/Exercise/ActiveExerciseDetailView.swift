@@ -4,9 +4,11 @@
 //
 //  Created by Alex Shillingford on 5/14/25.
 //
-//  Exercise detail sheet: panel chrome with a grabber, eyebrow position readout over the
-//  exercise name, target panel, the embedded example video, the logged sets as a list panel,
-//  and one plasma CTA (Add set). `isReadOnly` hides every editing control (used by previews).
+//  Exercise logging sheet: a native grouped list — the exercise name and position, the target,
+//  the example video (AVKit's VideoPlayer), the logged sets and their totals, Swap movement —
+//  with the system close button up top and two native buttons along the bottom: Add set and
+//  Complete exercise. Complete marks the exercise done and hands off to the presenter, which
+//  opens the next unfinished exercise. `isReadOnly` hides every editing control (previews).
 //
 
 import SwiftUI
@@ -14,107 +16,85 @@ import SwiftUI
 struct ActiveExerciseDetailView: View {
     @StateObject private var viewModel: ActiveExerciseViewModel
     @ObservedObject var workoutManager = WorkoutManager.shared
-    
+
     @Binding var workout: TrackedWorkout
     @Binding var showingExerciseDetail: Bool
-    
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     @State private var isShowingAddSet = false
     @State private var isEditingSet = false
     @State private var selectedSetIndex: Int?
     @State private var editingReps: Int = 0
     @State private var editingWeight: Double = 0.0
     @State private var editingSetType: SetType = .working
-    @State private var showingCancelAlert = false
     @State private var volumeUnit: VolumeUnit = .pounds
     @State private var isShowingSwapPicker = false
-    
+    @State private var isShowingSetsSavedNotice = false
+
+    /// The first close ever explains that closing loses nothing: sets save as they're logged.
+    @AppStorage("exerciseSheet.hasSeenSetsSavedNotice") private var hasSeenSetsSavedNotice = false
+
     let exerciseIndex: Int
     let isReadOnly: Bool
-    
-    init(workout: Binding<TrackedWorkout>, showingExerciseDetail: Binding<Bool>, exerciseIndex: Int, isReadOnly: Bool = false) {
+    /// Complete exercise hands the finished index here so the presenter can open the next
+    /// exercise. Without one, completing just closes the sheet.
+    let onComplete: ((Int) -> Void)?
+
+    init(
+        workout: Binding<TrackedWorkout>,
+        showingExerciseDetail: Binding<Bool>,
+        exerciseIndex: Int,
+        isReadOnly: Bool = false,
+        onComplete: ((Int) -> Void)? = nil
+    ) {
         self._workout = workout
         self._showingExerciseDetail = showingExerciseDetail
         self.exerciseIndex = exerciseIndex
         self.isReadOnly = isReadOnly
-        
+        self.onComplete = onComplete
+
         // Create the view model with binding
         _viewModel = StateObject(wrappedValue: ActiveExerciseViewModel(
             workout: workout.wrappedValue,
             exerciseIndex: exerciseIndex
         ))
     }
-    
+
     var body: some View {
-        workoutView
-            .environmentObject(viewModel)
-    }
-    
-    private var workoutView: some View {
-        VStack(spacing: 0) {
-            header
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: VoidSpace.s5) {
-                    titleBlock
-                    
-                    // Exercise information
-                    if let exercise = viewModel.matchingExercise {
-                        targetPanel(exercise)
-                        videoSection(exercise)
-                    } else if isReadOnly {
-                        // Fallback for read-only mode when no matching exercise found
-                        Text("Exercise details not available")
-                            .font(VoidFont.caption)
-                            .foregroundStyle(VoidColor.text2)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, VoidSpace.s4)
-                    }
-                    
-                    // Logged sets (only when not read-only)
-                    if !isReadOnly {
-                        if viewModel.matchingExercise != nil {
-                            setsSection
-                            
-                            if viewModel.totalVolume > 0 {
-                                summaryPanel
-                            }
-                        }
-                        
-                        swapMovementButton
+        NavigationStack {
+            Group {
+                if isReadOnly {
+                    exerciseList
+                } else {
+                    exerciseList
+                        .modifier(BottomActionBar { ctaBar })
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    SheetCloseButton(accessibilityLabel: isReadOnly ? "Close" : "Back to workout") {
+                        closeTapped()
                     }
                 }
-                .padding(.top, VoidSpace.s2)
-                .padding(.bottom, VoidSpace.s6)
-            }
-            
-            if !isReadOnly {
-                ctaBar
             }
         }
-        .background(VoidColor.panel.ignoresSafeArea())
-        .alert("Cancel exercise", isPresented: $showingCancelAlert) {
-            Button("Go back", role: .cancel) {
-                // Just dismiss the alert
-            }
-            
-            Button("Close anyway", role: .destructive) {
-                showingExerciseDetail = false
+        .alert("Your sets are saved", isPresented: $isShowingSetsSavedNotice) {
+            Button("Got it") {
+                close()
             }
         } message: {
-            Text("You have sets logged for this exercise. Close without finishing?")
+            Text("Every set is saved the moment you log it, so closing never loses anything. Come back to this exercise anytime from your workout.")
         }
         .sheet(isPresented: $isShowingAddSet) {
             if let exercise = viewModel.matchingExercise {
                 AddRepCountView(exercise: exercise) { newSet in
                     viewModel.addSet(newSet)
-                    // Update the binding to ensure changes propagate (with bounds check)
-                    if let currentExercise = viewModel.currentExercise,
-                       exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
-                        workout.trackedExercises[exerciseIndex] = currentExercise
-                    }
+                    syncWorkoutBinding()
                 }
-                .presentationDetents([.fraction(0.75)])
-                .voidSheet()
+                .presentationDetents([.fraction(0.75), .large])
+                .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $isEditingSet) {
@@ -125,36 +105,30 @@ struct ActiveExerciseDetailView: View {
                     setType: $editingSetType,
                     onSave: { newReps, newWeight, newSetType in
                         viewModel.updateSet(at: index, reps: newReps, weight: newWeight, setType: newSetType)
-                        // Update the binding to ensure changes propagate (with bounds check)
-                        if let currentExercise = viewModel.currentExercise,
-                           exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
-                            workout.trackedExercises[exerciseIndex] = currentExercise
-                        }
+                        syncWorkoutBinding()
                     }
                 )
-                .presentationDetents([.height(430), .large])
-                .voidSheet()
+                .presentationDetents([.fraction(0.75), .large])
+                .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $isShowingSwapPicker) {
             NavigationStack {
                 ExerciseBrowserView { selected in
                     viewModel.swapExercise(to: selected)
-                    if let currentExercise = viewModel.currentExercise,
-                       exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
-                        workout.trackedExercises[exerciseIndex] = currentExercise
-                    }
+                    syncWorkoutBinding()
                     isShowingSwapPicker = false
                 }
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Cancel") {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", role: .cancel) {
                             isShowingSwapPicker = false
                         }
                     }
                 }
             }
-            .tint(VoidColor.plasma)
+            .tint(VoidColor.plasmaInk)
+            .presentationDragIndicator(.visible)
         }
         .onAppear {
             // Synchronize view model with the latest workout data
@@ -165,180 +139,194 @@ struct ActiveExerciseDetailView: View {
             workout = newValue
         }
     }
-    
-    // MARK: - Header
-    
-    private var header: some View {
-        VStack(spacing: 0) {
-            VoidGrabber()
-                .padding(.top, 10)
-                .padding(.bottom, 14)
-            
-            HStack {
-                if isReadOnly {
-                    textButton("Close") {
-                        showingExerciseDetail = false
+
+    // MARK: - List
+
+    private var exerciseList: some View {
+        List {
+            titleSection
+
+            // Exercise information
+            if let exercise = viewModel.matchingExercise {
+                targetSection(exercise)
+                videoSection(exercise)
+            } else if isReadOnly {
+                // Fallback for read-only mode when no matching exercise found
+                Section {
+                    Text("Exercise details not available")
+                        .foregroundStyle(VoidColor.text2)
+                }
+            }
+
+            // Logged sets (only when not read-only)
+            if !isReadOnly {
+                if viewModel.matchingExercise != nil {
+                    setsSection
+
+                    if viewModel.totalVolume > 0 {
+                        totalsSection
+                    }
+                }
+
+                Section {
+                    Button("Swap movement", systemImage: VoidIcon.swap.systemName) {
+                        isShowingSwapPicker = true
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    // MARK: - Title
+
+    private var titleSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(positionReadout).voidEyebrowSm()
+
+                if let currentExercise = viewModel.currentExercise {
+                    Text(currentExercise.exerciseName)
+                        .font(VoidFont.title)
+                        .foregroundStyle(VoidColor.text)
+
+                    if currentExercise.isCompleted {
+                        Label {
+                            Text("Completed")
+                                .foregroundStyle(VoidColor.text2)
+                        } icon: {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(VoidColor.plasma)
+                        }
+                        .font(VoidFont.caption)
                     }
                 } else {
-                    cancelButton
-                }
-                
-                Spacer()
-                
-                if !isReadOnly {
-                    textButton("Done") {
-                        saveAndClose()
-                    }
+                    Text("No exercise available")
+                        .font(VoidFont.title)
+                        .foregroundStyle(VoidColor.text2)
                 }
             }
-            // The text buttons carry 8pt of extra hit area each side; pull the row in so the labels stay on the 20pt line.
-            .padding(.horizontal, VoidSpace.insetText - VoidSpace.s2)
-            .padding(.bottom, VoidSpace.s2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            .listRowBackground(Color.clear)
         }
     }
-    
-    /// SF 15 plasma text control: 44pt tall, hit area reaching 8pt past the label on each side.
-    private func textButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(VoidFont.button)
-                .foregroundStyle(VoidColor.plasma)
-                .padding(.horizontal, VoidSpace.s2)
-                .frame(minHeight: VoidSize.hitMin)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(VoidPlainButtonStyle())
-    }
-    
-    private var cancelButton: some View {
-        textButton("Cancel") {
-            if let currentExercise = viewModel.currentExercise, !currentExercise.trackedSets.isEmpty {
-                showingCancelAlert = true
-            } else {
-                showingExerciseDetail = false
-            }
-        }
-    }
-    
-    // MARK: - Title
-    
-    private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(positionReadout).voidEyebrowSm()
-            
-            if let currentExercise = viewModel.currentExercise {
-                Text(currentExercise.exerciseName)
-                    .font(VoidFont.title)
-                    .foregroundStyle(VoidColor.text)
-            } else {
-                Text("No exercise available")
-                    .font(VoidFont.title)
-                    .foregroundStyle(VoidColor.text2)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, VoidSpace.insetText)
-    }
-    
+
     private var positionReadout: String {
         let total = viewModel.workout.trackedExercises.count
         guard total > 0 else { return "Exercise" }
         return "Exercise \(VoidFormat.ratio(viewModel.exerciseIndex + 1, total))"
     }
-    
+
     // MARK: - Target info
-    
-    private func targetPanel(_ exercise: Exercise) -> some View {
-        VStack(spacing: 0) {
-            targetRow("Target sets", "\(exercise.warmUpSets) warm-up + \(exercise.workingSets) working")
-            VoidHairline()
-            targetRow("Target reps", "\(exercise.reps.lowerBound)–\(exercise.reps.upperBound)")
-            VoidHairline()
-            targetRow("Rest", "\(exercise.rest.lowerBound)–\(exercise.rest.upperBound) min")
-            VoidHairline()
-            targetRow("Intensity", exercise.lastSetIntensityTechnique)
+
+    private func targetSection(_ exercise: Exercise) -> some View {
+        Section("Target") {
+            LabeledContent("Sets", value: "\(exercise.warmUpSets) warm-up + \(exercise.workingSets) working")
+            LabeledContent("Reps", value: rangeText(exercise.reps))
+            LabeledContent("Rest", value: "\(rangeText(exercise.rest)) min")
+            LabeledContent("Intensity", value: exercise.lastSetIntensityTechnique)
         }
-        .padding(.horizontal, 14)
-        .voidPanel(radius: VoidRadius.panel, line: .clear, fill: VoidColor.panel2)
-        .padding(.horizontal, VoidSpace.insetCard)
     }
-    
-    private func targetRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label).voidEyebrowSm()
-            Spacer(minLength: VoidSpace.s3)
-            Text(value)
-                .font(VoidFont.body)
-                .foregroundStyle(VoidColor.text)
-                .multilineTextAlignment(.trailing)
-        }
-        .frame(minHeight: VoidSize.hitMin)
-        .accessibilityElement(children: .combine)
+
+    /// "8–12", or just "5" when both ends match.
+    private func rangeText(_ range: ClosedRange<Int>) -> String {
+        range.lowerBound == range.upperBound ? "\(range.lowerBound)" : "\(range.lowerBound)–\(range.upperBound)"
     }
-    
+
     // MARK: - Video (native player from the backend URL, else the embedded example)
-    
+
     @ViewBuilder
     private func videoSection(_ exercise: Exercise) -> some View {
         if let videoUrl = viewModel.nativeVideoUrl, let serverId = viewModel.exerciseServerId {
-            VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                Text("Example").voidEyebrowSm()
-                    .padding(.horizontal, VoidSpace.insetText)
-                
-                NativeVideoPlayer(
-                    exerciseServerId: serverId,
-                    videoUrl: videoUrl,
-                    showControls: true
-                )
-                .frame(maxHeight: 400)
-                .padding(.horizontal, VoidSpace.insetCard)
+            Section("Example") {
+                NativeVideoPlayer(exerciseServerId: serverId, videoUrl: videoUrl)
+                    .frame(maxWidth: .infinity, maxHeight: 400)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
             }
-        } else if !exercise.example.isEmpty {
-            VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                Text("Example").voidEyebrowSm()
-                    .padding(.horizontal, VoidSpace.insetText)
-                
+        } else if viewModel.isResolvingVideo {
+            // Holds the video's place while its current URL is fetched.
+            Section("Example") {
+                ProgressView()
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, minHeight: 160)
+                    .accessibilityLabel("Loading video")
+            }
+        } else if YouTubeEmbedView.isEmbed(exercise.example) {
+            // Legacy templates store a YouTube <iframe>; plan workouts store the MP4 URL, which
+            // plays in the native player above once it resolves.
+            Section("Example") {
                 YouTubeEmbedView(html: exercise.example)
-                    .aspectRatio(1.8, contentMode: .fit)
+                    .aspectRatio(16 / 9, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
-                    .frame(height: 200)
-                    .padding(.horizontal, VoidSpace.insetCard)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
             }
         }
     }
-    
+
     // MARK: - Sets
-    
+
     private var trackedSets: [TrackedSet] {
         viewModel.currentExercise?.trackedSets ?? []
     }
-    
+
+    /// Tap a set to edit it; swipe or long-press for Edit and Delete.
     private var setsSection: some View {
-        VStack(alignment: .leading, spacing: VoidSpace.s3) {
-            VoidSectionRow(title: "Sets", trailing: VoidFormat.pad2(trackedSets.count))
-            
+        Section {
             if trackedSets.isEmpty {
                 Text("No sets yet")
-                    .font(VoidFont.caption)
                     .foregroundStyle(VoidColor.text3)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, VoidSpace.s4)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(zip(trackedSets.indices, trackedSets)), id: \.0) { index, set in
+                ForEach(Array(trackedSets.enumerated()), id: \.element.id) { index, set in
+                    Button {
+                        startEditing(index: index, set: set)
+                    } label: {
                         setRow(index: index, set: set)
-                        if index < trackedSets.count - 1 {
-                            VoidHairline()
+                    }
+                    // Explicit tints: swipe actions otherwise take the plasma tint (even the
+                    // destructive one), and their white labels fail contrast on it.
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            viewModel.deleteSet(at: index)
+                        } label: {
+                            Label("Delete", systemImage: VoidIcon.trash.systemName)
+                        }
+                        .tint(.red)
+
+                        Button {
+                            startEditing(index: index, set: set)
+                        } label: {
+                            Label("Edit", systemImage: VoidIcon.edit.systemName)
+                        }
+                        .tint(.gray)
+                    }
+                    .contextMenu {
+                        Button {
+                            startEditing(index: index, set: set)
+                        } label: {
+                            Label("Edit", systemImage: VoidIcon.edit.systemName)
+                        }
+
+                        Button(role: .destructive) {
+                            viewModel.deleteSet(at: index)
+                        } label: {
+                            Label("Delete", systemImage: VoidIcon.trash.systemName)
                         }
                     }
                 }
-                .padding(.horizontal, 14)
-                .voidPanel(radius: VoidRadius.panel, line: .clear, fill: VoidColor.panel2)
-                .padding(.horizontal, VoidSpace.insetCard)
+            }
+        } header: {
+            HStack {
+                Text("Sets")
+                Spacer()
+                Text(VoidFormat.pad2(trackedSets.count))
             }
         }
     }
-    
+
     private func setRow(index: Int, set: TrackedSet) -> some View {
         HStack(spacing: VoidSpace.s3) {
             VStack(alignment: .leading, spacing: 4) {
@@ -348,45 +336,19 @@ struct ActiveExerciseDetailView: View {
                 Text(set.setType == .warmup ? "Warm-up" : "Working")
                     .voidEyebrowSm()
             }
-            
+
             Spacer(minLength: VoidSpace.s2)
-            
+
             HStack(spacing: VoidSpace.s3) {
                 readout(VoidFormat.pad2(set.reps), unit: "reps")
                 readout(weightText(set.weight), unit: "lbs")
             }
-            
-            // Edit and Delete (only when not read-only)
-            if !isReadOnly {
-                Menu {
-                    Button {
-                        selectedSetIndex = index
-                        editingReps = set.reps
-                        editingWeight = set.weight
-                        editingSetType = set.setType
-                        isEditingSet = true
-                    } label: {
-                        Label("Edit", systemImage: VoidIcon.edit.systemName)
-                    }
-                    
-                    Button(role: .destructive) {
-                        viewModel.deleteSet(at: index)
-                    } label: {
-                        Label("Delete", systemImage: VoidIcon.trash.systemName)
-                    }
-                } label: {
-                    Image(systemName: VoidIcon.more.systemName)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(VoidColor.text2)
-                        .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("Set \(index + 1) options")
-            }
         }
-        .frame(minHeight: VoidSize.listRow)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Edits this set")
     }
-    
+
     private func readout(_ value: String, unit: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(value)
@@ -394,80 +356,185 @@ struct ActiveExerciseDetailView: View {
                 .foregroundStyle(VoidColor.text)
             Text(unit).voidEyebrowSm()
         }
-        .accessibilityElement(children: .combine)
     }
-    
+
+    /// "135", "46.25": whole pounds without a decimal, otherwise up to the two places a set keeps.
     private func weightText(_ weight: Double) -> String {
-        weight.rounded() == weight ? "\(Int(weight))" : String(format: "%.1f", weight)
+        weight.formatted(.number.precision(.fractionLength(0...2)).grouping(.never))
     }
-    
-    // MARK: - Summary
-    
-    private var summaryPanel: some View {
-        HStack(alignment: .top) {
-            summaryStat("Sets", VoidFormat.pad2(trackedSets.count))
-            Spacer()
-            summaryStat("Reps", VoidFormat.pad2(viewModel.totalReps))
-            Spacer()
-            Button {
-                volumeUnit = volumeUnit.next()
-            } label: {
-                summaryStat("Volume", formatVolume(viewModel.totalVolume), alignment: .trailing)
-                    .contentShape(Rectangle())
+
+    private func startEditing(index: Int, set: TrackedSet) {
+        selectedSetIndex = index
+        editingReps = set.reps
+        editingWeight = set.weight
+        editingSetType = set.setType
+        isEditingSet = true
+    }
+
+    // MARK: - Totals
+
+    private var totalsSection: some View {
+        Section("Totals") {
+            LabeledContent("Sets", value: VoidFormat.pad2(trackedSets.count))
+            LabeledContent("Reps", value: VoidFormat.pad2(viewModel.totalReps))
+            LabeledContent("Volume") {
+                Menu {
+                    Picker("Volume unit", selection: $volumeUnit) {
+                        ForEach(VolumeUnit.allCases, id: \.self) { unit in
+                            Text(unit.rawValue).tag(unit)
+                        }
+                    }
+                } label: {
+                    Text(formatVolume(viewModel.totalVolume))
+                }
+                .accessibilityHint("Chooses the volume unit")
             }
-            .buttonStyle(VoidPlainButtonStyle())
-            .accessibilityHint("Cycles the volume unit")
         }
-        .padding(14)
-        .voidPanel(radius: VoidRadius.panel, line: .clear, fill: VoidColor.panel2)
-        .padding(.horizontal, VoidSpace.insetCard)
     }
-    
-    private func summaryStat(_ label: String, _ value: String, alignment: HorizontalAlignment = .leading) -> some View {
-        VStack(alignment: alignment, spacing: 4) {
-            Text(label).voidEyebrowSm()
-            Text(value)
-                .font(VoidFont.stepper)
-                .foregroundStyle(VoidColor.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .accessibilityElement(children: .combine)
-    }
-    
+
     private func formatVolume(_ volume: Double) -> String {
         let convertedVolume = volumeUnit.convert(volume, from: .pounds)
         return volumeUnit.format(convertedVolume)
     }
-    
-    // MARK: - Actions
-    
-    private var swapMovementButton: some View {
-        VoidPillButton(title: "Swap movement") {
-            isShowingSwapPicker = true
-        }
-        .padding(.horizontal, VoidSpace.insetCard)
-    }
-    
+
+    // MARK: - Bottom actions
+
+    /// Add set and Complete exercise, side by side (stacked from xxLarge text up, where
+    /// "Complete exercise" no longer fits half the width).
+    /// Exactly one of them is prominent; see `ExerciseCTAState`.
     private var ctaBar: some View {
-        VoidCTAButton(title: "Add set", isEnabled: viewModel.matchingExercise != nil) {
-            isShowingAddSet = true
+        let cta = viewModel.ctaState
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(spacing: VoidSpace.s2))
+            : AnyLayout(HStackLayout(spacing: VoidSpace.s3))
+
+        return layout {
+            Button {
+                isShowingAddSet = true
+            } label: {
+                CTALabel(title: "Add set", isProminent: cta.addSetIsPrimary)
+            }
+            .ctaButtonStyle(isProminent: cta.addSetIsPrimary)
+            .disabled(!cta.canAddSet)
+
+            Button(action: completeExercise) {
+                CTALabel(title: "Complete exercise", isProminent: cta.completeIsPrimary)
+            }
+            .ctaButtonStyle(isProminent: cta.completeIsPrimary)
+            .disabled(!cta.canComplete)
+            .accessibilityHint(completeHint)
         }
+        .controlSize(.large)
         .padding(.horizontal, VoidSpace.insetCard)
-        .padding(.top, VoidSpace.s3)
-        .padding(.bottom, VoidSpace.s3)
-        .background(VoidColor.panel)
+        .padding(.vertical, VoidSpace.s3)
     }
-    
-    private func saveAndClose() {
-        // Save changes through the workout binding (with bounds check)
-        if let currentExercise = viewModel.currentExercise,
-           exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count {
-            workout.trackedExercises[exerciseIndex] = currentExercise
-            // Update in workout manager
-            workoutManager.updateExercise(at: exerciseIndex, with: currentExercise)
+
+    private var completeHint: String {
+        if onComplete != nil, let next = viewModel.nextExercise {
+            return "Saves this exercise and opens \(next.exerciseName)"
+        }
+        return "Saves this exercise and returns to your workout"
+    }
+
+    // MARK: - Actions
+
+    private func completeExercise() {
+        viewModel.markComplete()
+        persistCurrentExercise()
+        if let onComplete {
+            onComplete(viewModel.exerciseIndex)
+        } else {
+            showingExerciseDetail = false
+        }
+    }
+
+    /// The first close ever shows the "sets are saved" note; after that it just closes.
+    private func closeTapped() {
+        if isReadOnly || hasSeenSetsSavedNotice {
+            close()
+        } else {
+            hasSeenSetsSavedNotice = true
+            isShowingSetsSavedNotice = true
+        }
+    }
+
+    private func close() {
+        if !isReadOnly {
+            persistCurrentExercise()
         }
         showingExerciseDetail = false
+    }
+
+    /// Mirrors the view model's copy of this exercise into the workout binding.
+    private func syncWorkoutBinding() {
+        guard let currentExercise = viewModel.currentExercise,
+              exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count else { return }
+        workout.trackedExercises[exerciseIndex] = currentExercise
+    }
+
+    /// Writes this exercise through the binding and WorkoutManager (sets are already saved as
+    /// they're logged; this keeps the workout's copy identical to the sheet's).
+    private func persistCurrentExercise() {
+        guard let currentExercise = viewModel.currentExercise,
+              exerciseIndex >= 0 && exerciseIndex < workout.trackedExercises.count else { return }
+        workout.trackedExercises[exerciseIndex] = currentExercise
+        workoutManager.updateExercise(at: exerciseIndex, with: currentExercise)
+    }
+}
+
+// MARK: - Bottom bar chrome
+
+/// Hosts the bottom buttons: iOS 26's safe-area bar (scroll-edge effect under glass buttons),
+/// else a safe-area inset on the system bar material.
+private struct BottomActionBar<Bar: View>: ViewModifier {
+    @ViewBuilder let bar: () -> Bar
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.safeAreaBar(edge: .bottom) { bar() }
+        } else {
+            content.safeAreaInset(edge: .bottom) {
+                bar().background(.bar)
+            }
+        }
+    }
+}
+
+/// A bottom-button label that keeps contrast: dark on the plasma fill, neutral otherwise,
+/// and the system's dimmed colour while disabled.
+private struct CTALabel: View {
+    let title: String
+    let isProminent: Bool
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Text(title)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(isEnabled ? (isProminent ? VoidColor.onPlasma : VoidColor.text) : Color.secondary)
+    }
+}
+
+private extension View {
+    /// Glass buttons over the scrolling list on iOS 26; bordered before it. Plasma only on
+    /// the prominent one.
+    @ViewBuilder
+    func ctaButtonStyle(isProminent: Bool) -> some View {
+        if #available(iOS 26.0, *) {
+            if isProminent {
+                self.buttonStyle(.glassProminent).tint(VoidColor.plasma)
+            } else {
+                self.buttonStyle(.glass)
+            }
+        } else {
+            if isProminent {
+                self.buttonStyle(.borderedProminent).tint(VoidColor.plasma)
+            } else {
+                self.buttonStyle(.bordered).tint(VoidColor.text)
+            }
+        }
     }
 }
 

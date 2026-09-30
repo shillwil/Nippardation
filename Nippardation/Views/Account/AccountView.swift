@@ -3,7 +3,7 @@
 //  Nippardation
 //
 //  Account / settings: who is signed in, and sign out. Reached from the ··· menu on Plan.
-//  A Void list panel on the hull, with the app version pinned at the bottom.
+//  A grouped list on the hull, with the app version under Sign out.
 //
 
 import SwiftUI
@@ -32,51 +32,43 @@ struct AccountView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                VoidSectionRow(title: "Signed in as")
-                    .padding(.top, VoidSpace.s5)
+        List {
+            Section {
+                HStack(spacing: VoidSpace.s3) {
+                    VoidAvatar(text: VoidFormat.initials(displayName))
 
-                VoidListPanel {
-                    HStack(spacing: VoidSpace.s3) {
-                        VoidAvatar(text: VoidFormat.initials(displayName))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(displayName)
-                                .font(VoidFont.bodyStrong)
-                                .foregroundStyle(VoidColor.text)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(displayName)
+                            .font(VoidFont.bodyStrong)
+                            .foregroundStyle(VoidColor.text)
+                            .lineLimit(1)
+                        if let email {
+                            Text(email)
+                                .font(VoidFont.caption2)
+                                .foregroundStyle(VoidColor.text2)
                                 .lineLimit(1)
-                            if let email {
-                                Text(email)
-                                    .font(VoidFont.caption2)
-                                    .foregroundStyle(VoidColor.text2)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
+                                .truncationMode(.middle)
                         }
-
-                        Spacer(minLength: 0)
                     }
-                    .frame(minHeight: VoidSize.listRow)
-                    .accessibilityElement(children: .combine)
-                }
-                .padding(.top, VoidSpace.s2)
 
-                VoidDestructiveButton(title: "Sign out") {
+                    Spacer(minLength: 0)
+                }
+                .accessibilityElement(children: .combine)
+                .listRowBackground(VoidColor.panel)
+            } header: {
+                Text("Signed in as")
+            }
+
+            Section {
+                Button("Sign out", role: .destructive) {
                     signOut()
                 }
-                .padding(.horizontal, VoidSpace.insetCard)
-                .padding(.top, VoidSpace.s6)
+                .listRowBackground(VoidColor.panel)
+            } footer: {
+                Text(versionString)
             }
-            .padding(.bottom, VoidSpace.s6)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            Text(versionString)
-                .voidEyebrowSm(VoidColor.text3)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, VoidSpace.s3)
-                .background(VoidColor.hull)
-        }
+        .listStyle(.insetGrouped)
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.inline)
         .voidScreen()

@@ -3,7 +3,7 @@
 //  Nippardation
 //
 //  Edit plan: rename, set the length, reorder days, add or remove a day, assign a workout to a day.
-//  Void list panels instead of a system Form; the ViewModel's save() contract is unchanged.
+//  A native inset-grouped List of system controls in Void colours; the ViewModel's save() contract is unchanged.
 //
 
 import SwiftUI
@@ -24,18 +24,6 @@ struct ProgramEditorView: View {
         self.onSaved = onSaved
     }
 
-    private enum PlanLength: Hashable {
-        case ongoing
-        case weeks
-
-        var label: String {
-            switch self {
-            case .ongoing: return "Ongoing"
-            case .weeks: return "Weeks"
-            }
-        }
-    }
-
     // MARK: - Body
 
     var body: some View {
@@ -51,19 +39,28 @@ struct ProgramEditorView: View {
         .navigationTitle(viewModel.isEditing ? "Edit plan" : "New plan")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", role: .cancel) {
                     dismiss()
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: VoidSpace.s3) {
-                    EditButton()
+                EditButton()
+            }
+            if #available(iOS 26.0, *) {
+                // Edit and Save would otherwise share one glass capsule.
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                if viewModel.isSaving {
+                    // Progress shows where Save was tapped; the editor is disabled until it finishes.
+                    ProgressView()
+                        .accessibilityLabel("Saving")
+                } else {
                     Button("Save") {
                         viewModel.save()
                     }
-                    .fontWeight(.semibold)
-                    .disabled(!viewModel.isValid || !viewModel.isStep2Valid || viewModel.isSaving)
+                    .disabled(!viewModel.isValid || !viewModel.isStep2Valid)
                 }
             }
         }
@@ -88,11 +85,6 @@ struct ProgramEditorView: View {
             viewModel.loadTemplates()
         }
         .disabled(viewModel.isSaving)
-        .overlay {
-            if viewModel.isSaving {
-                savingOverlay
-            }
-        }
         .alert("Something went wrong", isPresented: .init(
             get: { viewModel.error != nil },
             set: { if !$0 { viewModel.clearError() } }
@@ -109,46 +101,44 @@ struct ProgramEditorView: View {
 
     private var nameSection: some View {
         Section {
-            VoidTextField(placeholder: "Plan name", text: $viewModel.name, autocapitalization: .words)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            TextField("Plan name", text: $viewModel.name)
+                .font(VoidFont.body)
+                .foregroundStyle(VoidColor.text)
+                .textInputAutocapitalization(.words)
+                .listRowBackground(VoidColor.panel)
         } header: {
-            sectionHeader("Name")
+            Text("Name")
         }
     }
 
     private var lengthSection: some View {
         Section {
-            HStack {
-                Text(viewModel.isIndefinite ? "Ongoing" : "\(viewModel.durationWeeks ?? 8) weeks")
+            Toggle(isOn: $viewModel.isIndefinite) {
+                Text("Ongoing")
                     .font(VoidFont.body)
                     .foregroundStyle(VoidColor.text)
-                    .lineLimit(1)
-                Spacer()
-                VoidSegmentedControl(
-                    items: [PlanLength.ongoing, PlanLength.weeks],
-                    label: { $0.label },
-                    selection: lengthSelection
-                )
             }
+            .tint(VoidColor.plasma)
             .listRowBackground(VoidColor.panel)
             .listRowSeparatorTint(VoidColor.hairline)
 
             if !viewModel.isIndefinite {
-                HStack {
-                    Text("Weeks")
-                        .font(VoidFont.body)
-                        .foregroundStyle(VoidColor.text)
-                        .lineLimit(1)
-                    Spacer()
-                    PlanStepperWell(value: weeksBinding, range: 1...52)
+                Stepper(value: weeksBinding, in: 1...52) {
+                    LabeledContent {
+                        Text(VoidFormat.pad2(weeksBinding.wrappedValue))
+                            // VoiceOver reads "8 weeks" rather than the padded "08".
+                            .accessibilityLabel("\(weeksBinding.wrappedValue) weeks")
+                    } label: {
+                        Text("Weeks")
+                    }
+                    .font(VoidFont.body)
+                    .foregroundStyle(VoidColor.text)
                 }
                 .listRowBackground(VoidColor.panel)
                 .listRowSeparatorTint(VoidColor.hairline)
             }
         } header: {
-            sectionHeader("Length")
+            Text("Length")
         }
     }
 
@@ -168,47 +158,33 @@ struct ProgramEditorView: View {
                 addDayRow
             }
         } header: {
-            HStack {
-                Text("Days").voidEyebrowSm()
-                Spacer()
-                Text(VoidFormat.pad2(viewModel.workouts.count)).voidEyebrowSm()
-            }
+            Text("Days")
         } footer: {
             if viewModel.workouts.isEmpty {
                 Text("Add at least one day.")
-                    .font(VoidFont.caption2)
-                    .foregroundStyle(VoidColor.text2)
             } else if !allDaysAssigned {
                 Text("Choose a workout for every day.")
-                    .font(VoidFont.caption2)
-                    .foregroundStyle(VoidColor.text2)
             }
         }
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title).voidEyebrowSm()
-    }
-
     // MARK: - Rows
 
+    /// Opens the workout picker sheet, so the row carries no disclosure chevron.
     private func dayRow(_ workout: ProgramEditorViewModel.EditableWorkout, index: Int) -> some View {
         Button {
             selectedWorkoutIndex = index
             showTemplatePicker = true
         } label: {
-            HStack(spacing: VoidSpace.s3) {
-                VStack(alignment: .leading, spacing: VoidSpace.s1) {
-                    Text("Day \(VoidFormat.pad2(index + 1))")
-                        .voidEyebrowSm()
-                    Text(workout.templateName ?? "Choose workout")
-                        .font(VoidFont.bodyStrong)
-                        .foregroundStyle(workout.templateName == nil ? VoidColor.text2 : VoidColor.text)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: VoidSpace.s2)
-                VoidChevron()
+            VStack(alignment: .leading, spacing: VoidSpace.s1) {
+                Text("Day \(VoidFormat.pad2(index + 1))")
+                    .voidEyebrowSm()
+                Text(workout.templateName ?? "Choose workout")
+                    .font(VoidFont.bodyStrong)
+                    .foregroundStyle(workout.templateName == nil ? VoidColor.text2 : VoidColor.text)
+                    .lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, VoidSpace.s2)
             .contentShape(Rectangle())
         }
@@ -225,18 +201,12 @@ struct ProgramEditorView: View {
         Button {
             viewModel.addWorkout()
         } label: {
-            HStack(spacing: VoidSpace.s3) {
-                Image(systemName: VoidIcon.plus.systemName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(VoidColor.text)
-                    .frame(width: 20)
-                Text("Add a day")
-                    .font(VoidFont.bodyStrong)
-                    .foregroundStyle(VoidColor.text)
-                Spacer()
-            }
-            .padding(.vertical, VoidSpace.s2)
-            .contentShape(Rectangle())
+            Label("Add a day", systemImage: VoidIcon.plus.systemName)
+                .font(VoidFont.bodyStrong)
+                .foregroundStyle(VoidColor.text)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, VoidSpace.s2)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .listRowBackground(VoidColor.panel)
@@ -245,27 +215,7 @@ struct ProgramEditorView: View {
         .moveDisabled(true)
     }
 
-    private var savingOverlay: some View {
-        ZStack {
-            VoidColor.hull.opacity(0.6).ignoresSafeArea()
-            VStack(spacing: VoidSpace.s3) {
-                ProgressView()
-                    .tint(VoidColor.text)
-                Text("Saving").voidEyebrowSm()
-            }
-            .padding(VoidSpace.s6)
-            .voidPanel(radius: VoidRadius.panel, line: VoidColor.hairline2)
-        }
-    }
-
     // MARK: - Bindings & derived
-
-    private var lengthSelection: Binding<PlanLength> {
-        Binding(
-            get: { viewModel.isIndefinite ? .ongoing : .weeks },
-            set: { viewModel.isIndefinite = ($0 == .ongoing) }
-        )
-    }
 
     private var weeksBinding: Binding<Int> {
         Binding(
@@ -278,50 +228,6 @@ struct ProgramEditorView: View {
         viewModel.workouts.enumerated().allSatisfy { index, workout in
             viewModel.restDays.contains(index) || workout.templateServerId != nil
         }
-    }
-}
-
-// MARK: - Stepper well
-
-/// Squared −/+ stepper: panel-2 well, radius 8, SF 20 bold monospaced value.
-/// Each button is a full `VoidSize.hitMin` square so the well meets the 44pt hit target inside a 52pt row.
-/// The minus glyph is not part of `VoidIcon`; it is the one SF Symbol named here directly.
-private struct PlanStepperWell: View {
-    @Binding var value: Int
-    let range: ClosedRange<Int>
-
-    private static let minusSymbol = "minus"
-
-    var body: some View {
-        HStack(spacing: 0) {
-            step(symbol: Self.minusSymbol, enabled: value > range.lowerBound, label: "Fewer weeks") {
-                value = max(range.lowerBound, value - 1)
-            }
-            Text(VoidFormat.pad2(value))
-                .font(VoidFont.stepper)
-                .foregroundStyle(VoidColor.text)
-                .frame(minWidth: 44)
-            step(symbol: VoidIcon.plus.systemName, enabled: value < range.upperBound, label: "More weeks") {
-                value = min(range.upperBound, value + 1)
-            }
-        }
-        .voidPanel(radius: VoidRadius.control, line: VoidColor.hairline2, fill: VoidColor.panel2)
-        .accessibilityElement(children: .contain)
-        .accessibilityValue("\(value) weeks")
-    }
-
-    private func step(symbol: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(VoidColor.text)
-                .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(VoidPlainButtonStyle())
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.4)
-        .accessibilityLabel(label)
     }
 }
 

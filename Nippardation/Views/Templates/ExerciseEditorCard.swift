@@ -2,8 +2,9 @@
 //  ExerciseEditorCard.swift
 //  Nippardation
 //
-//  66pt exercise row in the workout editor: index square · name · "4 × 6-8 · rest 3:00" · chevron.
-//  Tap opens the config sheet; the context menu moves or removes the exercise.
+//  Exercise row in the workout editor's List: index square · name · "4 × 6-8 · rest 3:00".
+//  Tap opens the config sheet (no chevron: it doesn't navigate). Swipe or Edit deletes and
+//  reorders through the List; the context menu is the long-press path to the same actions.
 //
 
 import SwiftUI
@@ -12,7 +13,6 @@ struct ExerciseEditorCard: View {
 
     let index: Int
     let exercise: TemplateEditorViewModel.EditableExercise
-    var isLast: Bool = false
     let onConfigure: () -> Void
     let onDelete: () -> Void
     var onMoveUp: (() -> Void)? = nil
@@ -34,18 +34,10 @@ struct ExerciseEditorCard: View {
                         .lineLimit(1)
                 }
 
-                Spacer(minLength: VoidSpace.s2)
-
-                VoidChevron()
+                Spacer(minLength: 0)
             }
-            .frame(height: VoidSize.listRow)
+            .padding(.vertical, VoidSpace.s1)
             .contentShape(Rectangle())
-        }
-        .buttonStyle(VoidRowButtonStyle())
-        .overlay(alignment: .bottom) {
-            if !isLast {
-                VoidHairline()
-            }
         }
         .contextMenu {
             if let onMoveUp {
@@ -66,7 +58,6 @@ struct ExerciseEditorCard: View {
                 Label("Remove exercise", systemImage: VoidIcon.trash.systemName)
             }
         }
-        .accessibilityElement(children: .combine)
         .accessibilityHint("Configure sets, reps and rest")
     }
 
@@ -105,40 +96,40 @@ private enum GapIcon {
 // MARK: - Previews
 
 #Preview {
-    ZStack {
-        VoidColor.hull.ignoresSafeArea()
-        VoidListPanel {
-            ExerciseEditorCard(
-                index: 0,
-                exercise: TemplateEditorViewModel.EditableExercise(
-                    orderIndex: 0,
-                    exerciseServerId: "ex_001",
-                    exerciseLibraryItem: MockExerciseRepository.sampleExercises[0],
-                    warmupSets: 2,
-                    workingSets: 4,
-                    targetReps: "6-8",
-                    restSeconds: 180,
-                    notes: "Pause on the chest"
-                ),
-                onConfigure: {},
-                onDelete: {}
-            )
-            ExerciseEditorCard(
-                index: 1,
-                exercise: TemplateEditorViewModel.EditableExercise(
-                    orderIndex: 1,
-                    exerciseServerId: "ex_005",
-                    exerciseLibraryItem: MockExerciseRepository.sampleExercises[4],
-                    warmupSets: 0,
-                    workingSets: 3,
-                    targetReps: "12-15",
-                    restSeconds: 60,
-                    notes: ""
-                ),
-                isLast: true,
-                onConfigure: {},
-                onDelete: {}
-            )
-        }
+    List {
+        ExerciseEditorCard(
+            index: 0,
+            exercise: TemplateEditorViewModel.EditableExercise(
+                orderIndex: 0,
+                exerciseServerId: "ex_001",
+                exerciseLibraryItem: MockExerciseRepository.sampleExercises[0],
+                warmupSets: 2,
+                workingSets: 4,
+                targetReps: "6-8",
+                restSeconds: 180,
+                notes: "Pause on the chest"
+            ),
+            onConfigure: {},
+            onDelete: {}
+        )
+        .listRowBackground(VoidColor.panel)
+        ExerciseEditorCard(
+            index: 1,
+            exercise: TemplateEditorViewModel.EditableExercise(
+                orderIndex: 1,
+                exerciseServerId: "ex_005",
+                exerciseLibraryItem: MockExerciseRepository.sampleExercises[4],
+                warmupSets: 0,
+                workingSets: 3,
+                targetReps: "12-15",
+                restSeconds: 60,
+                notes: ""
+            ),
+            onConfigure: {},
+            onDelete: {}
+        )
+        .listRowBackground(VoidColor.panel)
     }
+    .listStyle(.insetGrouped)
+    .voidScreen()
 }

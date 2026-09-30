@@ -13,20 +13,16 @@ class ActiveWorkoutViewModel: ObservableObject {
     @Published var workout: TrackedWorkout
     @Published var totalVolume: Double = 0
     @Published var completedSets: Int = 0
-    @Published var elapsedTime: TimeInterval = 0
     @Published var isShowingEndWorkoutAlert = false
     @Published var volumeUnit: VolumeUnit = .pounds
-    
-    // Timer for tracking workout duration
-    private var timer: Timer?
-    
+
     // Dependencies
     private let workoutManager = WorkoutManager.shared
     private var cancellables = Set<AnyCancellable>()
-    
+
     init(workout: TrackedWorkout) {
         self.workout = workout
-        
+
         // Subscribe to workout manager updates
         workoutManager.$activeWorkout
             .compactMap { $0 }
@@ -35,37 +31,18 @@ class ActiveWorkoutViewModel: ObservableObject {
                 self?.updateWorkoutStats()
             }
             .store(in: &cancellables)
-        
+
         // Calculate initial stats
         updateWorkoutStats()
-        
-        // Set initial elapsed time based on workout start time
-        if let startTime = workout.startTime {
-            elapsedTime = Date().timeIntervalSince(startTime)
-        }
     }
-    
-    // MARK: - Timer Management
-    
-    func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            self.elapsedTime += 1
-        }
-    }
-    
-    func stopTimer() {
-        timer?.invalidate()
-        timer = nil
-    }
-    
+
     // MARK: - Workout Management
-    
+
     func updateWorkout(_ newWorkout: TrackedWorkout) {
         self.workout = newWorkout
         updateWorkoutStats()
     }
-    
+
     func updateExercise(at index: Int, with exercise: TrackedExercise) {
         guard index < workout.trackedExercises.count else { return }
 
@@ -79,30 +56,24 @@ class ActiveWorkoutViewModel: ObservableObject {
         updateWorkoutStats()
     }
 
-    /// Replaces the exercise at `index` with one selected from the library, preserving the
-    /// existing tracked id and any sets already logged (snapshotted set metadata is intentionally
-    /// left intact so historical rows continue to reflect the exercise they were logged against).
+    /// Replaces the exercise at `index` with one selected from the library, keeping its id,
+    /// sets and completion (see `TrackedExercise.swapped(to:)`).
     func swapExercise(at index: Int, to libraryItem: ExerciseLibraryItem) {
         guard index < workout.trackedExercises.count else { return }
-
-        let existing = workout.trackedExercises[index]
-        let updated = TrackedExercise(
-            id: existing.id,
-            exerciseName: libraryItem.name,
-            muscleGroups: libraryItem.primaryMuscles.map { $0.rawValue },
-            trackedSets: existing.trackedSets,
-            exerciseLibraryServerId: libraryItem.serverId
-        )
-        updateExercise(at: index, with: updated)
+        updateExercise(at: index, with: workout.trackedExercises[index].swapped(to: libraryItem))
     }
-    
+
+    /// The exercise to open after completing the one at `index`, or nil when all are done.
+    func nextUnfinishedExercise(after index: Int) -> Int? {
+        ExerciseProgression.nextUnfinishedIndex(after: index, in: workout.trackedExercises)
+    }
+
     func endWorkout() {
         workoutManager.endWorkout()
-        stopTimer()
     }
-    
+
     // MARK: - Stats Calculation
-    
+
     func updateWorkoutStats() {
         // Calculate total volume
         totalVolume = workout.trackedExercises.reduce(0.0) { exerciseSum, exercise in
@@ -110,31 +81,13 @@ class ActiveWorkoutViewModel: ObservableObject {
                 setSum + (Double(set.reps) * set.weight)
             }
         }
-        
-        // Count completed sets
+
+        // Count logged sets
         completedSets = workout.trackedExercises.reduce(0) { $0 + $1.trackedSets.count }
     }
-    
-    // MARK: - Formatted Time
-    
-    var formattedElapsedTime: String {
-        let hours = Int(elapsedTime) / 3600
-        let minutes = (Int(elapsedTime) % 3600) / 60
-        let seconds = Int(elapsedTime) % 60
-        
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%d:%02d", minutes, seconds)
-        }
-    }
-    
-    // MARK: - Volume Management
-    
-    func cycleVolumeUnit() {
-        volumeUnit = volumeUnit.next()
-    }
-    
+
+    // MARK: - Volume
+
     var formattedTotalVolume: String {
         let convertedVolume = volumeUnit.convert(totalVolume, from: .pounds)
         return volumeUnit.format(convertedVolume)

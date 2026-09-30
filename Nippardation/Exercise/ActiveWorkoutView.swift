@@ -4,50 +4,64 @@
 //
 //  Created by Alex Shillingford on 5/14/25.
 //
-//  Active workout logger: hull screen, a stats panel (radius 14 + hairline), the exercises as a
-//  list panel with eyebrow-sm labels over stepper numbers and a plasma check once sets exist,
-//  and "End workout" as the destructive panel button behind a confirmation alert.
+//  Active workout logger: a native grouped list — the duration / start / totals readout, the
+//  exercises (tap to log, swipe or long-press to swap, a plasma check once completed), and
+//  End workout as a destructive row behind a confirmation alert. Completing an exercise moves
+//  the open sheet on to the next unfinished exercise in place.
 //
 
 import SwiftUI
 
+/// One presentation of the exercise sheet. Its id stays fixed while `index` moves from
+/// exercise to exercise, so completing one swaps the sheet's content instead of dismissing
+/// and presenting it again.
+struct ExerciseSheetRoute: Identifiable, Equatable {
+    let id = UUID()
+    var index: Int
+}
+
 struct ActiveWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var viewModel: ActiveWorkoutViewModel
-    
+
     // UI state properties
-    @State private var selectedExercise: IdentifiableIndex?
-    @State private var selectedDetent: PresentationDetent
+    @State private var exerciseSheet: ExerciseSheetRoute?
+    @State private var selectedDetent: PresentationDetent = .large
     @State private var swappingExerciseIndex: Int?
-    
+    /// Bumped by every Complete exercise, for the success haptic.
+    @State private var completionCount = 0
+
     init(workout: TrackedWorkout) {
         // Initialize the view model with the workout
         _viewModel = StateObject(wrappedValue: ActiveWorkoutViewModel(workout: workout))
-        selectedDetent = .large
     }
-    
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: VoidSpace.s3) {
-                statsPanel
-                exercisesSection
-                endSection
-            }
-            .padding(.top, VoidSpace.s2)
-            .padding(.bottom, VoidSpace.s6)
+        List {
+            statsSection
+            exercisesSection
+            endSection
         }
+        .listStyle(.insetGrouped)
         .voidScreen()
-        .sheet(item: $selectedExercise) { identifiableIndex in
+        .sheet(item: $exerciseSheet) { route in
             ActiveExerciseDetailView(
                 workout: $viewModel.workout,
                 showingExerciseDetail: Binding(
-                    get: { self.selectedExercise != nil },
-                    set: { _ in self.selectedExercise = nil }
+                    get: { exerciseSheet != nil },
+                    set: { isShowing in
+                        if !isShowing { exerciseSheet = nil }
+                    }
                 ),
-                exerciseIndex: identifiableIndex.value
+                exerciseIndex: route.index,
+                onComplete: advance(from:)
             )
+            // A new index is a new exercise: fresh view model, video and scroll position,
+            // while the sheet itself stays up.
+            .id(route.index)
             .presentationDetents([.height(350), .height(180), .large], selection: $selectedDetent)
-            .voidSheet()
+            .presentationDragIndicator(.visible)
             .interactiveDismissDisabled()
             .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
@@ -61,15 +75,17 @@ struct ActiveWorkoutView: View {
                     swappingExerciseIndex = nil
                 }
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Cancel") {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", role: .cancel) {
                             swappingExerciseIndex = nil
                         }
                     }
                 }
             }
-            .tint(VoidColor.plasma)
+            .tint(VoidColor.plasmaInk)
+            .presentationDragIndicator(.visible)
         }
+        .sensoryFeedback(.success, trigger: completionCount)
         .navigationTitle(viewModel.workout.workoutTemplate)
         .navigationBarTitleDisplayMode(.inline)
         .alert("End workout", isPresented: $viewModel.isShowingEndWorkoutAlert) {
@@ -81,57 +97,69 @@ struct ActiveWorkoutView: View {
         } message: {
             Text("Your progress will be saved.")
         }
-        .onAppear {
-            viewModel.startTimer()
-        }
-        .onDisappear {
-            viewModel.stopTimer()
-        }
     }
-    
+
     // MARK: - Stats
-    
-    /// Duration / started, then completed sets / volume once a set is logged.
-    private var statsPanel: some View {
-        VStack(spacing: 14) {
-            // Duration and start time row
-            HStack(alignment: .top) {
-                stat("Duration", viewModel.formattedElapsedTime)
-                Spacer()
-                stat("Started", startedText, alignment: .trailing)
-            }
-            
-            // Completed sets and volume
-            if viewModel.completedSets > 0 {
-                VoidHairline()
-                
+
+    /// Duration / started, then logged sets / volume once a set is logged.
+    private var statsSection: some View {
+        Section {
+            VStack(spacing: 14) {
+                // Duration and start time row
                 HStack(alignment: .top) {
-                    stat("Completed sets", VoidFormat.pad2(viewModel.completedSets))
+                    stat("Duration") { durationText }
                     Spacer()
-                    Button {
-                        viewModel.cycleVolumeUnit()
-                    } label: {
-                        stat("Volume", viewModel.formattedTotalVolume, alignment: .trailing)
-                            .contentShape(Rectangle())
+                    stat("Started", alignment: .trailing) { Text(startedText) }
+                }
+
+                // Logged sets and volume
+                if viewModel.completedSets > 0 {
+                    Divider()
+
+                    HStack(alignment: .top) {
+                        stat("Sets logged") { Text(VoidFormat.pad2(viewModel.completedSets)) }
+                        Spacer()
+                        Menu {
+                            Picker("Volume unit", selection: $viewModel.volumeUnit) {
+                                ForEach(VolumeUnit.allCases, id: \.self) { unit in
+                                    Text(unit.rawValue).tag(unit)
+                                }
+                            }
+                        } label: {
+                            stat("Volume", alignment: .trailing) { Text(viewModel.formattedTotalVolume) }
+                        }
+                        .accessibilityHint("Chooses the volume unit")
                     }
-                    .buttonStyle(VoidPlainButtonStyle())
-                    .accessibilityHint("Cycles the volume unit")
                 }
             }
+            .padding(.vertical, VoidSpace.s1)
+            .listRowBackground(VoidColor.panel)
         }
-        .padding(14)
-        .voidPanel(radius: VoidRadius.panel, line: VoidColor.hairline)
-        .padding(.horizontal, VoidSpace.insetCard)
     }
-    
+
+    /// Counts up from the start time on its own, so it never drifts while the list scrolls
+    /// or the phone sleeps between sets.
+    @ViewBuilder
+    private var durationText: some View {
+        if let startTime = viewModel.workout.startTime {
+            Text(timerInterval: startTime...Date.distantFuture, countsDown: false)
+        } else {
+            Text("–")
+        }
+    }
+
     private var startedText: String {
         viewModel.workout.startTime?.formatted(date: .omitted, time: .shortened) ?? "–"
     }
-    
-    private func stat(_ label: String, _ value: String, alignment: HorizontalAlignment = .leading) -> some View {
+
+    private func stat<Value: View>(
+        _ label: String,
+        alignment: HorizontalAlignment = .leading,
+        @ViewBuilder value: () -> Value
+    ) -> some View {
         VStack(alignment: alignment, spacing: 4) {
             Text(label).voidEyebrowSm()
-            Text(value)
+            value()
                 .font(VoidFont.stepper)
                 .foregroundStyle(VoidColor.text)
                 .lineLimit(1)
@@ -139,45 +167,45 @@ struct ActiveWorkoutView: View {
         }
         .accessibilityElement(children: .combine)
     }
-    
+
     // MARK: - Exercises
-    
+
     private var exercises: [TrackedExercise] {
         viewModel.workout.trackedExercises
     }
-    
-    /// Eyebrow over a list panel of exercise rows. Long-press a row for Swap (the detail sheet
-    /// also carries a "Swap movement" pill).
+
+    /// Tap a row to log it; swipe or long-press it for Swap (the sheet also carries
+    /// "Swap movement").
     private var exercisesSection: some View {
-        VStack(alignment: .leading, spacing: VoidSpace.s3) {
-            VoidSectionRow(title: "Exercises")
-            
-            VoidListPanel {
-                ForEach(Array(zip(exercises.indices, exercises)), id: \.0) { index, exercise in
+        Section("Exercises") {
+            ForEach(Array(zip(exercises.indices, exercises)), id: \.1.id) { index, exercise in
+                Button {
+                    open(index)
+                } label: {
+                    exerciseRow(exercise)
+                }
+                .swipeActions(edge: .trailing) {
                     Button {
-                        selectedDetent = .large
-                        selectedExercise = IdentifiableIndex(id: index)
+                        swappingExerciseIndex = index
                     } label: {
-                        exerciseRow(exercise)
+                        Label("Swap", systemImage: VoidIcon.swap.systemName)
                     }
-                    .buttonStyle(VoidRowButtonStyle())
-                    .contextMenu {
-                        Button {
-                            swappingExerciseIndex = index
-                        } label: {
-                            Label("Swap", systemImage: VoidIcon.swap.systemName)
-                        }
-                    }
-                    
-                    if index < exercises.count - 1 {
-                        VoidHairline()
+                    // Explicit: an untinted action takes the plasma tint, and its white label
+                    // fails contrast on it.
+                    .tint(.gray)
+                }
+                .contextMenu {
+                    Button {
+                        swappingExerciseIndex = index
+                    } label: {
+                        Label("Swap", systemImage: VoidIcon.swap.systemName)
                     }
                 }
+                .listRowBackground(VoidColor.panel)
             }
         }
-        .padding(.top, VoidSpace.s2)
     }
-    
+
     private func exerciseRow(_ exercise: TrackedExercise) -> some View {
         HStack(spacing: VoidSpace.s3) {
             VStack(alignment: .leading, spacing: 4) {
@@ -186,29 +214,32 @@ struct ActiveWorkoutView: View {
                     .foregroundStyle(VoidColor.text)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
-                
+
                 Text(setCaption(exercise))
-                    .voidEyebrowSm(exercise.trackedSets.isEmpty ? VoidColor.text3 : VoidColor.text2)
+                    .voidEyebrowSm(exercise.hasLoggedSets ? VoidColor.text2 : VoidColor.text3)
                     .lineLimit(1)
             }
-            
+
             Spacer(minLength: VoidSpace.s2)
-            
-            if !exercise.trackedSets.isEmpty {
-                Image(systemName: VoidIcon.check.systemName)
-                    .font(.system(size: 13, weight: .bold))
+
+            if exercise.isCompleted {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
                     .foregroundStyle(VoidColor.plasma)
-                    .accessibilityLabel("Logged")
+                    .accessibilityHidden(true) // the row's value already says "Completed"
             }
-            
-            VoidChevron()
         }
-        .padding(.vertical, VoidSpace.s3)
-        .frame(minHeight: VoidSize.listRow)
+        .padding(.vertical, VoidSpace.s1)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+        .accessibilityValue(status(of: exercise))
     }
-    
+
+    private func status(of exercise: TrackedExercise) -> String {
+        if exercise.isCompleted { return "Completed" }
+        return exercise.hasLoggedSets ? "In progress" : "Not started"
+    }
+
     private func setCaption(_ exercise: TrackedExercise) -> String {
         let sets = exercise.trackedSets
         guard !sets.isEmpty else { return "No sets" }
@@ -216,16 +247,56 @@ struct ActiveWorkoutView: View {
         let setWord = sets.count == 1 ? "set" : "sets"
         return VoidFormat.readout(["\(VoidFormat.pad2(sets.count)) \(setWord)", "\(Int(volume)) lbs"])
     }
-    
+
     // MARK: - End workout
-    
+
     /// Opens the confirmation alert; its destructive action ends the workout and closes the cover.
     private var endSection: some View {
-        VoidDestructiveButton(title: "End workout") {
-            viewModel.isShowingEndWorkoutAlert = true
+        Section {
+            Button("End workout", role: .destructive) {
+                viewModel.isShowingEndWorkoutAlert = true
+            }
+            .listRowBackground(VoidColor.panel)
         }
-        .padding(.horizontal, VoidSpace.insetCard)
-        .padding(.top, VoidSpace.s3)
+    }
+
+    // MARK: - Exercise sheet
+
+    /// Opens an exercise, or switches the open sheet to it (rows stay tappable behind the
+    /// sheet at its small detents).
+    private func open(_ index: Int) {
+        selectedDetent = .large
+        if exerciseSheet != nil {
+            exerciseSheet?.index = index
+        } else {
+            exerciseSheet = ExerciseSheetRoute(index: index)
+        }
+    }
+
+    /// Complete exercise: move the sheet on to the next unfinished exercise, or close it
+    /// back to this list when every exercise is done.
+    private func advance(from index: Int) {
+        completionCount += 1
+        let finished = exercises.indices.contains(index) ? exercises[index].exerciseName : "Exercise"
+
+        guard let next = viewModel.nextUnfinishedExercise(after: index) else {
+            exerciseSheet = nil
+            announce("\(finished) complete. That's every exercise.")
+            return
+        }
+
+        selectedDetent = .large
+        withAnimation(reduceMotion ? nil : .smooth) {
+            exerciseSheet?.index = next
+        }
+        announce("\(finished) complete. Next: \(exercises[next].exerciseName).")
+    }
+
+    /// High priority, so the sheet's content swap (or dismissal) doesn't cut it off.
+    private func announce(_ message: String) {
+        var announcement = AttributedString(message)
+        announcement.accessibilitySpeechAnnouncementPriority = .high
+        AccessibilityNotification.Announcement(announcement).post()
     }
 }
 

@@ -44,14 +44,14 @@ enum VoidColor {
     /// THE action color. Deepens in light mode so marks hold on white.
     static let plasma     = dyn(hex(0x00A3C4), hex(0x33E0FF))
     static let onPlasma   = Color(hex(0x05070C))
+    /// Plasma for text and tinted controls (links, toolbar buttons, checkmarks, menus): a
+    /// deeper cyan in light mode so tinted text clears 4.5:1 on white and on the hull
+    /// (6.2:1 / 5.3:1); dark mode is plasma itself. Fills paired with `onPlasma` keep `plasma`.
+    static let plasmaInk  = dyn(hex(0x006A80), hex(0x33E0FF))
     /// Instrument red: labels + PR count only. Never a fill.
     static let warning    = dyn(hex(0xB8323A), hex(0xE0525A))
-    static let tabBar     = dyn(hex(0xFFFFFF, 0.94), hex(0x0C1119, 0.97))
-    static let tabBarLine = dyn(hex(0x0B1220, 0.10), hex(0xBECDE0, 0.12))
     /// Progress-bar track (rgba(190,205,224,.12) in the kit).
     static let track      = dyn(hex(0x0B1220, 0.12), hex(0xBECDE0, 0.12))
-    /// Scrim behind bottom sheets.
-    static let scrim      = Color(hex(0x05070C, 0.72))
 }
 
 // MARK: - Type
@@ -129,8 +129,6 @@ enum VoidSpace {
     /// First content line sits 112pt down on a 393×852 canvas whose status bar is 54pt,
     /// i.e. 58pt below the top safe-area inset.
     static let topContent: CGFloat = 58
-    /// Space between the bottom pills and the tab bar.
-    static let pillsBottom: CGFloat = 24
 }
 
 // MARK: - Sizes
@@ -142,27 +140,19 @@ enum VoidSize {
     static let tileStreak: CGFloat = 64
     static let badge: CGFloat = 20
     static let pill: CGFloat = 44
-    static let cta: CGFloat = 50
     static let start: CGFloat = 200
-    static let tabBar: CGFloat = 53
-    static let tabItem: CGFloat = 47
     static let statTile: CGFloat = 124
-    static let control: CGFloat = 32
-    static let chip: CGFloat = 28
-    static let listRow: CGFloat = 66
     static let avatar: CGFloat = 36
-    static let createTile: CGFloat = 76
     static let hitMin: CGFloat = 44
     static let iconStroke: CGFloat = 2.2
     static let upNextMark = CGSize(width: 3, height: 36)
-    static let grabber = CGSize(width: 36, height: 5)
 }
 
 // MARK: - Radii (Void is squared: panels, never pills)
 
 enum VoidRadius {
     static let badge: CGFloat = 5, mark: CGFloat = 6, control: CGFloat = 8, avatar: CGFloat = 10, tile: CGFloat = 12
-    static let panel: CGFloat = 14, tabBar: CGFloat = 16, tabItem: CGFloat = 13, tileHero: CGFloat = 18, start: CGFloat = 28
+    static let panel: CGFloat = 14, tabBar: CGFloat = 16, tileHero: CGFloat = 18, start: CGFloat = 28
 }
 
 // MARK: - Glyphs (SF Symbols)

@@ -6,6 +6,8 @@
 //  library or a rotation row (Edit workout), or presented in a sheet (New workout).
 //  Workouts that arrive from a list endpoint (exercise count only, no exercises) are
 //  fetched in full before the editor opens so a save can never drop their exercises.
+//  One inset-grouped List: the exercises section reorders and deletes through the system
+//  edit mode (the header's Edit / Done) and swipe-to-delete.
 //
 
 import SwiftUI
@@ -45,8 +47,8 @@ struct TemplateEditorView: View {
 
 // MARK: - Full-record loader
 
-/// Fetches the complete workout before handing it to the editor. Shows the library's
-/// loading state, and a retry when the fetch fails or still comes back without exercises.
+/// Fetches the complete workout before handing it to the editor. Shows a spinner while it
+/// loads, and a retry when the fetch fails or still comes back without exercises.
 private struct TemplateEditorLoader: View {
     let template: Template
     let onSave: ((Template) -> Void)?
@@ -61,21 +63,31 @@ private struct TemplateEditorLoader: View {
         if let fullTemplate {
             TemplateEditorContent(existingTemplate: fullTemplate, onSave: onSave)
         } else {
-            VStack(spacing: VoidSpace.s4) {
+            Group {
                 if let loadError {
-                    VoidPlaceholder(eyebrow: "Couldn't load workout", caption: loadError)
-                    VoidPillButton(title: "Retry") {
-                        self.loadError = nil
-                        attempt += 1
+                    ContentUnavailableView {
+                        Label("Couldn't load workout", systemImage: GapIcon.error)
+                    } description: {
+                        Text(loadError)
+                    } actions: {
+                        Button {
+                            self.loadError = nil
+                            attempt += 1
+                        } label: {
+                            Text("Retry")
+                                .foregroundStyle(VoidColor.onPlasma)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(VoidColor.plasma)
                     }
                 } else {
-                    ProgressView()
-                        .tint(VoidColor.text2)
-                    Text("Loading")
-                        .voidEyebrowSm()
+                    ProgressView {
+                        Text("Loading")
+                            .voidEyebrowSm()
+                    }
+                    .tint(VoidColor.text2)
                 }
             }
-            .padding(.horizontal, 60)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("Edit workout")
             .navigationBarTitleDisplayMode(.inline)
@@ -118,7 +130,9 @@ private struct TemplateEditorContent: View {
     @State private var showExercisePicker = false
     @State private var editingExercise: TemplateEditorView.ExerciseEditContext?
     @State private var showShareSheet = false
-    @State private var isReordering = false
+    /// The List's edit mode, toggled by the exercises header's `EditButton`: shows the
+    /// reorder handles and delete controls on the exercise rows.
+    @State private var editMode: EditMode = .inactive
 
     /// Optional callback fired with the newly saved template
     private var onSave: ((Template) -> Void)?
@@ -129,48 +143,22 @@ private struct TemplateEditorContent: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: VoidSpace.s3) {
-                detailsPanel
-
-                summaryRow
-
-                MuscleAnalysisChart(distribution: viewModel.muscleGroupDistribution)
-                    .padding(.horizontal, VoidSpace.insetCard)
-
-                exercisesSection
-
-                VoidCTAButton(title: "Add exercises") {
-                    showExercisePicker = true
-                }
-                .padding(.horizontal, VoidSpace.insetCard)
-                .padding(.top, VoidSpace.s1)
-            }
-            .padding(.top, VoidSpace.s2)
-            .padding(.bottom, VoidSpace.s6)
+        List {
+            detailsSection
+            summarySection
+            muscleSplitSection
+            exercisesSection
+            addExercisesSection
         }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
+        .environment(\.editMode, $editMode)
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle(viewModel.isEditing ? "Edit workout" : "New workout")
         .navigationBarTitleDisplayMode(.inline)
         .voidScreen()
         .toolbar {
-            if !viewModel.isEditing {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                if viewModel.isEditing {
-                    shareButton
-                }
-                Button("Save") {
-                    viewModel.save()
-                }
-                .fontWeight(.semibold)
-                .disabled(!viewModel.isValid || viewModel.isSaving)
-            }
+            toolbarContent
         }
         .sheet(isPresented: $showExercisePicker) {
             exercisePickerSheet
@@ -180,6 +168,7 @@ private struct TemplateEditorContent: View {
                 ShareActivityView(activityItems: [
                     PlanShareItemSource(url: url, title: viewModel.name, subtitle: shareSubtitle)
                 ])
+                .presentationDetents([.medium, .large])
             }
         }
         .onChange(of: shareViewModel.shareURL) { _, url in
@@ -219,24 +208,14 @@ private struct TemplateEditorContent: View {
                 dismiss()
             }
         }
-        .onChange(of: viewModel.exercises.count) { _, count in
-            if count < 2 {
-                isReordering = false
+        .onChange(of: viewModel.exercises.isEmpty) { _, isEmpty in
+            // Nothing left to reorder or delete: leave edit mode so the header's Edit
+            // button doesn't vanish while it reads "Done".
+            if isEmpty {
+                editMode = .inactive
             }
         }
         .disabled(viewModel.isSaving)
-        .overlay {
-            if viewModel.isSaving {
-                HStack(spacing: VoidSpace.s3) {
-                    ProgressView()
-                        .tint(VoidColor.text2)
-                    Text("Saving")
-                        .voidEyebrowSm()
-                }
-                .padding(VoidSpace.s4)
-                .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2)
-            }
-        }
         .alert("Error", isPresented: .init(
             get: { viewModel.error != nil },
             set: { if !$0 { viewModel.clearError() } }
@@ -251,21 +230,46 @@ private struct TemplateEditorContent: View {
 
     // MARK: - Toolbar
 
-    private var shareButton: some View {
-        Button {
-            if let serverId = viewModel.existingServerId {
-                shareViewModel.createShare(type: "template", itemId: serverId)
-            }
-        } label: {
-            if shareViewModel.isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Image(systemName: VoidIcon.share.systemName)
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if !viewModel.isEditing {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", role: .cancel) {
+                    dismiss()
+                }
             }
         }
-        .disabled(shareViewModel.isLoading)
-        .accessibilityLabel("Share workout")
+        if viewModel.isEditing {
+            ToolbarItem(placement: .topBarTrailing) {
+                shareButton
+            }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            // Progress shows where the action happened: the spinner takes Save's place.
+            if viewModel.isSaving {
+                ProgressView()
+                    .accessibilityLabel("Saving")
+            } else {
+                Button("Save") {
+                    viewModel.save()
+                }
+                .disabled(!viewModel.isValid)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var shareButton: some View {
+        if shareViewModel.isLoading {
+            ProgressView()
+                .accessibilityLabel("Creating share link")
+        } else {
+            Button("Share workout", systemImage: VoidIcon.share.systemName) {
+                if let serverId = viewModel.existingServerId {
+                    shareViewModel.createShare(type: "template", itemId: serverId)
+                }
+            }
+        }
     }
 
     /// "6 exercises · 18 sets" for the share preview card.
@@ -276,23 +280,35 @@ private struct TemplateEditorContent: View {
 
     // MARK: - Sections
 
-    private var detailsPanel: some View {
-        VStack(spacing: VoidSpace.s2) {
-            VoidTextField(placeholder: "Workout name", text: $viewModel.name, autocapitalization: .words)
-            MultilineTextWell(placeholder: "Description (optional)", text: $viewModel.description)
+    private var detailsSection: some View {
+        Section {
+            TextField("Workout name", text: $viewModel.name)
+                .font(VoidFont.body)
+                .foregroundStyle(VoidColor.text)
+                .textInputAutocapitalization(.words)
+                .listRowBackground(VoidColor.panel)
+                .listRowSeparatorTint(VoidColor.hairline)
+            TextField("Description (optional)", text: $viewModel.description, axis: .vertical)
+                .lineLimit(3...6)
+                .font(VoidFont.body)
+                .foregroundStyle(VoidColor.text)
+                .listRowBackground(VoidColor.panel)
+                .listRowSeparatorTint(VoidColor.hairline)
         }
-        .padding(14)
-        .voidPanel()
-        .padding(.horizontal, VoidSpace.insetCard)
     }
 
-    private var summaryRow: some View {
-        HStack(spacing: 10) {
-            statReadout(value: VoidFormat.pad2(viewModel.exercises.count), label: "Exercises")
-            statReadout(value: VoidFormat.pad2(viewModel.totalWarmupSets), label: "Warmup")
-            statReadout(value: VoidFormat.pad2(viewModel.totalWorkingSets), label: "Working")
+    /// Stat tiles: brand content in a row of its own, on the page background.
+    private var summarySection: some View {
+        Section {
+            HStack(spacing: 10) {
+                statReadout(value: VoidFormat.pad2(viewModel.exercises.count), label: "Exercises")
+                statReadout(value: VoidFormat.pad2(viewModel.totalWarmupSets), label: "Warmup")
+                statReadout(value: VoidFormat.pad2(viewModel.totalWorkingSets), label: "Working")
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         }
-        .padding(.horizontal, VoidSpace.insetCard)
     }
 
     private func statReadout(value: String, label: String) -> some View {
@@ -313,72 +329,70 @@ private struct TemplateEditorContent: View {
         .accessibilityLabel("\(label): \(value)")
     }
 
+    /// The muscle split chart draws its own panel, so its row sits on the page background.
+    private var muscleSplitSection: some View {
+        Section {
+            MuscleAnalysisChart(distribution: viewModel.muscleGroupDistribution)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+        }
+    }
+
     private var exercisesSection: some View {
-        VStack(spacing: VoidSpace.s2) {
-            HStack {
-                Text("Exercises\(VoidFormat.dot)\(VoidFormat.pad2(viewModel.exercises.count))")
-                    .voidEyebrowSm()
-                Spacer()
-                if viewModel.exercises.count > 1 {
-                    Button {
-                        isReordering.toggle()
-                    } label: {
-                        Text(isReordering ? "Done" : "Reorder")
-                            .font(VoidFont.buttonSm)
-                            .foregroundStyle(VoidColor.text)
-                            .frame(minWidth: VoidSize.hitMin, minHeight: VoidSize.hitMin)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(VoidPlainButtonStyle())
+        Section {
+            if viewModel.exercises.isEmpty {
+                ContentUnavailableView(
+                    "No exercises yet",
+                    systemImage: VoidIcon.barbell.systemName,
+                    description: Text("Add exercises to build the workout.")
+                )
+                .listRowBackground(VoidColor.panel)
+            } else {
+                ForEach(Array(viewModel.exercises.enumerated()), id: \.element.id) { index, exercise in
+                    ExerciseEditorCard(
+                        index: index,
+                        exercise: exercise,
+                        onConfigure: {
+                            editingExercise = TemplateEditorView.ExerciseEditContext(index: index, exercise: exercise)
+                        },
+                        onDelete: {
+                            viewModel.removeExercise(at: index)
+                        },
+                        onMoveUp: moveUpAction(index),
+                        onMoveDown: moveDownAction(index)
+                    )
+                    .listRowBackground(VoidColor.panel)
+                    .listRowSeparatorTint(VoidColor.hairline)
+                }
+                .onMove { source, destination in
+                    viewModel.moveExercises(from: source, to: destination)
+                }
+                .onDelete { offsets in
+                    viewModel.removeExercises(at: offsets)
                 }
             }
-            .padding(.horizontal, VoidSpace.insetText)
-            .padding(.top, VoidSpace.s3)
-
-            if viewModel.exercises.isEmpty {
-                VoidListPanel {
-                    VoidPlaceholder(eyebrow: "No exercises yet", caption: "Add exercises to build the workout.")
-                }
-            } else {
-                VoidListPanel {
-                    exerciseList
+        } header: {
+            HStack {
+                Text("Exercises")
+                Spacer()
+                if !viewModel.exercises.isEmpty {
+                    EditButton()
+                        .textCase(nil)
                 }
             }
         }
     }
 
-    /// Exercise rows in a `List` so the system reorder handles drive `moveExercises`.
-    /// Scrolling is disabled and the height is fixed so it sits inside the outer ScrollView.
-    private var exerciseList: some View {
-        List {
-            ForEach(Array(viewModel.exercises.enumerated()), id: \.element.id) { index, exercise in
-                ExerciseEditorCard(
-                    index: index,
-                    exercise: exercise,
-                    isLast: index == viewModel.exercises.count - 1,
-                    onConfigure: {
-                        editingExercise = TemplateEditorView.ExerciseEditContext(index: index, exercise: exercise)
-                    },
-                    onDelete: {
-                        viewModel.removeExercise(at: index)
-                    },
-                    onMoveUp: moveUpAction(index),
-                    onMoveDown: moveDownAction(index)
-                )
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+    private var addExercisesSection: some View {
+        Section {
+            VoidCTAButton(title: "Add exercises") {
+                showExercisePicker = true
             }
-            .onMove { source, destination in
-                viewModel.moveExercises(from: source, to: destination)
-            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         }
-        .listStyle(.plain)
-        .scrollDisabled(true)
-        .scrollContentBackground(.hidden)
-        .environment(\.defaultMinListRowHeight, VoidSize.listRow)
-        .environment(\.editMode, .constant(isReordering ? .active : .inactive))
-        .frame(height: CGFloat(viewModel.exercises.count) * VoidSize.listRow)
     }
 
     private func moveUpAction(_ index: Int) -> (() -> Void)? {
@@ -406,30 +420,10 @@ private struct TemplateEditorContent: View {
     }
 }
 
-// MARK: - Multi-line well
-
-/// Multi-line text well for descriptions and notes: the same panel-2 fill, radius 12 and
-/// SF 15 as `VoidTextField`, but it grows from three to six lines and Return inserts a newline.
-/// Foundation gap: `VoidTextField` is a fixed 44pt single-line well.
-struct MultilineTextWell: View {
-    let placeholder: String
-    @Binding var text: String
-    var lines: ClosedRange<Int> = 3...6
-    var autocapitalization: TextInputAutocapitalization = .sentences
-
-    var body: some View {
-        TextField(placeholder, text: $text, axis: .vertical)
-            .lineLimit(lines)
-            .font(VoidFont.body)
-            .foregroundStyle(VoidColor.text)
-            .textInputAutocapitalization(autocapitalization)
-            .padding(14)
-            .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2, fill: VoidColor.panel2)
-    }
-}
-
 // MARK: - Exercise Picker Sheet Helper
 
+/// Multi-select exercise picker. The browser supplies the list selection and the
+/// "Add (n)" confirmation item because `onConfirmSelection` is set; this host adds Cancel.
 private struct ExercisePickerSheet: View {
     let onCancel: () -> Void
     let onConfirm: ([ExerciseLibraryItem]) -> Void
@@ -450,14 +444,19 @@ private struct ExercisePickerSheet: View {
             .navigationTitle("Add exercises")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) {
                         onCancel()
                     }
                 }
             }
         }
     }
+}
+
+/// SF Symbols the Void glyph set does not name yet.
+private enum GapIcon {
+    static let error = "exclamationmark.triangle"
 }
 
 // MARK: - Previews

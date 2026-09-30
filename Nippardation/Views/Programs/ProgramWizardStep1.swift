@@ -2,7 +2,7 @@
 //  ProgramWizardStep1.swift
 //  Nippardation
 //
-//  Step 1 of the plan wizard: name, duration and training days.
+//  Step 1 of the plan wizard: name, length (a switch, then a weeks stepper) and training days.
 //
 
 import SwiftUI
@@ -17,139 +17,73 @@ struct ProgramWizardStep1: View {
         )
     }
 
+    /// The switch reads "Fixed length"; the view model stores the opposite, `isIndefinite`.
+    private var isFixedLength: Binding<Bool> {
+        Binding(
+            get: { !viewModel.isIndefinite },
+            set: { viewModel.isIndefinite = !$0 }
+        )
+    }
+
+    private var weeksText: String {
+        let count = weeks.wrappedValue
+        return "\(count) week\(count == 1 ? "" : "s")"
+    }
+
+    private var lengthFooter: String {
+        viewModel.isIndefinite ? "Ongoing: the plan has no end date." : "The plan ends after \(weeksText)."
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: VoidSpace.s6) {
-                WizardStepHeading(title: "The basics", caption: "Name the plan and pick the days you train.")
-
-                // Plan name
-                VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                    WizardSectionLabel(title: "Plan name")
-                    VoidTextField(placeholder: "e.g. Upper / Lower", text: $viewModel.name, icon: .edit)
-                }
-
-                // Duration
-                VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                    WizardSectionLabel(title: "Duration")
-
-                    HStack(spacing: 10) {
-                        durationOption(
-                            title: "Ongoing",
-                            caption: "No end date",
-                            isSelected: viewModel.isIndefinite
-                        ) {
-                            viewModel.isIndefinite = true
-                        }
-                        durationOption(
-                            title: "Fixed length",
-                            caption: "Ends after a set number of weeks",
-                            isSelected: !viewModel.isIndefinite
-                        ) {
-                            viewModel.isIndefinite = false
-                        }
-                    }
-
-                    if !viewModel.isIndefinite {
-                        weeksRow
-                    }
-                }
-
-                // Training days
-                VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                    WizardSectionLabel(title: "Training days")
-                    DaySelectorGrid(selectedDays: $viewModel.selectedDays)
-                }
+        Form {
+            Section {
+                TextField("e.g. Upper / Lower", text: $viewModel.name)
+                    .textInputAutocapitalization(.words)
+                    .foregroundStyle(VoidColor.text)
+            } header: {
+                Text("Plan name")
             }
-            .padding(.horizontal, VoidSpace.insetCard)
-            .padding(.vertical, VoidSpace.s2)
+            .wizardFormRows()
+
+            Section {
+                Toggle("Fixed length", isOn: isFixedLength)
+
+                if !viewModel.isIndefinite {
+                    Stepper(value: weeks, in: 1...52) {
+                        LabeledContent("Duration", value: weeksText)
+                    }
+                }
+            } header: {
+                Text("Length")
+            } footer: {
+                Text(lengthFooter)
+            }
+            .wizardFormRows()
+
+            Section {
+                // The day strip is a row of tiles, so it sits on the hull rather than in a panel row.
+                // Its tiles are buttons: a non-automatic button style keeps each one answering only
+                // its own taps inside a list row.
+                DaySelectorGrid(selectedDays: $viewModel.selectedDays)
+                    // Prominent: a selected day is a solid plasma fill with on-plasma ink. Under
+                    // .bordered it was a faint wash that read as less selected than the others.
+                    .buttonStyle(.borderedProminent)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: VoidSpace.s1, leading: 0, bottom: VoidSpace.s1, trailing: 0))
+            } header: {
+                Text("Training days")
+            }
         }
         .scrollDismissesKeyboard(.interactively)
-    }
-
-    // MARK: - Subviews
-
-    private func durationOption(title: String, caption: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        WizardOptionCard(isSelected: isSelected, action: action) {
-            VStack(alignment: .leading, spacing: VoidSpace.s1) {
-                Text(title)
-                    .font(VoidFont.bodyStrong)
-                    .foregroundStyle(VoidColor.text)
-                Text(caption)
-                    .font(VoidFont.caption2)
-                    .foregroundStyle(VoidColor.text2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 14)
-            .padding(.trailing, 28)
-            .padding(.vertical, 14)
-        }
-    }
-
-    private var weeksRow: some View {
-        HStack(spacing: VoidSpace.s3) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(VoidFormat.weeks(weeks.wrappedValue).capitalized)
-                    .font(VoidFont.bodyStrong)
-                    .monospacedDigit()
-                    .foregroundStyle(VoidColor.text)
-                Text("1 to 52 weeks")
-                    .font(VoidFont.caption2)
-                    .foregroundStyle(VoidColor.text2)
-            }
-
-            Spacer()
-
-            // VoidIcon has no minus glyph; system "minus" used here (foundation gap).
-            weekStepButton(
-                icon: "minus",
-                label: "Remove a week",
-                enabled: weeks.wrappedValue > 1
-            ) {
-                weeks.wrappedValue -= 1
-            }
-
-            weekStepButton(
-                icon: VoidIcon.plus.systemName,
-                label: "Add a week",
-                enabled: weeks.wrappedValue < 52
-            ) {
-                weeks.wrappedValue += 1
-            }
-        }
-        .padding(14)
-        .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2)
-    }
-
-    /// 32pt control chrome (same look as `VoidControlButton`) drawn inside a 44pt label so the whole
-    /// 44pt square is tappable: a `.frame` applied outside a Button only pads layout, not the hit region.
-    private func weekStepButton(icon: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            ZStack {
-                RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous)
-                    .fill(VoidColor.panel)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous)
-                            .strokeBorder(VoidColor.hairline2, lineWidth: 1)
-                    )
-                    .frame(width: VoidSize.control, height: VoidSize.control)
-
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(VoidColor.text)
-            }
-            .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(VoidPlainButtonStyle())
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.5)
-        .accessibilityLabel(label)
     }
 }
 
 #Preview {
-    ProgramWizardStep1(viewModel: ProgramEditorViewModel())
-        .voidScreen()
-        .withDependencies(.preview)
+    NavigationStack {
+        ProgramWizardStep1(viewModel: ProgramEditorViewModel())
+            .voidScreen()
+            .navigationTitle("Basics")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+    .withDependencies(.preview)
 }

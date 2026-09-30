@@ -2,8 +2,10 @@
 //  BodyWeightSheet.swift
 //  Nippardation
 //
-//  Bottom sheet behind the BODY LB stat tile: log a weight in pounds and
-//  review or delete recent entries. Backed by `BodyWeightStore.shared`.
+//  Sheet behind the BODY LB stat tile: log a weight in pounds and review or delete
+//  recent entries. A standard form sheet: Cancel / Log in the navigation bar, the weight
+//  field in its own section, recent entries below with swipe to delete.
+//  Backed by `BodyWeightStore.shared`.
 //
 
 import SwiftUI
@@ -32,80 +34,69 @@ struct BodyWeightSheet: View {
     }
 
     var body: some View {
-        VoidSheetContainer {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Body weight")
-                    .voidEyebrow()
-
-                HStack(spacing: 10) {
-                    VoidTextField(
-                        placeholder: "0.0",
-                        text: $input,
-                        icon: .scale,
-                        keyboard: .decimalPad
-                    )
-                    .focused($isInputFocused)
-                    .accessibilityLabel("Body weight in pounds")
-
-                    Text("LB")
-                        .voidReadout()
+        NavigationStack {
+            Form {
+                Section {
+                    HStack(spacing: VoidSpace.s3) {
+                        TextField("Body weight", text: $input, prompt: Text("0.0"))
+                            .keyboardType(.decimalPad)
+                            .font(VoidFont.body)
+                            .foregroundStyle(VoidColor.text)
+                            .focused($isInputFocused)
+                            .accessibilityLabel("Body weight in pounds")
+                        Text("LB")
+                            .voidReadout()
+                            .accessibilityHidden(true)
+                    }
                 }
-                .padding(.top, VoidSpace.s3)
-
-                VoidCTAButton(title: "Log", isEnabled: parsedPounds != nil) {
-                    log()
-                }
-                .padding(.top, VoidSpace.s3)
 
                 if !recentEntries.isEmpty {
-                    Text("Recent")
-                        .voidEyebrowSm()
-                        .padding(.top, VoidSpace.s6)
-                        .padding(.bottom, VoidSpace.s2)
-
-                    recentList
-                        .frame(maxHeight: .infinity)
+                    Section {
+                        ForEach(recentEntries) { entry in
+                            LabeledContent {
+                                Text("\(VoidFormat.weight(entry.pounds)) LB")
+                                    .voidReadout(VoidColor.text)
+                            } label: {
+                                Text(VoidFormat.relativeDay(entry.date).capitalized)
+                                    .font(VoidFont.body)
+                                    .foregroundStyle(VoidColor.text)
+                            }
+                        }
+                        .onDelete(perform: delete)
+                    } header: {
+                        Text("Recent")
+                    }
                 }
             }
-            // Pin to the top so the grabber sits at the edge even before the first entry
-            // exists; with entries the list still fills the rest of the sheet.
-            .frame(maxHeight: .infinity, alignment: .top)
+            .navigationTitle("Body weight")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                // Cancel, not Close: dismissing throws away a typed weight.
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Log") {
+                        log()
+                    }
+                    .disabled(parsedPounds == nil)
+                }
+                // The decimal pad has no return key.
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isInputFocused = false
+                    }
+                }
+            }
         }
-        .voidSheet()
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
         .onAppear {
             isInputFocused = true
         }
-    }
-
-    /// Plain list so rows keep swipe-to-delete; chrome is hidden and rows draw their own hairlines.
-    private var recentList: some View {
-        List {
-            ForEach(Array(recentEntries.enumerated()), id: \.element.id) { index, entry in
-                VStack(spacing: 0) {
-                    HStack {
-                        Text(VoidFormat.relativeDay(entry.date).capitalized)
-                            .font(VoidFont.body)
-                            .foregroundStyle(VoidColor.text)
-                        Spacer()
-                        Text("\(VoidFormat.weight(entry.pounds)) LB")
-                            .voidReadout(VoidColor.text)
-                    }
-                    .frame(height: VoidSize.pill)
-                    if index < recentEntries.count - 1 {
-                        VoidHairline()
-                    }
-                }
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .accessibilityElement(children: .combine)
-            }
-            .onDelete(perform: delete)
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .environment(\.defaultMinListRowHeight, VoidSize.pill)
     }
 
     // MARK: - Actions

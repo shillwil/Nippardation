@@ -2,7 +2,8 @@
 //  DayScheduleCard.swift
 //  Nippardation
 //
-//  One day of the schedule builder: tile, eyebrow, workout name (or a prompt), rest toggle.
+//  One day of the schedule builder, as a list row: tile, eyebrow, workout name (or a prompt),
+//  rest-day toggle.
 //
 
 import SwiftUI
@@ -42,6 +43,16 @@ struct DayScheduleCard: View {
         }
     }
 
+    /// The toggle reports its new state; the owner flips the day, so the card only relays the tap.
+    private var restBinding: Binding<Bool> {
+        Binding(
+            get: { isRest },
+            set: { _ in onToggleRest() }
+        )
+    }
+
+    /// Two controls share the row. Each carries a non-automatic button style, so a tap fires only
+    /// the one under the finger rather than every button in the list row.
     var body: some View {
         HStack(spacing: 14) {
             Button(action: onSelectTemplate) {
@@ -67,7 +78,7 @@ struct DayScheduleCard: View {
                         } else {
                             Text("Select workout")
                                 .font(VoidFont.bodyStrong)
-                                .foregroundStyle(VoidColor.plasma)
+                                .foregroundStyle(VoidColor.text2)
                                 .lineLimit(1)
                         }
                     }
@@ -76,35 +87,28 @@ struct DayScheduleCard: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(VoidPlainButtonStyle())
+            .buttonStyle(.plain)
             .disabled(isRest)
             .accessibilityLabel(accessibilityText)
             .accessibilityHint(isRest ? "" : "Choose a workout for this day")
 
-            // 32pt control chrome drawn inside a 44pt label: a frame outside a Button only pads layout,
-            // the tappable region is the label, so the hit target has to be the label itself.
-            Button(action: onToggleRest) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous)
-                        .fill(isRest ? VoidColor.panel2 : VoidColor.panel)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous)
-                                .strokeBorder(VoidColor.hairline2, lineWidth: 1)
-                        )
-                        .frame(width: VoidSize.control, height: VoidSize.control)
-
-                    Image(systemName: VoidIcon.rest.systemName)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(isRest ? VoidColor.text : VoidColor.text2)
-                }
-                .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
-                .contentShape(Rectangle())
+            // System toggle button in the prominent style: on fills with the tint, off is the bare
+            // glyph. The tint is the quiet panel-2 well this control always used (not a second plasma
+            // action), and the glyph colour is set per state because the style's default white label
+            // would vanish on that light fill. Large control size keeps the hit target about 60 × 50pt
+            // in both states. (Bordered would fill the off state grey and leave on a faint wash;
+            // borderless shrinks the off hit target to the glyph.)
+            Toggle(isOn: restBinding) {
+                Label("Rest day", systemImage: VoidIcon.rest.systemName)
+                    .foregroundStyle(isRest ? VoidColor.text : VoidColor.text2)
             }
-            .buttonStyle(VoidPlainButtonStyle())
-            .accessibilityLabel(isRest ? "Make a training day" : "Make a rest day")
+            .toggleStyle(.button)
+            .buttonStyle(.borderedProminent)
+            .labelStyle(.iconOnly)
+            .controlSize(.large)
+            .buttonBorderShape(.roundedRectangle(radius: VoidRadius.control))
+            .tint(VoidColor.panel2)
         }
-        .padding(14)
-        .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2)
     }
 
     private var accessibilityText: String {
@@ -115,9 +119,8 @@ struct DayScheduleCard: View {
 }
 
 #Preview {
-    ZStack {
-        VoidColor.hull.ignoresSafeArea()
-        VStack(spacing: 10) {
+    List {
+        Section {
             DayScheduleCard(
                 dayNumber: 0, dayIndex: 0, templateName: "Push Day",
                 exerciseCount: 7, isRest: false,
@@ -134,6 +137,8 @@ struct DayScheduleCard: View {
                 onSelectTemplate: {}, onToggleRest: {}
             )
         }
-        .padding(VoidSpace.insetCard)
+        .wizardFormRows()
     }
+    .listStyle(.insetGrouped)
+    .voidScreen()
 }

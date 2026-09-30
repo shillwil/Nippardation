@@ -2,69 +2,26 @@
 //  VoidComponents.swift
 //  Nippardation
 //
-//  Reusable Void building blocks: tiles, pills, the giant Start, controls,
-//  panels, rows, sheets, press styles and haptics.
-//  Rules: one plasma action per screen; warning red is a label colour, never a fill;
-//  the tile carries state and the glyph never changes; squared radii, no gradients.
+//  Reusable Void building blocks. The buttons, progress bar and bar chart are Apple's own
+//  controls (bordered and prominent buttons, `ProgressView`, Swift Charts) in Void colours with
+//  system fonts; the tiles, brand marks, panels and the giant Start stay custom. Everything
+//  else is the system's: sheets, navigation bars, lists, pickers and toggles are used directly.
+//  Rules: one plasma action per screen; the tile carries state and the glyph never changes;
+//  custom pieces keep squared radii and no gradients.
 //
 
 import SwiftUI
 import UIKit
-
-// MARK: - Haptics
-
-enum VoidHaptics {
-    /// Light impact — Start, checkpoint reached. Nothing on tab change.
-    static func light() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-}
+import Charts
 
 // MARK: - Button styles
 
-/// Secondary press feedback: the panel fills panel-2 while pressed. Draws the panel itself.
-struct VoidPanelButtonStyle: ButtonStyle {
-    var radius: CGFloat = VoidRadius.tile
-    var line: Color = VoidColor.hairline2
-    var fill: Color = VoidColor.panel
-    var pressedFill: Color = VoidColor.panel2
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(configuration.isPressed ? pressedFill : fill)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(line, lineWidth: 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-    }
-}
-
-/// Primary press feedback: scale .97 over 120ms ease-out. Nothing bounces.
+/// The giant Start's press feedback: scale .97 over 120ms ease-out. Nothing bounces.
 struct VoidScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-/// Row press feedback: the row fills panel-2 while pressed, no shape of its own.
-struct VoidRowButtonStyle: ButtonStyle {
-    var pressedFill: Color = VoidColor.panel2
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(configuration.isPressed ? pressedFill : Color.clear)
-            .contentShape(Rectangle())
-    }
-}
-
-/// A button with no visual feedback of its own (menus, icon buttons that draw their own state).
-struct VoidPlainButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }
 
@@ -93,21 +50,16 @@ extension View {
         modifier(VoidPanelModifier(radius: radius, line: line, fill: fill))
     }
 
-    /// Hull page background behind any screen, with system list backgrounds hidden.
+    /// Hull page background behind any screen, with system list backgrounds hidden and the
+    /// plasma tint. The navigation bar keeps its system background, so content scrolls under
+    /// the standard material (iOS 18) or the Liquid Glass scroll-edge effect (iOS 26).
     func voidScreen() -> some View {
         self
             .scrollContentBackground(.hidden)
             .background(VoidColor.hull.ignoresSafeArea())
-            .toolbarBackground(VoidColor.hull, for: .navigationBar)
-            .tint(VoidColor.plasma)
+            .tint(VoidColor.plasmaInk)
     }
 
-    /// Hides the system navigation bar on a tab root that draws its own eyebrow row.
-    func voidRootScreen() -> some View {
-        self
-            .voidScreen()
-            .toolbar(.hidden, for: .navigationBar)
-    }
 }
 
 // MARK: - Tiles
@@ -250,7 +202,10 @@ enum VoidGlyphs {
 
 // MARK: - Buttons
 
-/// Secondary pill: 44pt, radius 12, panel + hairline-2, SF 15 semibold. Press: panel-2 fill.
+/// Full-width secondary: the system bordered button at the large control size, in neutral ink
+/// (the text colour; plasma fails contrast as text on a light fill). SF subheadline semibold,
+/// set outright so an inherited custom font can't reach it; it follows Dynamic Type, and the
+/// title shrinks a touch before it truncates.
 struct VoidPillButton: View {
     let title: String
     var isEnabled: Bool = true
@@ -259,21 +214,21 @@ struct VoidPillButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(VoidFont.button)
-                .foregroundStyle(VoidColor.text)
+                .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-                .padding(.horizontal, 14)
                 .frame(maxWidth: .infinity)
-                .frame(height: VoidSize.pill)
         }
-        .buttonStyle(VoidPanelButtonStyle())
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .tint(VoidColor.text)
         .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.5)
     }
 }
 
-/// Full-width primary: 50pt, radius 12, plasma fill, SF 17 semibold on-plasma. One per screen.
+/// Full-width primary: the system prominent button in plasma at the large control size, with an
+/// on-plasma title in SF headline. One per screen. `isLoading` swaps the title for a spinner
+/// without changing the button's size, and disables the button until it clears.
 struct VoidCTAButton: View {
     let title: String
     var isEnabled: Bool = true
@@ -282,47 +237,54 @@ struct VoidCTAButton: View {
 
     var body: some View {
         Button(action: action) {
-            ZStack {
-                Text(title)
-                    .font(VoidFont.buttonLg)
-                    .foregroundStyle(VoidColor.onPlasma)
-                    .opacity(isLoading ? 0 : 1)
-                if isLoading {
-                    ProgressView().tint(VoidColor.onPlasma)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: VoidSize.cta)
-            .background(VoidColor.plasma)
-            .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
+            VoidCTALabel(title: title, isLoading: isLoading)
         }
-        .buttonStyle(VoidScaleButtonStyle())
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(VoidColor.plasma)
         .disabled(!isEnabled || isLoading)
-        .opacity(isEnabled ? 1 : 0.5)
+        // The title is hidden, not removed, while loading; say it outright so VoiceOver always has it.
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(isLoading ? Text("Loading") : Text(""))
     }
 }
 
-/// Destructive full-width button: panel fill, warning label. Warning is never a fill.
-struct VoidDestructiveButton: View {
+/// The CTA's title. Enabled, it takes on-plasma ink (the system's white fails contrast on plasma);
+/// disabled, including while loading, it keeps the system's own disabled look.
+private struct VoidCTALabel: View {
     let title: String
-    let action: () -> Void
+    let isLoading: Bool
+
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(VoidFont.button)
-                .foregroundStyle(VoidColor.warning)
-                .frame(maxWidth: .infinity)
-                .frame(height: VoidSize.pill)
+        if isEnabled {
+            content.foregroundStyle(VoidColor.onPlasma)
+        } else {
+            content
         }
-        .buttonStyle(VoidPanelButtonStyle())
+    }
+
+    private var content: some View {
+        Text(title)
+            .font(.headline)
+            .opacity(isLoading ? 0 : 1)
+            .overlay {
+                if isLoading {
+                    // Loading disables the button, so the spinner sits on the system's disabled
+                    // fill, where secondary ink reads in both appearances (on-plasma would not).
+                    ProgressView()
+                        .controlSize(.regular)
+                        .tint(VoidColor.text2)
+                }
+            }
+            .frame(maxWidth: .infinity)
     }
 }
 
 /// The giant Start: 200×200, radius 28, plasma, a rippling ring field, play triangle + "Start".
 /// Press: scale .97 over 120ms — the rings ride that scale, so they collapse in with the square —
-/// plus one faster, brighter ring thrown out of the press. Fires a light haptic.
+/// plus one faster, brighter ring thrown out of the press. Plays a light impact (`sensoryFeedback`).
 struct VoidStartButton: View {
     var title: String = "Start"
     var isEnabled: Bool = true
@@ -339,12 +301,15 @@ struct VoidStartButton: View {
     @State private var tapDate: Date?
     /// Reduce Motion tap response: 0…1 brightening of the static rings, no travel.
     @State private var flash: Double = 0
+    /// Counts presses; each change plays the light impact. (`tapDate` can't be the trigger:
+    /// it only moves when Reduce Motion is off.)
+    @State private var tapCount = 0
 
     private var glow: Double { colorScheme == .dark ? 0.25 : 0.22 }
 
     var body: some View {
         Button {
-            VoidHaptics.light()
+            tapCount += 1
             respondToTap()
             action()
         } label: {
@@ -375,6 +340,7 @@ struct VoidStartButton: View {
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.5)
         .accessibilityLabel(title)
+        .sensoryFeedback(.impact(weight: .light), trigger: tapCount)
         .onAppear {
             appearDate = Date()
             isOnScreen = true
@@ -521,130 +487,9 @@ private struct VoidStartRipple: View {
     }
 }
 
-/// Small 32pt control (radius 8, panel + hairline-2) holding one glyph — the ··· and link buttons.
-struct VoidControlButton: View {
-    let icon: VoidIcon
-    var accessibilityLabel: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon.systemName)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(VoidColor.text)
-                .frame(width: VoidSize.control, height: VoidSize.control)
-        }
-        .buttonStyle(VoidPanelButtonStyle(radius: VoidRadius.control))
-        .accessibilityLabel(accessibilityLabel)
-    }
-}
-
-/// Same chrome as `VoidControlButton`, but the label is a `Menu` trigger.
-struct VoidControlMenu<Content: View>: View {
-    let icon: VoidIcon
-    var accessibilityLabel: String
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        Menu {
-            content()
-        } label: {
-            Image(systemName: icon.systemName)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(VoidColor.text)
-                .frame(width: VoidSize.control, height: VoidSize.control)
-                .background(VoidColor.panel)
-                .clipShape(RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous)
-                        .strokeBorder(VoidColor.hairline2, lineWidth: 1)
-                )
-        }
-        .accessibilityLabel(accessibilityLabel)
-    }
-}
-
-/// 28pt chip: panel + hairline-2, radius 8, glyph 14pt + eyebrow label tracked .06em (the streak chip).
-struct VoidChip: View {
-    var icon: VoidIcon?
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 5) {
-            if let icon {
-                Image(systemName: icon.systemName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(VoidColor.text)
-            }
-            Text(text).voidChipLabel()
-        }
-        .padding(.leading, icon == nil ? 10 : 8)
-        .padding(.trailing, 10)
-        .frame(height: VoidSize.chip)
-        .voidPanel(radius: VoidRadius.control, line: VoidColor.hairline2)
-    }
-}
-
-/// 28pt segmented control: panel + hairline-2, 2pt padding, selected item panel-2 with 6pt radius.
-struct VoidSegmentedControl<Item: Hashable>: View {
-    let items: [Item]
-    let label: (Item) -> String
-    @Binding var selection: Item
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(items, id: \.self) { item in
-                let on = item == selection
-                Button {
-                    selection = item
-                } label: {
-                    Text(label(item))
-                        .voidChipLabel(on ? VoidColor.text : VoidColor.text2)
-                        .padding(.horizontal, 12)
-                        .frame(height: VoidSize.chip - 4)
-                        .background(on ? VoidColor.panel2 : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: VoidRadius.mark, style: .continuous))
-                }
-                .buttonStyle(VoidPlainButtonStyle())
-                .accessibilityAddTraits(on ? [.isSelected] : [])
-            }
-        }
-        .padding(2)
-        .voidPanel(radius: VoidRadius.control, line: VoidColor.hairline2)
-    }
-}
-
 // MARK: - Layout pieces
 
-/// The eyebrow row at the top of a tab screen: leading label, trailing accessory.
-struct VoidEyebrowRow<Trailing: View>: View {
-    let title: String
-    @ViewBuilder let trailing: () -> Trailing
-
-    init(_ title: String, @ViewBuilder trailing: @escaping () -> Trailing) {
-        self.title = title
-        self.trailing = trailing
-    }
-
-    var body: some View {
-        HStack(alignment: .center) {
-            Text(title).voidEyebrow()
-                .lineLimit(1)
-            Spacer(minLength: VoidSpace.s3)
-            trailing()
-        }
-        .padding(.horizontal, VoidSpace.insetText)
-        .padding(.top, VoidSpace.topContent)
-    }
-}
-
-extension VoidEyebrowRow where Trailing == EmptyView {
-    init(_ title: String) {
-        self.init(title, trailing: { EmptyView() })
-    }
-}
-
-/// Two pills side by side, 16pt inset, 10pt gap, sitting above the tab bar.
+/// Two `VoidPillButton`s (system bordered) side by side, 16pt inset, 10pt gap.
 struct VoidPillPair: View {
     let leading: String
     let trailing: String
@@ -654,11 +499,18 @@ struct VoidPillPair: View {
     let onTrailing: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            VoidPillButton(title: leading, isEnabled: leadingEnabled, action: onLeading)
-            VoidPillButton(title: trailing, isEnabled: trailingEnabled, action: onTrailing)
+        // Side by side while both titles fit; stacked at large text sizes instead of truncating.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) { pills }
+            VStack(spacing: 10) { pills }
         }
         .padding(.horizontal, VoidSpace.insetCard)
+    }
+
+    @ViewBuilder
+    private var pills: some View {
+        VoidPillButton(title: leading, isEnabled: leadingEnabled, action: onLeading)
+        VoidPillButton(title: trailing, isEnabled: trailingEnabled, action: onTrailing)
     }
 }
 
@@ -680,20 +532,6 @@ struct VoidSectionRow: View {
     }
 }
 
-/// A list panel: radius 14, panel + hairline, rows separated by hairlines, inner inset 14.
-struct VoidListPanel<Content: View>: View {
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        VStack(spacing: 0) {
-            content()
-        }
-        .padding(.horizontal, 14)
-        .voidPanel(radius: VoidRadius.panel, line: VoidColor.hairline)
-        .padding(.horizontal, VoidSpace.insetCard)
-    }
-}
-
 /// 36pt avatar square (radius 10) with initials in the eyebrow font.
 struct VoidAvatar: View {
     let text: String
@@ -712,52 +550,20 @@ struct VoidAvatar: View {
     }
 }
 
-/// 16pt chevron, stroke-weight matched to the glyph set.
-struct VoidChevron: View {
-    var color: Color = VoidColor.text3
-    var body: some View {
-        Image(systemName: VoidIcon.chevron.systemName)
-            .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(color)
-            .frame(width: 16, height: 16)
-            .accessibilityHidden(true)
-    }
-}
-
-/// Hairline separator between rows.
-struct VoidHairline: View {
-    var body: some View {
-        Rectangle().fill(VoidColor.hairline).frame(height: 1)
-    }
-}
-
-/// 4pt progress bar, plasma on track, no radius.
+/// Linear progress in plasma: the system `ProgressView`, which VoiceOver reads as a percentage.
+/// Clamped to 0…1; a non-finite value (e.g. 0 / 0) reads as empty.
 struct VoidProgressBar: View {
     let progress: Double
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle().fill(VoidColor.track)
-                Rectangle().fill(VoidColor.plasma)
-                    .frame(width: geo.size.width * min(max(progress, 0), 1))
-            }
-        }
-        .frame(height: 4)
-        .accessibilityHidden(true)
+        ProgressView(value: progress.isFinite ? min(max(progress, 0), 1) : 0)
+            .progressViewStyle(.linear)
+            .tint(VoidColor.plasma)
     }
 }
 
-/// Sheet grabber: 36×5, text-3.
-struct VoidGrabber: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 3, style: .continuous)
-            .fill(VoidColor.text3)
-            .frame(width: VoidSize.grabber.width, height: VoidSize.grabber.height)
-            .accessibilityHidden(true)
-    }
-}
-
-/// Simple bar chart: bars 56pt max, 17pt gaps, radius 3; past bars text-3, `currentIndex` plasma.
+/// The workouts-per-week bars, in Swift Charts: one `BarMark` per value, radius 3, no axes;
+/// the `currentIndex` bar is plasma and the rest text-3. An empty week keeps a 3pt stub so it
+/// still reads as a slot. VoiceOver gets a label and value per bar, plus the chart's audio graph.
 struct VoidBarChart: View {
     /// Values in 0…1.
     let values: [Double]
@@ -765,15 +571,51 @@ struct VoidBarChart: View {
     var maxHeight: CGFloat = 56
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 17) {
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(index == currentIndex ? VoidColor.plasma : VoidColor.text3)
-                    .frame(height: max(3, maxHeight * min(max(value, 0), 1)))
-                    .frame(maxWidth: .infinity)
-            }
+        Chart(values.indices, id: \.self) { index in
+            // `.inset(8.5)` is the step minus 8.5pt a side: the spec's fixed 17pt gap at any width.
+            // The week label doubles as the category, so the audio graph reads weeks, not indices.
+            BarMark(
+                x: .value("Week", barLabel(index)),
+                y: .value("Share of target", plotted(values[index])),
+                width: .inset(8.5)
+            )
+            .foregroundStyle(index == currentIndex ? VoidColor.plasma : VoidColor.text3)
+            .cornerRadius(3)
+            .accessibilityLabel(barLabel(index))
+            .accessibilityValue(barValue(values[index]))
         }
-        .frame(height: maxHeight, alignment: .bottom)
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
+        .chartYScale(domain: 0.0...1.0)
+        .frame(height: maxHeight)
+    }
+
+    /// A value clamped to 0…1; a non-finite value reads as 0.
+    private func clamped(_ value: Double) -> Double {
+        value.isFinite ? min(max(value, 0), 1) : 0
+    }
+
+    /// The drawn height: the clamped value, never below the 3pt stub.
+    private func plotted(_ value: Double) -> Double {
+        max(clamped(value), 3 / Double(max(maxHeight, 3)))
+    }
+
+    /// "This week", "Last week", "3 weeks ago": counted back from `currentIndex`.
+    private func barLabel(_ index: Int) -> String {
+        guard let currentIndex, index <= currentIndex else {
+            return "Week \(index + 1) of \(values.count)"
+        }
+        switch currentIndex - index {
+        case 0: return "This week"
+        case 1: return "Last week"
+        default: return "\(currentIndex - index) weeks ago"
+        }
+    }
+
+    /// "75 percent of target": the real value, not the stub.
+    private func barValue(_ value: Double) -> String {
+        "\(Int((clamped(value) * 100).rounded())) percent of target"
     }
 }
 
@@ -807,7 +649,9 @@ struct VoidStatTile: View {
                     }
                 }
                 if let progress {
+                    // The tile's own label already reads the value ("12 / 40").
                     VoidProgressBar(progress: progress)
+                        .accessibilityHidden(true)
                 }
                 Text(label).voidEyebrowSm()
                     .lineLimit(1)
@@ -823,43 +667,10 @@ struct VoidStatTile: View {
     }
 }
 
-// MARK: - Sheet chrome
-
-/// Bottom-sheet body chrome: panel fill, top radius 16, 1pt top hairline, grabber, padding 10/20/34.
-/// Use inside `.sheet` with `.presentationBackground(VoidColor.panel)` and detents.
-struct VoidSheetContainer<Content: View>: View {
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        VStack(spacing: 0) {
-            VoidGrabber()
-                .padding(.top, 10)
-                .padding(.bottom, 22)
-            content()
-        }
-        .padding(.horizontal, VoidSpace.insetText)
-        .padding(.bottom, 34)
-        .frame(maxWidth: .infinity)
-        .background(VoidColor.panel)
-        .overlay(alignment: .top) {
-            Rectangle().fill(VoidColor.hairline2).frame(height: 1)
-        }
-    }
-}
-
-extension View {
-    /// Applies the Void sheet presentation chrome (panel background, hidden system drag indicator, corner radius).
-    func voidSheet() -> some View {
-        self
-            .presentationDragIndicator(.hidden)
-            .presentationBackground(VoidColor.panel)
-            .presentationCornerRadius(VoidRadius.tabBar)
-    }
-}
-
 // MARK: - Text inputs
 
-/// Squared text field well: panel-2 fill, radius 12, SF 15.
+/// Squared well around a native `TextField`: panel-2 fill, radius 12, Chakra Petch body.
+/// At least 44pt tall, and it grows with the text under larger Dynamic Type sizes.
 struct VoidTextField: View {
     let placeholder: String
     @Binding var text: String
@@ -882,7 +693,8 @@ struct VoidTextField: View {
                 .autocorrectionDisabled(keyboard == .URL || keyboard == .emailAddress)
         }
         .padding(.horizontal, 14)
-        .frame(height: VoidSize.pill)
+        .padding(.vertical, VoidSpace.s2)
+        .frame(minHeight: VoidSize.pill)
         .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2, fill: VoidColor.panel2)
     }
 }
@@ -917,6 +729,7 @@ struct VoidPlaceholder: View {
         VStack(spacing: 24) {
             HStack(spacing: 12) {
                 WorkoutTile(glyph: .workoutLegs, state: .done)
+                WorkoutTile(glyph: .workoutLower, state: .skipped)
                 WorkoutTile(glyph: .workoutPush, state: .next)
                 WorkoutTile(glyph: .workoutPull, state: .later)
                 WorkoutTile(glyph: .workoutPush, hero: true)
@@ -924,11 +737,6 @@ struct VoidPlaceholder: View {
             VoidStartButton { }
             VoidPillPair(leading: "Preview Exercises", trailing: "Swap Workout", onLeading: {}, onTrailing: {})
             VoidCTAButton(title: "Use this plan") { }.padding(.horizontal, 20)
-            HStack {
-                VoidChip(icon: .flame, text: "03 WK")
-                VoidSegmentedControl(items: ["ME", "CREW"], label: { $0 }, selection: .constant("ME"))
-                VoidControlButton(icon: .more, accessibilityLabel: "More") { }
-            }
             HStack(spacing: 10) {
                 VoidStatTile(icon: .barbell, value: "38.4", unit: "K", label: "Volume · ↑ 6%")
                 VoidStatTile(icon: .calendarCheck, value: "12", unit: " / 40", label: "The OG · WK 03 / 08", progress: 0.3)
@@ -936,4 +744,23 @@ struct VoidPlaceholder: View {
             .padding(.horizontal, 16)
         }
     }
+}
+
+#Preview("System-backed controls") {
+    ScrollView {
+        VStack(spacing: 16) {
+            VoidCTAButton(title: "Use this plan") { }
+            VoidCTAButton(title: "Activate", isLoading: true) { }
+            VoidCTAButton(title: "Continue", isEnabled: false) { }
+            VoidPillButton(title: "Save for later") { }
+            VoidPillButton(title: "Saved", isEnabled: false) { }
+            VoidProgressBar(progress: 0.4)
+            VoidBarChart(values: [0.5, 0.75, 0, 1, 0.25, 0.6, 0.9, 0.4], currentIndex: 7)
+                .padding(14)
+                .voidPanel()
+            VoidTextField(placeholder: "Plan name", text: .constant(""), icon: .edit)
+        }
+        .padding(.horizontal, 16)
+    }
+    .voidScreen()
 }

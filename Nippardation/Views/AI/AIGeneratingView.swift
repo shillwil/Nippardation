@@ -2,7 +2,8 @@
 //  AIGeneratingView.swift
 //  Nippardation
 //
-//  Overlay shown while the AI generates a plan: scrim + panel, eyebrow, rotating message, Cancel.
+//  The screen shown while the AI generates a plan: a system spinner, the rotating status message
+//  and Cancel, on the hull. It replaces the whole wizard while it is up rather than dimming it.
 //
 
 import SwiftUI
@@ -18,9 +19,33 @@ struct AIGeneratingView: View {
     }
 
     var body: some View {
-        WizardBusyOverlay(eyebrow: "Generating", message: message, onCancel: onCancel)
-            .animation(.easeOut(duration: 0.12), value: messageIndex)
-            .transition(.opacity)
+        VStack(spacing: VoidSpace.s6) {
+            ProgressView {
+                Text("Generating").voidEyebrow()
+            }
+            .controlSize(.large)
+            .tint(VoidColor.plasma)
+
+            Text(message)
+                .font(VoidFont.body)
+                .foregroundStyle(VoidColor.text)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.opacity)
+                .animation(.easeOut(duration: 0.12), value: messageIndex)
+
+            Button(role: .cancel, action: onCancel) {
+                Text("Cancel")
+                    .frame(minWidth: 120)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .tint(VoidColor.text)
+        }
+        .padding(.horizontal, VoidSpace.s6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(VoidColor.hull.ignoresSafeArea())
+        .accessibilityAddTraits(.isModal)
     }
 
     /// The view model's status strings predate the plan / workout vocabulary and end in "...";
@@ -39,12 +64,9 @@ struct AIGeneratingView: View {
 }
 
 #Preview {
-    ZStack {
-        VoidColor.hull.ignoresSafeArea()
-        AIGeneratingView(
-            messageIndex: 2,
-            messages: ["Analyzing your goals...", "Selecting exercises...", "Building your program..."],
-            onCancel: {}
-        )
-    }
+    AIGeneratingView(
+        messageIndex: 2,
+        messages: ["Analyzing your goals...", "Selecting exercises...", "Building your program..."],
+        onCancel: {}
+    )
 }

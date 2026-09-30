@@ -18,33 +18,32 @@ struct StarterPlansSheet: View {
     private let splits = StarterPlanBuilder.splits
 
     var body: some View {
-        ScrollView {
-            VoidSheetContainer {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Starter splits").voidEyebrow()
-
-                    Text("Workouts from the built-in lists, matched to the exercise library.")
-                        .font(VoidFont.caption2)
-                        .foregroundStyle(VoidColor.text2)
-                        .padding(.top, 6)
-
-                    panel
-                        .padding(.top, 18)
-
-                    if builder.isBuilding {
-                        HStack(spacing: 10) {
-                            ProgressView().tint(VoidColor.plasma)
-                            Text(builder.progressText).voidEyebrowSm()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 14)
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(splits) { split in
+                        row(split)
                     }
+                } footer: {
+                    footer
+                }
+            }
+            .listStyle(.insetGrouped)
+            // No list or sheet fill of our own, so the system sheet material shows behind the rows.
+            .scrollContentBackground(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .navigationTitle("Starter splits")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    SheetCloseButton { dismiss() }
+                        .disabled(builder.isBuilding)
                 }
             }
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .voidSheet()
+        .tint(VoidColor.plasmaInk)
         .presentationDetents([.fraction(0.6), .large])
+        .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(builder.isBuilding)
         .alert("Could not build this plan", isPresented: Binding(
             get: { builder.error != nil },
@@ -56,45 +55,42 @@ struct StarterPlansSheet: View {
         }
     }
 
-    // MARK: - Panel
+    // MARK: - Rows
 
-    private var panel: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(splits.enumerated()), id: \.element.id) { index, split in
-                row(split)
-                if index < splits.count - 1 {
-                    VoidHairline()
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .voidPanel(radius: VoidRadius.panel, line: VoidColor.hairline)
-        .opacity(builder.isBuilding ? 0.5 : 1)
-        .disabled(builder.isBuilding)
-    }
-
+    /// Picking a split builds it, so a button row without a chevron.
     private func row(_ split: StarterSplit) -> some View {
         Button {
             pick(split)
         } label: {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(split.name)
-                        .font(VoidFont.bodyStrong)
-                        .foregroundStyle(VoidColor.text)
-                        .lineLimit(1)
-                    Text(split.caption)
-                        .font(VoidFont.caption2)
-                        .foregroundStyle(VoidColor.text2)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                VoidChevron()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(split.name)
+                    .font(VoidFont.bodyStrong)
+                    .foregroundStyle(VoidColor.text)
+                    .lineLimit(1)
+                Text(split.caption)
+                    .font(VoidFont.caption2)
+                    .foregroundStyle(VoidColor.text2)
+                    .lineLimit(1)
             }
-            .frame(height: VoidSize.listRow)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(builder.isBuilding ? 0.5 : 1)
         }
-        .buttonStyle(VoidRowButtonStyle())
-        .accessibilityElement(children: .combine)
+        .disabled(builder.isBuilding)
+        .listRowBackground(VoidColor.panel)
+        .listRowSeparatorTint(VoidColor.hairline)
+    }
+
+    /// What the splits are, and while one is building, how far along it is.
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: VoidSpace.s3) {
+            Text("Workouts from the built-in lists, matched to the exercise library.")
+            if builder.isBuilding {
+                HStack(spacing: VoidSpace.s2) {
+                    ProgressView()
+                    Text(builder.progressText)
+                }
+            }
+        }
     }
 
     // MARK: - Build

@@ -2,9 +2,10 @@
 //  ExerciseBrowserView.swift
 //  Nippardation
 //
-//  Browse and filter exercises with optional selection. Void chrome: hull background,
-//  squared search well, 28pt muscle chips, hairline rows, plasma selection checks,
-//  and a content-sized "Add (n)" CTA when picking.
+//  Browse and filter exercises with optional selection. The system search field sits in the
+//  navigation bar drawer with the muscle chips under it, and the exercises fill an
+//  inset-grouped List. Picking one exercise is a tap on its row; picking several uses the
+//  List's own selection (edit mode) with an "Add (n)" confirmation in the toolbar.
 //
 
 import SwiftUI
@@ -39,7 +40,9 @@ struct ExerciseBrowserView: View {
     }
 }
 
-/// Content view that uses an externally-managed ViewModel
+/// Content view that uses an externally-managed ViewModel. Needs a NavigationStack from its
+/// host for the search field and toolbar. In picker mode with `onConfirmSelection` set, it
+/// adds the "Add (n)" confirmation item itself; the host adds Cancel.
 struct ExerciseBrowserContent: View {
 
     @ObservedObject var viewModel: ExerciseBrowserViewModel
@@ -68,64 +71,51 @@ struct ExerciseBrowserContent: View {
         !viewModel.selectedExercises.isEmpty
     }
 
-    private var showsFloatingButton: Bool {
-        viewModel.isPickerMode && !viewModel.selectedExercises.isEmpty && onConfirmSelection != nil
-    }
-
     var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
-                VoidTextField(
-                    placeholder: "Search exercises",
-                    text: $viewModel.searchText,
-                    icon: .search,
-                    autocapitalization: .never
-                )
-                .padding(.horizontal, VoidSpace.insetCard)
-                .padding(.top, VoidSpace.s2)
-                .padding(.bottom, VoidSpace.s3)
-
-                MuscleGroupFilterBar(
-                    selectedMuscles: viewModel.filter.muscleGroups,
-                    onToggle: { muscle in
-                        viewModel.toggleMuscleGroupFilter(muscle)
-                    }
-                )
-
-                if viewModel.filter.hasNonMuscleFilters {
-                    filterChips
-                        .padding(.top, VoidSpace.s2)
+        VStack(spacing: 0) {
+            MuscleGroupFilterBar(
+                selectedMuscles: viewModel.filter.muscleGroups,
+                onToggle: { muscle in
+                    viewModel.toggleMuscleGroupFilter(muscle)
                 }
+            )
 
-                Group {
-                    if viewModel.isLoading && viewModel.exercises.isEmpty {
-                        loadingView
-                    } else if viewModel.exercises.isEmpty {
-                        emptyView
-                    } else {
-                        exerciseList
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, VoidSpace.s1)
+            if viewModel.filter.hasNonMuscleFilters {
+                filterChips
             }
 
-            if showsFloatingButton, let onConfirmSelection {
-                FloatingSelectionButton(
-                    count: viewModel.selectedExercises.count,
-                    action: {
-                        onConfirmSelection(viewModel.selectedExercisesList)
-                    }
-                )
-                .padding(.bottom, VoidSpace.s6)
+            Group {
+                if viewModel.isLoading && viewModel.exercises.isEmpty {
+                    loadingView
+                } else if viewModel.exercises.isEmpty {
+                    emptyView
+                } else {
+                    exerciseList
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Exercises")
         .navigationBarTitleDisplayMode(.inline)
         .voidScreen()
+        // Pinned in the navigation bar drawer so the muscle chips stay right under it.
+        .searchable(
+            text: $viewModel.searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search exercises"
+        )
+        .textInputAutocapitalization(.never)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 filterButton
+            }
+            if viewModel.isPickerMode, let onConfirmSelection {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(addTitle) {
+                        onConfirmSelection(viewModel.selectedExercisesList)
+                    }
+                    .disabled(viewModel.selectedExercises.isEmpty)
+                }
             }
         }
         .sheet(isPresented: $showFilters) {
@@ -155,29 +145,44 @@ struct ExerciseBrowserContent: View {
 
     // MARK: - Chrome
 
-    private var filterButton: some View {
-        Button {
-            showFilters = true
-        } label: {
-            Image(systemName: GapIcon.filter)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(VoidColor.text)
-                .overlay(alignment: .topTrailing) {
-                    if viewModel.filter.activeFilterCount > 0 {
-                        PlasmaDot(size: 6)
-                            .offset(x: 5, y: -4)
-                    }
-                }
-        }
-        .accessibilityLabel("Filters")
-        .accessibilityValue(viewModel.filter.activeFilterCount > 0 ? "\(viewModel.filter.activeFilterCount) active" : "")
+    /// Filters set from the chips or the Filters sheet. The search text isn't counted: it has
+    /// its own field.
+    private var activeFilterCount: Int {
+        var filter = viewModel.filter
+        filter.searchText = ""
+        return filter.activeFilterCount
     }
 
+    @ViewBuilder
+    private var filterButton: some View {
+        let count = activeFilterCount
+        if #available(iOS 26.0, *) {
+            // iOS 26 toolbar items carry a system badge.
+            Button("Filters", systemImage: GapIcon.filter) {
+                showFilters = true
+            }
+            .badge(count)
+            .accessibilityValue(count > 0 ? "\(count) active" : "")
+        } else {
+            // Earlier toolbars draw no badge, so the glyph fills in while filters are on.
+            Button("Filters", systemImage: count > 0 ? GapIcon.filterActive : GapIcon.filterIdle) {
+                showFilters = true
+            }
+            .accessibilityValue(count > 0 ? "\(count) active" : "")
+        }
+    }
+
+    private var addTitle: String {
+        let count = viewModel.selectedExercises.count
+        return count == 0 ? "Add" : "Add (\(count))"
+    }
+
+    /// The non-muscle filters that are on, each a button that removes it, then Clear all.
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: VoidSpace.s2) {
                 ForEach(Array(viewModel.filter.equipment).sorted { $0.displayName < $1.displayName }, id: \.self) { equip in
-                    VoidSquareChip(text: equip.displayName, isSelected: true, trailingIcon: .close) {
+                    removeFilterButton(equip.displayName) {
                         var newFilter = viewModel.filter
                         newFilter.equipment.remove(equip)
                         viewModel.applyFilters(newFilter)
@@ -185,7 +190,7 @@ struct ExerciseBrowserContent: View {
                 }
 
                 if let difficulty = viewModel.filter.difficulty {
-                    VoidSquareChip(text: difficulty.displayName, isSelected: true, trailingIcon: .close) {
+                    removeFilterButton(difficulty.displayName) {
                         var newFilter = viewModel.filter
                         newFilter.difficulty = nil
                         viewModel.applyFilters(newFilter)
@@ -193,149 +198,197 @@ struct ExerciseBrowserContent: View {
                 }
 
                 if let pattern = viewModel.filter.movementPattern {
-                    VoidSquareChip(text: pattern.displayName, isSelected: true, trailingIcon: .close) {
+                    removeFilterButton(pattern.displayName) {
                         var newFilter = viewModel.filter
                         newFilter.movementPattern = nil
                         viewModel.applyFilters(newFilter)
                     }
                 }
 
-                Button {
+                Button("Clear all") {
                     viewModel.clearFilters()
-                } label: {
-                    Text("Clear all")
-                        .font(VoidFont.buttonSm)
-                        .foregroundStyle(VoidColor.text2)
-                        .frame(minWidth: VoidSize.hitMin, minHeight: VoidSize.hitMin)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(VoidPlainButtonStyle())
+                .buttonStyle(.borderless)
+                .tint(VoidColor.text2)
                 .padding(.leading, VoidSpace.s1)
             }
             .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s1)
         }
+    }
+
+    private func removeFilterButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: VoidSpace.s1) {
+                Text(title)
+                Image(systemName: VoidIcon.close.systemName)
+                    .imageScale(.small)
+            }
+        }
+        .buttonStyle(.bordered)
+        .tint(VoidColor.text)
+        .accessibilityLabel("Remove \(title) filter")
     }
 
     // MARK: - States
 
     private var loadingView: some View {
-        VStack(spacing: VoidSpace.s3) {
-            ProgressView()
-                .tint(VoidColor.text2)
+        ProgressView {
             Text("Loading")
                 .voidEyebrowSm()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .tint(VoidColor.text2)
     }
 
+    @ViewBuilder
     private var emptyView: some View {
-        VStack(spacing: VoidSpace.s4) {
-            VoidPlaceholder(eyebrow: "No exercises", caption: emptyCaption)
-
-            if viewModel.error != nil {
-                VoidPillButton(title: "Retry") {
+        if let error = viewModel.error {
+            ContentUnavailableView {
+                Label("Couldn't load exercises", systemImage: GapIcon.error)
+            } description: {
+                Text(error)
+            } actions: {
+                emptyStateAction("Retry") {
                     viewModel.clearError()
                     viewModel.loadExercises(refresh: true)
                 }
-            } else if !viewModel.filter.isEmpty {
-                VoidPillButton(title: "Clear filters") {
+            }
+        } else if viewModel.filter.isEmpty {
+            ContentUnavailableView(
+                "No exercises",
+                systemImage: VoidIcon.barbell.systemName,
+                description: Text("Nothing in the library yet.")
+            )
+        } else if activeFilterCount == 0 {
+            // Only the search is narrowing the list.
+            ContentUnavailableView.search(text: viewModel.filter.searchText)
+        } else {
+            ContentUnavailableView {
+                Label("No exercises", systemImage: VoidIcon.barbell.systemName)
+            } description: {
+                Text("Try fewer filters.")
+            } actions: {
+                emptyStateAction("Clear filters") {
                     viewModel.clearFilters()
                 }
             }
         }
-        .padding(.horizontal, 60)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var emptyCaption: String {
-        if let error = viewModel.error {
-            return error
+    /// An empty state's one action: plasma fill with an on-plasma label.
+    private func emptyStateAction(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .foregroundStyle(VoidColor.onPlasma)
         }
-        if viewModel.filter.isEmpty {
-            return "Nothing in the library yet."
-        }
-        return "Try fewer filters."
+        .buttonStyle(.borderedProminent)
+        .tint(VoidColor.plasma)
     }
 
     // MARK: - List
 
     private var exerciseList: some View {
-        List {
+        List(selection: listSelection) {
             if !viewModel.recentlyUsedExercises.isEmpty && viewModel.searchText.isEmpty {
-                Section {
+                Section("Recently used") {
                     ForEach(viewModel.recentlyUsedExercises) { exercise in
                         row(exercise)
                     }
-                } header: {
-                    sectionHeader("Recently used")
                 }
             }
 
-            Section {
+            Section("Library") {
                 ForEach(viewModel.exercises) { exercise in
                     row(exercise)
                 }
+            }
 
-                if viewModel.hasMore {
-                    HStack {
-                        Spacer()
-                        if viewModel.isLoadingMore {
-                            ProgressView()
-                                .tint(VoidColor.text2)
-                        }
-                        Spacer()
-                    }
-                    .frame(height: VoidSize.pill)
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .onAppear {
-                        viewModel.loadMore()
-                    }
+            if viewModel.hasMore {
+                // Its own section so the library section keeps its rounded end.
+                Section {
+                    loadMoreRow
                 }
-            } header: {
-                sectionHeader("Library")
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .listSectionSeparator(.hidden)
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
+        // Picking several: the List's edit-mode selection draws the selection circles.
+        .environment(\.editMode, .constant(viewModel.isPickerMode ? .active : .inactive))
         .scrollDismissesKeyboard(.interactively)
-        .contentMargins(.bottom, showsFloatingButton ? VoidSize.cta + VoidSpace.s6 * 2 : 0, for: .scrollContent)
     }
 
-    private func row(_ exercise: ExerciseLibraryItem) -> some View {
-        ExerciseSelectionRow(
-            exercise: exercise,
-            isSelected: viewModel.isPickerMode ? viewModel.isSelected(exercise) : nil,
-            onTap: {
-                if viewModel.isPickerMode {
-                    viewModel.toggleSelection(exercise)
-                } else {
-                    onSelect?(exercise)
+    /// Multi-select picking goes through the List's own selection. Single picks are Button
+    /// rows, so the List gets no selection at all.
+    private var listSelection: Binding<Set<String>>? {
+        guard viewModel.isPickerMode else { return nil }
+        return Binding(
+            get: { viewModel.selectedExercises },
+            set: { newSelection in
+                // Route each change through toggleSelection so the view model keeps its
+                // id → exercise map and enforces maxSelections.
+                let changed = newSelection.symmetricDifference(viewModel.selectedExercises)
+                guard !changed.isEmpty else { return }
+                let shown = Dictionary(
+                    (viewModel.recentlyUsedExercises + viewModel.exercises).map { ($0.serverId, $0) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                for id in changed {
+                    if let exercise = shown[id] {
+                        viewModel.toggleSelection(exercise)
+                    }
                 }
             }
         )
-        .listRowInsets(EdgeInsets())
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .voidEyebrowSm()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, VoidSpace.insetText)
-            .padding(.top, VoidSpace.s3)
-            .padding(.bottom, VoidSpace.s2)
-            .background(VoidColor.hull)
-            .listRowInsets(EdgeInsets())
+    /// Tagged with the server id, which is what the List's selection holds; the tag is
+    /// inert when the List has no selection.
+    private func row(_ exercise: ExerciseLibraryItem) -> some View {
+        rowContent(exercise)
+            .tag(exercise.serverId)
+            .listRowBackground(VoidColor.panel)
+            .listRowSeparatorTint(VoidColor.hairline)
+    }
+
+    @ViewBuilder
+    private func rowContent(_ exercise: ExerciseLibraryItem) -> some View {
+        if viewModel.isPickerMode {
+            ExerciseSelectionRow(exercise: exercise)
+                .accessibilityElement(children: .combine)
+        } else {
+            Button {
+                onSelect?(exercise)
+            } label: {
+                ExerciseSelectionRow(exercise: exercise)
+            }
+        }
+    }
+
+    private var loadMoreRow: some View {
+        HStack {
+            Spacer()
+            if viewModel.isLoadingMore {
+                ProgressView()
+                    .tint(VoidColor.text2)
+            }
+            Spacer()
+        }
+        .frame(height: VoidSize.pill)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .selectionDisabled()
+        .onAppear {
+            viewModel.loadMore()
+        }
     }
 }
 
 /// SF Symbols the Void glyph set does not name yet.
 private enum GapIcon {
     static let filter = "line.3.horizontal.decrease"
+    static let filterIdle = "line.3.horizontal.decrease.circle"
+    static let filterActive = "line.3.horizontal.decrease.circle.fill"
+    static let error = "exclamationmark.triangle"
 }
 
 // MARK: - Previews
@@ -349,7 +402,7 @@ private enum GapIcon {
 
 #Preview("Picker Mode") {
     NavigationStack {
-        ExerciseBrowserView(isPickerMode: true)
+        ExerciseBrowserView(isPickerMode: true, onConfirmSelection: { _ in })
     }
     .withDependencies(.preview)
 }

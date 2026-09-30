@@ -2,11 +2,12 @@
 //  SwapWorkoutSheet.swift
 //  Nippardation
 //
-//  Swap Workout: a bottom sheet listing every workout in the plan plus a Rest day and a
+//  Swap Workout: a sheet listing every workout in the plan plus a Rest day and a
 //  Skip workout row. Picking a workout runs it today in place of the scheduled one (which
 //  stays next in the rotation); Rest day pushes today's workout to tomorrow; Skip workout
 //  drops it and moves the plan on, so the rotation records it as SKIPPED rather than DONE.
-//  Selecting dismisses immediately.
+//  Selecting dismisses immediately. A standard grouped list: today's choice carries the
+//  checkmark, and the close button sits in the navigation bar.
 //
 
 import SwiftUI
@@ -21,10 +22,14 @@ struct SwapWorkoutSheet: View {
     var nextAfterSkipName: String = ""
     @ObservedObject private var overrideStore: TodayOverrideStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showSkipConfirmation = false
+    /// Where the person dragged the sheet; nil until they do, so it opens at `openingDetent`.
+    @State private var draggedDetent: PresentationDetent?
 
-    /// HANDOFF: swap rows are 58pt (no VoidSize token).
-    private static let rowHeight: CGFloat = 58
+    /// Rows that fit below the navigation bar at half height on the smallest supported phone
+    /// (375×667) at the default text size.
+    static let rowsVisibleAtHalfHeight = 3
 
     init(
         program: Program,
@@ -84,61 +89,64 @@ struct SwapWorkoutSheet: View {
         TodayViewModel.word(workout: workout, template: template(for: workout), index: index)
     }
 
-    /// Sheet height that fits every row; falls back to system detents for long plans.
-    private var detents: Set<PresentationDetent> {
-        let grabber: CGFloat = 10 + VoidSize.grabber.height + 22
-        let header: CGFloat = 16 + VoidSpace.s4
-        let extraRows = onSkip == nil ? 1 : 2
-        let rows = CGFloat(workouts.count + extraRows) * Self.rowHeight + CGFloat(workouts.count + extraRows - 1)
-        let height = grabber + header + rows + 34
-        return height > 560 ? [.medium, .large] : [.height(height)]
+    /// Every workout, then Rest day, then Skip workout when it's offered.
+    private var rowCount: Int {
+        workouts.count + (onSkip == nil ? 1 : 2)
+    }
+
+    /// Half height while every row fits there; otherwise full height, so Rest day and Skip
+    /// workout don't open below the fold. Accessibility text sizes always open at full height.
+    static func openingDetent(rowCount: Int, dynamicTypeSize: DynamicTypeSize) -> PresentationDetent {
+        rowCount <= rowsVisibleAtHalfHeight && !dynamicTypeSize.isAccessibilitySize ? .medium : .large
+    }
+
+    private var detent: Binding<PresentationDetent> {
+        Binding(
+            get: { draggedDetent ?? Self.openingDetent(rowCount: rowCount, dynamicTypeSize: dynamicTypeSize) },
+            set: { draggedDetent = $0 }
+        )
     }
 
     // MARK: - Body
 
     var body: some View {
-        VoidSheetContainer {
-            VStack(spacing: 0) {
-                HStack {
-                    Text("Swap workout").voidEyebrow()
-                    Spacer(minLength: VoidSpace.s3)
-                    Text(dayReadout).voidEyebrow()
-                }
-                .padding(.bottom, VoidSpace.s4)
-
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(Array(workouts.enumerated()), id: \.element.id) { index, workout in
-                            workoutRow(workout, index: index)
-                            VoidHairline()
-                        }
-                        restRow
-                        if onSkip != nil {
-                            VoidHairline()
-                            skipRow
-                        }
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(Array(workouts.enumerated()), id: \.element.id) { index, workout in
+                        workoutRow(workout, index: index)
+                    }
+                } header: {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(program.name)
+                            .lineLimit(1)
+                        Spacer(minLength: VoidSpace.s3)
+                        Text(dayReadout)
                     }
                 }
-                .scrollBounceBehavior(.basedOnSize)
+
+                Section {
+                    restRow
+                    if onSkip != nil {
+                        skipRow
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("Swap workout")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    SheetCloseButton {
+                        dismiss()
+                    }
+                }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(VoidColor.panel)
-        .voidSheet()
-        .presentationDetents(detents)
-        .confirmationDialog(
-            "Skip \(scheduledName)?",
-            isPresented: $showSkipConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Skip workout", role: .destructive) {
-                onSkip?()
-                dismiss()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text(skipConfirmationMessage)
-        }
+        // Opens at half height only when every row fits there (see `openingDetent`); either way
+        // the sheet drags between half and full height.
+        .presentationDetents([.medium, .large], selection: detent)
+        .presentationDragIndicator(.visible)
     }
 
     /// Says plainly what a skip costs — it is not a rest day, and it is not a completion.
@@ -173,11 +181,9 @@ struct SwapWorkoutSheet: View {
                     todayMark
                 }
             }
-            .frame(height: Self.rowHeight)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(VoidRowButtonStyle())
         .accessibilityLabel(isToday ? "\(title), today" : title)
+        .accessibilityAddTraits(isToday ? [.isSelected] : [])
     }
 
     private var restRow: some View {
@@ -201,13 +207,12 @@ struct SwapWorkoutSheet: View {
                     todayMark
                 }
             }
-            .frame(height: Self.rowHeight)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(VoidRowButtonStyle())
         .accessibilityLabel(isRestSelected ? "Rest day, today" : "Rest day")
+        .accessibilityAddTraits(isRestSelected ? [.isSelected] : [])
     }
 
+    /// Opens the confirmation; the dialog hangs off this row so iOS 26 anchors it here.
     private var skipRow: some View {
         Button {
             showSkipConfirmation = true
@@ -229,22 +234,32 @@ struct SwapWorkoutSheet: View {
                     .foregroundStyle(VoidColor.text3)
                     .accessibilityHidden(true)
             }
-            .frame(height: Self.rowHeight)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(VoidRowButtonStyle())
         .accessibilityLabel("Skip workout")
         .accessibilityHint("Moves the plan past \(scheduledName) without logging it")
+        .confirmationDialog(
+            "Skip \(scheduledName)?",
+            isPresented: $showSkipConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Skip workout", role: .destructive) {
+                onSkip?()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text(skipConfirmationMessage)
+        }
     }
 
-    /// "Today" + a plasma check. The check is a glyph colour, not a fill.
+    /// "Today" + the list's checkmark in plasma. The check is a glyph colour, not a fill.
     private var todayMark: some View {
         HStack(spacing: VoidSpace.s2) {
             Text("Today")
                 .font(VoidFont.caption2)
                 .foregroundStyle(VoidColor.text2)
             Image(systemName: VoidIcon.check.systemName)
-                .font(.system(size: 15, weight: .bold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(VoidColor.plasma)
         }
         .accessibilityHidden(true)

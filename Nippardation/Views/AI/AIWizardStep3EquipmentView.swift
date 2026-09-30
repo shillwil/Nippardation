@@ -2,7 +2,7 @@
 //  AIWizardStep3EquipmentView.swift
 //  Nippardation
 //
-//  Step 3: experience level and equipment.
+//  Step 3: experience level (a segmented control) and equipment (a switch per item).
 //
 
 import SwiftUI
@@ -15,83 +15,64 @@ struct AIWizardStep3EquipmentView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: VoidSpace.s6) {
-                AISectionHeader(
-                    "Your setup",
-                    subtitle: showEquipment
-                        ? "Your experience level and the equipment you have."
-                        : "Your experience level."
-                )
-                .padding(.horizontal, VoidSpace.s1)
-
-                // Experience level
-                VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                    WizardSectionLabel(title: "Experience")
-
-                    VoidSegmentedControl(
-                        items: AIExperienceLevel.allCases,
-                        label: { $0.displayName },
-                        selection: $viewModel.experienceLevel
-                    )
+        Form {
+            Section {
+                Picker("Experience", selection: $viewModel.experienceLevel) {
+                    ForEach(AIExperienceLevel.allCases) { level in
+                        Text(level.displayName).tag(level)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            } header: {
+                Text("Experience")
+            } footer: {
+                if !showEquipment {
+                    Text("Your experience level.")
+                }
+            }
+            .wizardFormRows()
 
-                if showEquipment {
-                    VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                        WizardSectionLabel(
-                            title: "Equipment",
-                            trailing: "\(VoidFormat.pad2(viewModel.selectedEquipment.count)) selected"
-                        )
-
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: VoidSpace.s2),
-                            GridItem(.flexible(), spacing: VoidSpace.s2),
-                            GridItem(.flexible(), spacing: VoidSpace.s2),
-                            GridItem(.flexible(), spacing: VoidSpace.s2)
-                        ], spacing: VoidSpace.s2) {
-                            ForEach(AIEquipment.allCases) { equipment in
-                                equipmentCard(equipment)
+            if showEquipment {
+                Section {
+                    ForEach(AIEquipment.allCases) { equipment in
+                        Toggle(isOn: equipmentBinding(equipment)) {
+                            Label {
+                                Text(equipment.displayName)
+                                    .foregroundStyle(VoidColor.text)
+                            } icon: {
+                                Image(systemName: equipment.icon)
                             }
                         }
                     }
+                } header: {
+                    Text("Equipment")
+                } footer: {
+                    Text(equipmentFooter)
                 }
+                .wizardFormRows()
             }
-            .padding(.horizontal, VoidSpace.insetCard)
-            .padding(.vertical, VoidSpace.s2)
         }
     }
 
-    // MARK: - Subviews
+    // MARK: - Helpers
 
-    private func equipmentCard(_ equipment: AIEquipment) -> some View {
-        let isSelected = viewModel.selectedEquipment.contains(equipment)
+    private var equipmentFooter: String {
+        let count = viewModel.selectedEquipment.count
+        return count == 0 ? "Pick at least one." : "\(count) selected"
+    }
 
-        return WizardOptionCard(isSelected: isSelected, checkInset: 6, action: {
-            if isSelected {
-                viewModel.selectedEquipment.remove(equipment)
-            } else {
-                viewModel.selectedEquipment.insert(equipment)
+    private func equipmentBinding(_ equipment: AIEquipment) -> Binding<Bool> {
+        Binding(
+            get: { viewModel.selectedEquipment.contains(equipment) },
+            set: { isOn in
+                if isOn {
+                    viewModel.selectedEquipment.insert(equipment)
+                } else {
+                    viewModel.selectedEquipment.remove(equipment)
+                }
             }
-        }) {
-            VStack(spacing: 6) {
-                Image(systemName: equipment.icon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(VoidColor.text)
-                    .frame(height: 24)
-                    .accessibilityHidden(true)
-
-                Text(equipment.displayName)
-                    .font(VoidFont.caption2)
-                    .fontWeight(.medium)
-                    .foregroundStyle(VoidColor.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .padding(.horizontal, VoidSpace.s1)
-        }
-        .accessibilityLabel(equipment.displayName)
+        )
     }
 }
 
@@ -99,6 +80,8 @@ struct AIWizardStep3EquipmentView: View {
     NavigationStack {
         AIWizardStep3EquipmentView(viewModel: AIWizardViewModel())
             .voidScreen()
+            .navigationTitle("Setup")
+            .navigationBarTitleDisplayMode(.inline)
     }
     .withDependencies(.preview)
 }

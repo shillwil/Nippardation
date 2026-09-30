@@ -99,7 +99,7 @@ struct AuthenticationView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(VoidColor.hull.ignoresSafeArea())
-        .tint(VoidColor.plasma)
+        .tint(VoidColor.plasmaInk)
         .alert("Reset password", isPresented: $showForgotPassword) {
             TextField("Email", text: $resetEmail)
                 .textContentType(.emailAddress)
@@ -132,16 +132,15 @@ struct AuthenticationView: View {
     
     // MARK: - Pieces
     
-    /// SF 13 plasma text link with a 44pt hit target.
+    /// A system text link (borderless, footnote, tinted plasma by the screen) with a 44pt hit target.
     private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(VoidFont.buttonLink)
-                .foregroundStyle(VoidColor.plasma)
                 .frame(minHeight: VoidSize.hitMin)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(VoidPlainButtonStyle())
+        .buttonStyle(.borderless)
+        .font(.footnote)
     }
     
     /// Autofill and paste both like to leave a trailing space; Firebase rejects it as an
@@ -232,7 +231,8 @@ private struct VoidSecureField: View {
                 .autocorrectionDisabled()
         }
         .padding(.horizontal, 14)
-        .frame(height: VoidSize.pill)
+        // A minimum, not a fixed height: Chakra Petch grows with Dynamic Type.
+        .frame(minHeight: VoidSize.pill)
         .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2, fill: VoidColor.panel2)
     }
 }

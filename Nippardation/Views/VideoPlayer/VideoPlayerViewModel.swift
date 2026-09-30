@@ -2,87 +2,132 @@
 //  VideoPlayerViewModel.swift
 //  Nippardation
 //
-//  ViewModel for native video player using AVPlayer
+//  Loads an exercise demo through the video cache and drives one muted, looping AVPlayer.
+//  NativeVideoPlayer shows it with AVKit's `VideoPlayer`; ExercisePreviewCard tiles show it
+//  on a bare AVPlayerLayer. The system owns the transport controls, so nothing here tracks
+//  time or duration for a hand-drawn UI. The player's rate is watched only to tell a pause
+//  made with those controls from the view model's own, so a demo someone paused stays paused.
+//
+//  Demos start by themselves only while Settings › Accessibility › Motion › Auto-Play Video
+//  Previews is on. Off, a demo loads to its first frame and waits for the system Play button.
 //
 
 import Foundation
 import AVFoundation
 import Combine
+import UIKit
 
-/// ViewModel for native video player
+/// ViewModel for the exercise demo players
 @MainActor
 final class VideoPlayerViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published var isLoading = false
-    @Published var isPlaying = false
-    @Published var isMuted = true // Start muted by default for exercise demos
-    @Published var error: String?
-    @Published var currentTime: Double = 0
-    @Published var duration: Double = 0
-    @Published var isLooping = true
-    @Published var downloadProgress: Double = 0
-    @Published var detectedAspectRatio: CGFloat = 16/9
+    @Published private(set) var isLoading = false
+    @Published private(set) var error: String?
+    @Published private(set) var downloadProgress: Double = 0
+    @Published private(set) var detectedAspectRatio: CGFloat = 16/9
+
+    /// Demos loop. With `actionAtItemEnd = .none` the player never pauses at the end,
+    /// so the system controls don't flip to Play on every lap.
+    var isLooping = true {
+        didSet { player.actionAtItemEnd = isLooping ? .none : .pause }
+    }
 
     // MARK: - Player
 
     let player: AVPlayer
     private var playerItem: AVPlayerItem?
-    private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
-    private var playerItemCancellables = Set<AnyCancellable>() // Separate set for player item subscriptions
+    private var playerItemCancellables = Set<AnyCancellable>()
 
     // MARK: - Dependencies
 
     private let videoCacheService: any VideoCacheServiceProtocol
+    private let audioSession: any AudioSessionConfigurable
+    /// Auto-Play Video Previews (UIAccessibility), read each time the player would start itself.
+    private let isAutoplayEnabled: @MainActor () -> Bool
 
     // MARK: - State
 
     private var currentExerciseServerId: String?
+    private var currentVideoUrl: URL?
     private var loadTask: Task<Void, Never>?
+    /// Bumped by every load; work that finishes for an older load is dropped.
+    private var loadGeneration = 0
+    /// True while the owning view is on screen. A load that finishes after the view has
+    /// gone must not start a player nobody can see (it would still decode video and
+    /// activate the audio session).
+    private(set) var wantsPlayback = false
+    /// True from a start (the view model's, or Play in the controls after a pause made there)
+    /// until a pause. The view model's own pauses clear it first, so a setRate pause that
+    /// lands while it's set came from the controls.
+    private var didStartPlayer = false
+    /// Paused with the system controls. Coming back on screen (a scroll, a detent change, a
+    /// rebuilt row, the app returning) doesn't restart it; Play or the next video clears it.
+    private(set) var isPausedByUser = false
 
     // MARK: - Initialization
 
-    init(videoCacheService: (any VideoCacheServiceProtocol)? = nil) {
+    init(
+        videoCacheService: (any VideoCacheServiceProtocol)? = nil,
+        audioSession: any AudioSessionConfigurable = AVAudioSession.sharedInstance(),
+        isAutoplayEnabled: @escaping @MainActor () -> Bool = { UIAccessibility.isVideoAutoplayEnabled }
+    ) {
         self.videoCacheService = videoCacheService ?? DependencyContainer.shared.videoCacheService
+        self.audioSession = audioSession
+        self.isAutoplayEnabled = isAutoplayEnabled
         self.player = AVPlayer()
 
-        setupPlayer()
+        // The demos are silent and muted. Muting does not stop the player from activating
+        // the app's audio session (the files carry a silent AAC track), so other apps' music
+        // keeps playing only because the session category is Ambient (see AppAudioSession).
+        player.isMuted = true
+        player.actionAtItemEnd = .none
+
         observeDownloadProgress()
+        observePlayerRate()
+        observeAutoplaySetting()
     }
 
     deinit {
-        if let observer = timeObserver {
-            player.removeTimeObserver(observer)
-        }
         loadTask?.cancel()
     }
 
     // MARK: - Public Methods
 
-    /// Load a video for an exercise
+    /// Load a video for an exercise and play it while the owning view is on screen.
     /// - Parameters:
     ///   - exerciseServerId: The server ID of the exercise
     ///   - videoUrl: The remote URL of the video (optional if already cached)
     func loadVideo(exerciseServerId: String, videoUrl: URL?) async {
-        // Don't reload same video if already loaded successfully
-        if currentExerciseServerId == exerciseServerId && playerItem != nil && error == nil {
+        wantsPlayback = true
+
+        // Same video, loaded or still downloading (a view re-appearing): just resume, unless
+        // it was paused with the controls.
+        if currentExerciseServerId == exerciseServerId,
+           currentVideoUrl == videoUrl,
+           error == nil,
+           playerItem != nil || loadTask != nil {
+            resumeIfWanted()
             return
         }
 
         // Cancel any previous load
         loadTask?.cancel()
         loadTask = nil
+        loadGeneration += 1
+        let generation = loadGeneration
 
-        // Reset state for new video
+        // Reset state for the new video, and stop the previous one so it doesn't keep
+        // decoding under the loading cover. The previous aspect ratio stays until the new
+        // one is measured, so swapping between two portrait demos doesn't flash to 16:9.
         currentExerciseServerId = exerciseServerId
+        currentVideoUrl = videoUrl
         isLoading = true
         error = nil
         downloadProgress = 0
-        currentTime = 0
-        duration = 0
-        detectedAspectRatio = 16/9
+        clearPlayerItem()
 
         // Check if already cached. Pass the expected remote URL so a stale cache
         // entry (e.g., downloaded before an R2 re-upload changed filenames) is
@@ -91,9 +136,7 @@ final class VideoPlayerViewModel: ObservableObject {
             for: exerciseServerId,
             matching: videoUrl
         ) {
-            setupPlayerItem(with: localURL)
-            await detectVideoOrientation(from: localURL)
-            isLoading = false
+            await show(localURL, generation: generation)
             await videoCacheService.touchVideo(for: exerciseServerId)
             return
         }
@@ -106,101 +149,115 @@ final class VideoPlayerViewModel: ObservableObject {
         }
 
         loadTask = Task {
+            let url: URL
             do {
-                let localURL = try await videoCacheService.cacheVideo(
-                    for: exerciseServerId,
-                    from: remoteURL
-                )
-
-                if !Task.isCancelled {
-                    setupPlayerItem(with: localURL)
-                    await detectVideoOrientation(from: localURL)
-                    isLoading = false
-                }
+                url = try await videoCacheService.cacheVideo(for: exerciseServerId, from: remoteURL)
             } catch {
-                if !Task.isCancelled {
-                    // Cache download failed — fall back to direct streaming
-                    setupPlayerItem(with: remoteURL)
-                    await detectVideoOrientation(from: remoteURL)
-                    isLoading = false
-                }
+                // Cache download failed — fall back to direct streaming
+                url = remoteURL
+            }
+            guard !Task.isCancelled else { return }
+            await show(url, generation: generation)
+            if generation == loadGeneration {
+                loadTask = nil
             }
         }
     }
 
-    /// Load video directly from a URL (for preview/testing)
-    func loadVideo(from url: URL) {
-        setupPlayerItem(with: url)
-    }
-
-    /// Play the video
+    /// Play, or resume, while the owning view is on screen.
     func play() {
-        player.play()
-        isPlaying = true
+        wantsPlayback = true
+        resumeIfWanted()
     }
 
-    /// Pause the video
+    /// Pause, and keep a load that finishes later from starting playback.
     func pause() {
-        player.pause()
-        isPlaying = false
+        wantsPlayback = false
+        stopPlayer()
     }
 
-    /// Toggle play/pause state
-    func togglePlayPause() {
-        if isPlaying {
-            pause()
+    /// Starts the player if the owning view is on screen, a video is in, nobody paused it
+    /// with the controls, and Auto-Play Video Previews is on. The views also call this when
+    /// the app returns: iOS pauses video players when the app leaves the foreground.
+    func resumeIfWanted() {
+        guard wantsPlayback,
+              playerItem != nil,
+              error == nil,
+              !isPausedByUser,
+              isAutoplayEnabled() else { return }
+        startPlayback()
+    }
+
+    /// A rate change, with the rate as it was when the change was posted. Changes arrive a
+    /// beat late, and AVFoundation can replay a quick stop-and-start as a second pair of
+    /// changes, so each one is weighed against the player's rate now.
+    /// - A setRate to zero (AVKit's Pause), with the player still stopped, after a start the
+    ///   view model hasn't undone, is the person's pause. Interruptions and the app leaving
+    ///   the foreground carry other reasons.
+    /// - A start, with the player still playing, clears that pause. Right after the person's
+    ///   pause it's Play in the controls, which counts as a start. Otherwise it's the view
+    ///   model's own start (already counted) or a replay after its own stop (which mustn't).
+    func playerRateDidChange(to rate: Float, reason: AVPlayer.RateDidChangeReason?) {
+        if rate > 0 {
+            guard player.rate > 0 else { return }
+            if isPausedByUser {
+                didStartPlayer = true
+            }
+            isPausedByUser = false
+        } else if reason == .setRateCalled, didStartPlayer, player.rate == 0 {
+            isPausedByUser = true
+            didStartPlayer = false
+        }
+    }
+
+    /// Auto-Play Video Previews changed: turned off, a playing demo stops; turned on, one
+    /// that's on screen starts.
+    func autoplaySettingDidChange() {
+        if isAutoplayEnabled() {
+            resumeIfWanted()
         } else {
-            play()
+            stopPlayer()
         }
-    }
-
-    /// Toggle mute state
-    func toggleMute() {
-        isMuted.toggle()
-        player.isMuted = isMuted
-    }
-
-    /// Seek to a specific time
-    func seek(to time: Double) {
-        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
-        player.seek(to: cmTime)
-    }
-
-    /// Restart the video from the beginning
-    func restart() {
-        seek(to: 0)
-        play()
-    }
-
-    /// Stop and clean up the player
-    func stop() {
-        loadTask?.cancel()
-        loadTask = nil
-        player.pause()
-        player.replaceCurrentItem(with: nil)
-        playerItem = nil
-        playerItemCancellables.removeAll() // Clean up player item subscriptions
-        if let observer = timeObserver {
-            player.removeTimeObserver(observer)
-            timeObserver = nil
-        }
-        currentExerciseServerId = nil
-        isPlaying = false
-        currentTime = 0
-        duration = 0
-        error = nil
     }
 
     // MARK: - Private Methods
 
-    private func setupPlayer() {
-        player.isMuted = isMuted
+    /// Every path that starts the player comes through here, so the session is Ambient
+    /// first even if something reset it (a media-services reset, a web view).
+    private func startPlayback() {
+        AppAudioSession.configure(audioSession)
+        didStartPlayer = true
+        player.play()
+    }
 
-        // Observe playback state
-        player.publisher(for: \.timeControlStatus)
+    /// Every pause the view model makes comes through here, so none reads as the person's.
+    private func stopPlayer() {
+        didStartPlayer = false
+        player.pause()
+    }
+
+    private func observePlayerRate() {
+        let reasonKey = AVPlayer.rateDidChangeReasonKey
+        NotificationCenter.default.publisher(for: AVPlayer.rateDidChangeNotification, object: player)
+            // Read the rate where the change is posted (often AVFoundation's own queue): by
+            // the time the main queue runs the sink, the view model may have changed it again.
+            .map { @Sendable note -> (rate: Float, reason: AVPlayer.RateDidChangeReason?) in
+                let rate = (note.object as? AVPlayer)?.rate ?? 0
+                let reason = note.userInfo?[reasonKey] as? String
+                return (rate, reason.map(AVPlayer.RateDidChangeReason.init(rawValue:)))
+            }
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] status in
-                self?.isPlaying = status == .playing
+            .sink { [weak self] change in
+                self?.playerRateDidChange(to: change.rate, reason: change.reason)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func observeAutoplaySetting() {
+        NotificationCenter.default.publisher(for: UIAccessibility.videoAutoplayStatusDidChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.autoplaySettingDidChange()
             }
             .store(in: &cancellables)
     }
@@ -218,19 +275,29 @@ final class VideoPlayerViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func detectVideoOrientation(from url: URL) async {
-        let asset = AVAsset(url: url)
+    /// Puts `url` in the player and measures it, unless a newer load has started.
+    private func show(_ url: URL, generation: Int) async {
+        guard generation == loadGeneration else { return }
+        setupPlayerItem(with: url)
+
+        let ratio = await aspectRatio(of: url)
+        guard generation == loadGeneration else { return }
+        if let ratio {
+            detectedAspectRatio = ratio
+        }
+        isLoading = false
+    }
+
+    private func aspectRatio(of url: URL) async -> CGFloat? {
+        let asset = AVURLAsset(url: url)
         do {
-            let tracks = try await asset.loadTracks(withMediaType: .video)
-            guard let videoTrack = tracks.first else {
+            guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else {
                 print("[VideoOrientation] No video tracks found for \(url.lastPathComponent)")
-                return
+                return nil
             }
 
             let naturalSize = try await videoTrack.load(.naturalSize)
             let preferredTransform = try await videoTrack.load(.preferredTransform)
-
-            print("[VideoOrientation] \(url.lastPathComponent) — naturalSize: \(naturalSize), transform: \(preferredTransform)")
 
             // Apply transform to get actual rendered dimensions.
             // Adobe exports typically have an identity transform, so this is a no-op.
@@ -239,38 +306,33 @@ final class VideoPlayerViewModel: ObservableObject {
             let width = abs(transformedSize.width)
             let height = abs(transformedSize.height)
 
-            print("[VideoOrientation] \(url.lastPathComponent) — transformed: \(width)x\(height), ratio: \(width/height)")
-
-            guard width > 0, height > 0 else { return }
-            detectedAspectRatio = width / height
+            guard width > 0, height > 0 else { return nil }
+            return width / height
         } catch {
             print("[VideoOrientation] Detection failed for \(url.lastPathComponent): \(error)")
+            return nil
         }
+    }
+
+    private func clearPlayerItem() {
+        playerItemCancellables.removeAll()
+        // Stopped first: the rate outlives the item, so the next one would start by itself.
+        stopPlayer()
+        player.replaceCurrentItem(with: nil)
+        playerItem = nil
+        // A new video starts fresh.
+        isPausedByUser = false
     }
 
     private func setupPlayerItem(with url: URL) {
         // Clean up previous item's subscriptions to prevent memory leaks
         playerItemCancellables.removeAll()
 
-        if let observer = timeObserver {
-            player.removeTimeObserver(observer)
-            timeObserver = nil
-        }
-
-        // Create new player item
         let item = AVPlayerItem(url: url)
         playerItem = item
         player.replaceCurrentItem(with: item)
-
-        // Observe duration - stored in player item specific set
-        item.publisher(for: \.duration)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] duration in
-                if duration.isNumeric {
-                    self?.duration = duration.seconds
-                }
-            }
-            .store(in: &playerItemCancellables)
+        // Every demo starts muted, even if the last one was unmuted from the system controls.
+        player.isMuted = true
 
         // Observe status for errors
         item.publisher(for: \.status)
@@ -283,31 +345,22 @@ final class VideoPlayerViewModel: ObservableObject {
                 if let nsError = underlying as NSError? {
                     print("[VideoPlayer]   domain=\(nsError.domain) code=\(nsError.code) userInfo=\(nsError.userInfo)")
                 }
-                self?.error = "Failed to play video: \(detail)"
+                self?.error = "The video couldn't be played."
             }
             .store(in: &playerItemCancellables)
 
-        // Add time observer
-        timeObserver = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.1, preferredTimescale: 600),
-            queue: .main
-        ) { [weak self] time in
-            Task { @MainActor in
-                self?.currentTime = time.seconds
-            }
-        }
-
-        // Observe end of playback for looping
+        // Loop: the player keeps its rate at the end (actionAtItemEnd = .none), so a seek
+        // back to the start carries straight on without a pause/play round trip.
         NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: item)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                if self?.isLooping == true {
-                    self?.restart()
-                }
+                guard let self, self.isLooping else { return }
+                self.player.seek(to: .zero)
             }
             .store(in: &playerItemCancellables)
 
-        // Auto-play
-        play()
+        // Auto-play, but only for a view that is still on screen (and only when the
+        // Auto-Play Video Previews setting allows it).
+        resumeIfWanted()
     }
 }

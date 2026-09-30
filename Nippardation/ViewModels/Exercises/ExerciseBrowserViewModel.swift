@@ -26,6 +26,9 @@ final class ExerciseBrowserViewModel: ObservableObject {
 
     @Published var selectedExercises: Set<String> = []
     private var selectedExerciseItems: [String: ExerciseLibraryItem] = [:]
+    /// Ids of the exercises in `selectedExerciseItems`, in the order they were picked: a
+    /// preselected exercise takes its place when it loads, and deselecting removes it.
+    private var selectionOrder: [String] = []
     let isPickerMode: Bool
     let maxSelections: Int?
 
@@ -120,6 +123,7 @@ final class ExerciseBrowserViewModel: ObservableObject {
                         for exercise in result.items where self.selectedExercises.contains(exercise.serverId) {
                             if self.selectedExerciseItems[exercise.serverId] == nil {
                                 self.selectedExerciseItems[exercise.serverId] = exercise
+                                self.selectionOrder.append(exercise.serverId)
                             }
                         }
                         // Only update currentPage on success
@@ -144,6 +148,7 @@ final class ExerciseBrowserViewModel: ObservableObject {
                                 for exercise in cached where self.selectedExercises.contains(exercise.serverId) {
                                     if self.selectedExerciseItems[exercise.serverId] == nil {
                                         self.selectedExerciseItems[exercise.serverId] = exercise
+                                        self.selectionOrder.append(exercise.serverId)
                                     }
                                 }
                             }
@@ -230,12 +235,14 @@ final class ExerciseBrowserViewModel: ObservableObject {
         if selectedExercises.contains(exercise.serverId) {
             selectedExercises.remove(exercise.serverId)
             selectedExerciseItems.removeValue(forKey: exercise.serverId)
+            selectionOrder.removeAll { $0 == exercise.serverId }
         } else {
             if let max = maxSelections, selectedExercises.count >= max {
                 return // Don't allow more selections
             }
             selectedExercises.insert(exercise.serverId)
             selectedExerciseItems[exercise.serverId] = exercise
+            selectionOrder.append(exercise.serverId)
         }
     }
 
@@ -246,9 +253,10 @@ final class ExerciseBrowserViewModel: ObservableObject {
         selectedExercises.contains(exercise.serverId)
     }
 
-    /// Returns the list of selected exercise items (preserves selections even when filtered)
+    /// Returns the list of selected exercise items in the order they were picked (preserves
+    /// selections even when filtered), so "Add (n)" adds them in that order
     var selectedExercisesList: [ExerciseLibraryItem] {
-        Array(selectedExerciseItems.values)
+        selectionOrder.compactMap { selectedExerciseItems[$0] }
     }
 
     /// Clears the current error message

@@ -2,71 +2,48 @@
 //  ProgramWizardView.swift
 //  Nippardation
 //
-//  Three-step wizard for building a new plan. Presented modally inside the presenter's NavigationStack.
+//  Three-step wizard for building a new plan. Owns its NavigationStack (presented as a sheet):
+//  each step pushes the next, so the system back button and edge swipe step back.
 //
 
 import SwiftUI
 
 struct ProgramWizardView: View {
+    /// The wizard's steps, in order. The first is the stack's root; the rest are pushed.
+    enum Step: Int, CaseIterable, Hashable {
+        case basics
+        case schedule
+        case review
+
+        var title: String {
+            switch self {
+            case .basics: return "Basics"
+            case .schedule: return "Schedule"
+            case .review: return "Review"
+            }
+        }
+
+        var next: Step? { Step(rawValue: rawValue + 1) }
+    }
+
     @StateObject private var viewModel = ProgramEditorViewModel()
     @Environment(\.dismiss) private var dismiss
 
-    @State private var currentStep = 0
-    private let totalSteps = 3
+    /// The pushed steps. Always exactly the steps after the first up to the one on screen.
+    @State private var path: [Step] = []
 
     var body: some View {
-        VStack(spacing: 0) {
-            StepIndicator(totalSteps: totalSteps, currentStep: currentStep)
-                .padding(.top, VoidSpace.s3)
-                .padding(.bottom, VoidSpace.s4)
-
-            Group {
-                switch currentStep {
-                case 0:
-                    ProgramWizardStep1(viewModel: viewModel)
-                case 1:
-                    ProgramWizardStep2(viewModel: viewModel)
-                case 2:
-                    ProgramWizardStep3(viewModel: viewModel)
-                default:
-                    EmptyView()
+        NavigationStack(path: $path) {
+            stepScreen(.basics)
+                .navigationDestination(for: Step.self) { step in
+                    stepScreen(step)
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            WizardFooter(showBack: currentStep > 0, onBack: { currentStep -= 1 }) {
-                VoidCTAButton(
-                    title: currentStep < totalSteps - 1 ? "Continue" : "Create plan",
-                    isEnabled: isCurrentStepValid,
-                    isLoading: viewModel.isSaving
-                ) {
-                    if currentStep < totalSteps - 1 {
-                        currentStep += 1
-                    } else {
-                        viewModel.save()
-                    }
-                }
-            }
-        }
-        .voidScreen()
-        .navigationTitle("New plan")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") { dismiss() }
-            }
         }
         .onAppear {
             viewModel.loadTemplates()
         }
         .onChange(of: viewModel.savedProgram) { _, newValue in
             if newValue != nil { dismiss() }
-        }
-        .disabled(viewModel.isSaving)
-        .overlay {
-            if viewModel.isSaving {
-                WizardBusyOverlay(eyebrow: "Saving")
-            }
         }
         .alert("Error", isPresented: .init(
             get: { viewModel.error != nil },
@@ -78,19 +55,82 @@ struct ProgramWizardView: View {
         }
     }
 
-    private var isCurrentStepValid: Bool {
-        switch currentStep {
-        case 0: return viewModel.isStep1Valid
-        case 1: return viewModel.isStep2Valid
-        case 2: return viewModel.isValid
-        default: return false
+    private func stepScreen(_ step: Step) -> some View {
+        ProgramWizardStepScreen(
+            step: step,
+            viewModel: viewModel,
+            onContinue: { advance(from: step) },
+            onCancel: { dismiss() }
+        )
+    }
+
+    /// Pushes the step after `step`. Setting the whole path (rather than appending) keeps a double
+    /// tap on Continue from pushing the same step twice.
+    private func advance(from step: Step) {
+        guard let next = step.next else { return }
+        path = Array(Step.allCases.dropFirst().prefix(next.rawValue))
+    }
+}
+
+// MARK: - Step screen
+
+/// One step: its content, plus the shared step chrome with the step's primary action. Observes the
+/// view model itself so Continue / Create track validity and saving on a pushed screen.
+private struct ProgramWizardStepScreen: View {
+    let step: ProgramWizardView.Step
+    @ObservedObject var viewModel: ProgramEditorViewModel
+    let onContinue: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        content
+            .voidScreen()
+            .wizardStep(
+                step.title,
+                step: step.rawValue,
+                of: ProgramWizardView.Step.allCases.count,
+                onCancel: onCancel
+            ) {
+                if step.next == nil {
+                    VoidCTAButton(
+                        title: "Create plan",
+                        isEnabled: isValid,
+                        isLoading: viewModel.isSaving
+                    ) {
+                        viewModel.save()
+                    }
+                } else {
+                    VoidCTAButton(title: "Continue", isEnabled: isValid, action: onContinue)
+                }
+            }
+            // While the plan saves, nothing on the step (Cancel included) takes input and there is
+            // no stepping back; the Create button shows the progress.
+            .disabled(viewModel.isSaving)
+            .navigationBarBackButtonHidden(viewModel.isSaving)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch step {
+        case .basics:
+            ProgramWizardStep1(viewModel: viewModel)
+        case .schedule:
+            ProgramWizardStep2(viewModel: viewModel)
+        case .review:
+            ProgramWizardStep3(viewModel: viewModel)
+        }
+    }
+
+    private var isValid: Bool {
+        switch step {
+        case .basics: return viewModel.isStep1Valid
+        case .schedule: return viewModel.isStep2Valid
+        case .review: return viewModel.isValid
         }
     }
 }
 
 #Preview {
-    NavigationStack {
-        ProgramWizardView()
-    }
-    .withDependencies(.preview)
+    ProgramWizardView()
+        .withDependencies(.preview)
 }

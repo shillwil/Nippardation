@@ -2,8 +2,9 @@
 //  PlanView.swift
 //  Nippardation
 //
-//  Plan tab (HANDOFF screen 2): the active plan's rotation — one row per workout day
-//  (done / up next / later), the ··· menu, and the Other plans / Edit plan pills.
+//  Plan tab (HANDOFF screen 2): the active plan's rotation — one list row per workout day
+//  (done / skipped / up next / later) under the plan's name as the large title, the plan options
+//  menu in the toolbar, and the Other plans / Edit plan pills.
 //  Loading → rotation → or, with no active plan, the Plans hub in place.
 //
 
@@ -28,18 +29,19 @@ struct PlanView: View {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
 
+    /// Screens pushed from the plan options menu and the Other plans pill.
+    /// The rotation rows push their workout through their own `NavigationLink`.
     private enum Route: Hashable {
         case hub
         case library
         case account
-        case workout(Template)
     }
 
     // MARK: - Body
 
     var body: some View {
         content
-            .voidRootScreen()
+            .voidScreen()
             .navigationDestination(item: $route) { route in
                 destination(route)
             }
@@ -48,6 +50,7 @@ struct PlanView: View {
             }
             .sheet(isPresented: $showShareSheet) {
                 shareSheet
+                    .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $viewModel.showTemplateDeleteSheet) {
                 deleteSheet
@@ -92,11 +95,9 @@ struct PlanView: View {
             .onAppear {
                 viewModel.load()
             }
-            .overlay {
-                busyOverlay
-            }
     }
 
+    /// The title and toolbar live on each branch: with no active plan the Plans hub sets its own.
     @ViewBuilder
     private var content: some View {
         if let program = viewModel.program {
@@ -108,55 +109,95 @@ struct PlanView: View {
         }
     }
 
+    /// A menu action (restart / pause / delete) or a share link is in flight. The menu's place
+    /// in the toolbar shows a spinner meanwhile, and the rotation and pills wait.
+    private var isWorking: Bool {
+        viewModel.isBusy || viewModel.isFetchingDeleteDetail || shareViewModel.isLoading
+    }
+
     // MARK: - Rotation
 
     private func rotation(_ program: Program) -> some View {
-        VStack(spacing: 0) {
-            VoidEyebrowRow(program.name) {
-                HStack(spacing: VoidSpace.s3) {
-                    if let week = viewModel.weekEyebrow {
-                        Text(week).voidEyebrow()
-                    }
-                    planMenu(program)
+        List {
+            if let week = weekTitle {
+                Section {
+                    rotationRows
+                } header: {
+                    Text(week)
+                }
+            } else {
+                Section {
+                    rotationRows
                 }
             }
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(viewModel.rows.enumerated()), id: \.element.id) { index, row in
-                        Button {
-                            open(row)
-                        } label: {
-                            PlanRotationRow(row: row, showsChevron: row.template != nil)
-                        }
-                        .buttonStyle(VoidRowButtonStyle())
-                        // A row whose workout could not be resolved (offline, not cached) has nothing to open.
-                        .disabled(row.template == nil)
-                        .accessibilityHint(row.template == nil ? "" : "Opens the workout")
-
-                        if index < viewModel.rows.count - 1 {
-                            VoidHairline()
-                        }
-                    }
-                }
-                .padding(.top, VoidSpace.s5)
-                .padding(.bottom, VoidSpace.s4)
-            }
-            .scrollBounceBehavior(.basedOnSize)
-
+        }
+        .listStyle(.plain)
+        .scrollBounceBehavior(.basedOnSize)
+        .disabled(isWorking)
+        .planBottomBar {
             VoidPillPair(
                 leading: "Other plans",
                 trailing: "Edit plan",
                 onLeading: { route = .hub },
                 onTrailing: { showEditor = true }
             )
-            .padding(.top, VoidSpace.s3)
-            .padding(.bottom, VoidSpace.pillsBottom)
+            .padding(.vertical, VoidSpace.s3)
+            .disabled(isWorking)
+        }
+        .navigationTitle(program.name)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if isWorking {
+                    ProgressView()
+                        .accessibilityLabel("Working")
+                } else {
+                    planMenu(program)
+                }
+            }
         }
     }
 
+    /// Full-width rows on the hull, as in the Void spec: the row draws its own insets and the
+    /// up-next mark at its leading edge; the list draws the separators and the chevrons.
+    private var rotationRows: some View {
+        ForEach(viewModel.rows) { row in
+            rotationRow(row)
+                // Flush leading edge for the up-next mark; the chevron keeps the card inset.
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: VoidSpace.insetCard))
+                .listRowBackground(Color.clear)
+                .listRowSeparatorTint(VoidColor.hairline)
+        }
+    }
+
+    @ViewBuilder
+    private func rotationRow(_ row: RotationRow) -> some View {
+        if let template = row.template {
+            NavigationLink {
+                TemplateEditorView(existingTemplate: template, onSave: { saved in
+                    viewModel.handleTemplateSaved(saved)
+                })
+            } label: {
+                PlanRotationRow(row: row)
+            }
+            .accessibilityHint("Opens the workout")
+        } else {
+            // A row whose workout could not be resolved (offline, not cached) has nothing to open.
+            PlanRotationRow(row: row)
+        }
+    }
+
+    /// "Week 3 of 8", or "Week 3" for an ongoing plan.
+    private var weekTitle: String? {
+        guard let current = viewModel.stats.planCurrentWeek else { return nil }
+        if let total = viewModel.stats.planTotalWeeks {
+            return "Week \(current) of \(total)"
+        }
+        return "Week \(current)"
+    }
+
     private func planMenu(_ program: Program) -> some View {
-        VoidControlMenu(icon: .more, accessibilityLabel: "Plan options") {
+        Menu {
             Button {
                 route = .hub
             } label: {
@@ -194,40 +235,28 @@ struct PlanView: View {
             } label: {
                 Label("Delete plan", systemImage: VoidIcon.trash.systemName)
             }
+        } label: {
+            Label("Plan options", systemImage: Self.moreSymbol)
         }
         .menuOrder(.fixed)
-        .disabled(viewModel.isBusy)
     }
 
-    private func open(_ row: RotationRow) {
-        guard let template = row.template else { return }
-        route = .workout(template)
+    /// iOS 26 draws the glass circle around a bar glyph itself; earlier versions use the circled glyph.
+    private static var moreSymbol: String {
+        if #available(iOS 26.0, *) {
+            return VoidIcon.more.systemName
+        }
+        return "ellipsis.circle"
     }
 
     // MARK: - Loading
 
     private var loadingPlaceholder: some View {
-        VStack(spacing: 0) {
-            VoidEyebrowRow("Plan")
-            Spacer()
-            ProgressView()
-                .tint(VoidColor.text2)
-            Spacer()
-        }
-    }
-
-    @ViewBuilder
-    private var busyOverlay: some View {
-        if viewModel.isBusy || viewModel.isFetchingDeleteDetail || shareViewModel.isLoading {
-            ZStack {
-                VoidColor.hull.opacity(0.6).ignoresSafeArea()
-                ProgressView()
-                    .tint(VoidColor.text)
-                    .padding(VoidSpace.s6)
-                    .voidPanel(radius: VoidRadius.panel, line: VoidColor.hairline2)
-            }
-            .accessibilityLabel("Working")
-        }
+        ProgressView()
+            .tint(VoidColor.text2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle("Plan")
+            .navigationBarTitleDisplayMode(.large)
     }
 
     // MARK: - Destinations & sheets
@@ -241,10 +270,6 @@ struct PlanView: View {
             TemplateListView()
         case .account:
             AccountView()
-        case .workout(let template):
-            TemplateEditorView(existingTemplate: template, onSave: { saved in
-                viewModel.handleTemplateSaved(saved)
-            })
         }
     }
 
@@ -286,6 +311,27 @@ struct PlanView: View {
                     viewModel.clearDeleteState()
                 }
             )
+        }
+    }
+}
+
+// MARK: - Bottom bar
+
+extension View {
+    /// Pins a Plan screen's bottom actions (the Other plans / Edit plan pills, the Activate button)
+    /// above the tab bar. On iOS 26 it is a safe-area bar, so the scroll edge effect runs under it;
+    /// earlier versions put it on the hull so rows don't show through between the buttons.
+    @ViewBuilder
+    func planBottomBar<Bar: View>(@ViewBuilder _ bar: () -> Bar) -> some View {
+        if #available(iOS 26.0, *) {
+            safeAreaBar(edge: .bottom, spacing: 0) {
+                bar()
+            }
+        } else {
+            safeAreaInset(edge: .bottom, spacing: 0) {
+                bar()
+                    .background(VoidColor.hull)
+            }
         }
     }
 }

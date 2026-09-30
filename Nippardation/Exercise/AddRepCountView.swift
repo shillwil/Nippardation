@@ -4,7 +4,10 @@
 //
 //  Created by Alex Shillingford on 5/9/25.
 //
-//  "Add set" sheet: panel chrome, eyebrow title, panel-2 stepper wells, one plasma CTA.
+//  "Add set" sheet: a system form under a navigation bar (Cancel / Save). Set type, reps and
+//  weight are all entered here with the rows in `SetEntryForm.swift`; weight is typed on the
+//  decimal pad or stepped in place, with no separate weight sheet. Opens on the last set type
+//  logged for this exercise, with the last weight and reps logged for that type.
 //
 
 import SwiftUI
@@ -16,8 +19,8 @@ struct AddRepCountView: View {
     @Environment(\.dismiss) var dismiss
     var onSave: (TrackedSet) -> Void
     @State private var exercise: Exercise
-    @State private var showWeightPicker = false
     @State private var weightString: String = ""
+    @FocusState private var isWeightFocused: Bool
     
     @AppStorage("lastWorkingWeight-") private var lastWorkingWeight: Double = 0.0
     @AppStorage("lastWarmupWeight-") private var lastWarmupWeight: Double = 0.0
@@ -45,13 +48,17 @@ struct AddRepCountView: View {
         let savedSetType = UserDefaults.standard.string(forKey: setTypeKey) ?? "warmup"
         
         let initialSetType: SetType = savedSetType == "warmup" ? .warmup : .working
-        let initialReps: Int = defaultWarmupReps > 0 ? defaultWarmupReps : exercise.reps.lowerBound
-        let initialWeight: Double = defaultWarmupWeight > 0 ? defaultWarmupWeight : 45.0
+        // The memory for the type the sheet opens on: `onChange(of: setType)` doesn't run for
+        // the initial value, so a Working opening would otherwise show the warm-up numbers.
+        let rememberedReps = initialSetType == .working ? defaultWorkingReps : defaultWarmupReps
+        let rememberedWeight = initialSetType == .working ? defaultWorkingWeight : defaultWarmupWeight
+        let initialReps: Int = rememberedReps > 0 ? rememberedReps : exercise.reps.lowerBound
+        let initialWeight: Double = rememberedWeight > 0 ? rememberedWeight : 45.0
         
         _reps = State(initialValue: initialReps)
         _weight = State(initialValue: initialWeight)
         _setType = State(initialValue: initialSetType)
-        _weightString = State(initialValue: String(format: "%.1f", initialWeight))
+        _weightString = State(initialValue: SetEntry.weightText(initialWeight))
         
         _lastWorkingWeight = AppStorage(wrappedValue: defaultWorkingWeight, workingKey)
         _lastWarmupWeight = AppStorage(wrappedValue: defaultWarmupWeight, warmupKey)
@@ -61,136 +68,111 @@ struct AddRepCountView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            LoggerSheetHeader(title: "Add set") {
-                LoggerCloseButton(accessibilityLabel: "Close") {
-                    dismiss()
+        NavigationStack {
+            Form {
+                // The exercise, as a title above the form's cards.
+                Section {
+                    Text(exercise.type.name)
+                        .font(VoidFont.title)
+                        .foregroundStyle(VoidColor.text)
+                        .lineLimit(2)
+                        .accessibilityAddTraits(.isHeader)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+
+                Section {
+                    SetTypePicker(setType: $setType)
+                    SetRepsStepper(reps: $reps)
+                } footer: {
+                    Text(targetReadout)
+                }
+
+                SetWeightSection(weight: $weight, text: $weightString, isFocused: $isWeightFocused)
+            }
+            .listSectionSpacing(.compact)
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("Add set")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    // Dismissing throws the entry away, so this is Cancel rather than Close.
+                    Button("Cancel", role: .cancel) {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveSet()
+                    }
+                    .disabled(!canSave)
+                }
+                // The decimal pad has no return key.
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isWeightFocused = false
+                    }
                 }
             }
-
-            VStack(alignment: .leading, spacing: VoidSpace.s4) {
-                Text(exercise.type.name)
-                    .font(VoidFont.title)
-                    .foregroundStyle(VoidColor.text)
-                    .lineLimit(2)
-                    .padding(.leading, VoidSpace.insetText - VoidSpace.insetCard)
-
-                repsSection
-
-                repTypePicker
-
-                weightSelector
-
-                Text(targetReadout)
-                    .voidReadout()
-                    .padding(.leading, VoidSpace.insetText - VoidSpace.insetCard)
+            .onChange(of: setType) { oldValue, newValue in
+                // Update values based on set type
+                if newValue == .warmup {
+                    // Switch to warmup values
+                    if lastWarmupWeight > 0 {
+                        weight = lastWarmupWeight
+                        weightString = SetEntry.weightText(lastWarmupWeight)
+                    }
+                    if lastWarmupReps > 0 {
+                        reps = lastWarmupReps
+                    }
+                } else if newValue == .working {
+                    // Switch to working values
+                    if lastWorkingWeight > 0 {
+                        weight = lastWorkingWeight
+                        weightString = SetEntry.weightText(lastWorkingWeight)
+                    }
+                    if lastWorkingReps > 0 {
+                        reps = lastWorkingReps
+                    }
+                }
             }
-            .padding(.horizontal, VoidSpace.insetCard)
-            .padding(.top, VoidSpace.s2)
-
-            Spacer(minLength: VoidSpace.s4)
-
-            saveButton
         }
-        .background(VoidColor.panel.ignoresSafeArea())
-        .sheet(isPresented: $showWeightPicker) {
-            WeightInputView(weight: $weight, weightString: $weightString)
-                .presentationDetents([.fraction(0.667)])
-                .voidSheet()
-        }
+        .tint(VoidColor.plasmaInk)
     }
 
     private var targetReadout: String {
         "Target \(VoidFormat.pad2(exercise.reps.lowerBound)) – \(VoidFormat.pad2(exercise.reps.upperBound)) reps"
     }
     
-    private var repsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            LoggerFieldLabel(title: "Reps")
-            LoggerStepperWell(
-                value: VoidFormat.pad2(reps),
-                unit: "reps",
-                decrementLabel: "One rep fewer",
-                incrementLabel: "One rep more",
-                onDecrement: {
-                    if reps > 1 {
-                        reps -= 1
-                    }
-                },
-                onIncrement: {
-                    reps += 1
-                }
-            )
-        }
+    /// Save stays off until there's a weight in range to save.
+    private var canSave: Bool {
+        SetEntry.weightToSave(text: weightString, weight: weight) != nil
     }
-    
-    private var repTypePicker: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            LoggerFieldLabel(title: "Set type")
-            LoggerSegmentedControl(
-                items: [SetType.warmup, SetType.working],
-                label: { $0 == .warmup ? "Warm-up" : "Working" },
-                selection: $setType
-            )
+
+    /// The typed weight is read here, not on focus loss, so a number still being typed is kept.
+    /// A remembered or stepped weight the text still shows is saved as it is, unrounded.
+    private func saveSet() {
+        guard let enteredWeight = SetEntry.weightToSave(text: weightString, weight: weight) else { return }
+        isWeightFocused = false
+        weight = enteredWeight
+
+        // Save the weight for this exercise and set type
+        if setType == .working {
+            lastWorkingWeight = enteredWeight
+            lastWorkingReps = reps
+        } else {
+            lastWarmupWeight = enteredWeight
+            lastWarmupReps = reps
         }
-        .onChange(of: setType) { oldValue, newValue in
-           // Update values based on set type
-           if newValue == .warmup {
-               // Switch to warmup values
-               if lastWarmupWeight > 0 {
-                   weight = lastWarmupWeight
-                   weightString = String(format: "%.1f", weight)
-               }
-               if lastWarmupReps > 0 {
-                   reps = lastWarmupReps
-               }
-           } else if newValue == .working {
-               // Switch to working values
-               if lastWorkingWeight > 0 {
-                   weight = lastWorkingWeight
-                   weightString = String(format: "%.1f", weight)
-               }
-               if lastWorkingReps > 0 {
-                   reps = lastWorkingReps
-               }
-           }
-       }
-    }
     
-    private var weightSelector: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            LoggerFieldLabel(title: "Weight · lbs")
-            LoggerValueWell(
-                value: String(format: "%.1f", weight),
-                unit: "lbs",
-                accessibilityLabel: "Weight, opens the weight entry"
-            ) {
-                showWeightPicker = true
-            }
-        }
-    }
+        // Save the last used set type
+        lastSetType = setType == .warmup ? "warmup" : "working"
     
-    private var saveButton: some View {
-        VoidCTAButton(title: "Save set") {
-            // Save the weight for this exercise and set type
-            if setType == .working {
-                lastWorkingWeight = weight
-                lastWorkingReps = reps
-            } else {
-                lastWarmupWeight = weight
-                lastWarmupReps = reps
-            }
-                            
-            // Save the last used set type
-            lastSetType = setType == .warmup ? "warmup" : "working"
-            
-            // Create tracked set and save
-            let trackedSet = TrackedSet(reps: reps, weight: weight, setType: setType, exerciseType: exercise.type)
-            onSave(trackedSet)
-            dismiss()
-        }
-        .padding(.horizontal, VoidSpace.insetCard)
-        .padding(.bottom, VoidSpace.s3)
+        // Create tracked set and save
+        let trackedSet = TrackedSet(reps: reps, weight: enteredWeight, setType: setType, exerciseType: exercise.type)
+        onSave(trackedSet)
+        dismiss()
     }
 }
 

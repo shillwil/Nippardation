@@ -2,8 +2,9 @@
 //  TemplateListView.swift
 //  Nippardation
 //
-//  Workout library — every workout the user has built, one 66pt row each.
-//  Pushed from Plan → ··· → Workout library. System nav bar, inline title, back button.
+//  Workout library — every workout the user has built, one row each, in an inset-grouped
+//  List with the system search field. Pushed from Plan → ··· → Workout library. New workout
+//  is the toolbar's add button; swipe a row to duplicate or delete it (long-press also shares).
 //
 
 import SwiftUI
@@ -20,10 +21,18 @@ struct TemplateListView: View {
     @State private var showShareSheet = false
 
     var body: some View {
-        content
+        library
             .navigationTitle("Workout library")
             .navigationBarTitleDisplayMode(.inline)
             .voidScreen()
+            .searchable(text: $viewModel.searchText, prompt: "Search workouts")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("New workout", systemImage: VoidIcon.plus.systemName) {
+                        showCreateTemplate = true
+                    }
+                }
+            }
             .sheet(isPresented: $showCreateTemplate) {
                 NavigationStack {
                     TemplateEditorView(onSave: { template in
@@ -54,6 +63,7 @@ struct TemplateListView: View {
                             subtitle: PlanShareItemSource.subtitle(for: template)
                         )
                     ])
+                    .presentationDetents([.medium, .large])
                 }
             }
             .onChange(of: shareViewModel.shareURL) { _, url in
@@ -90,56 +100,51 @@ struct TemplateListView: View {
 
     // MARK: - Content
 
-    @ViewBuilder
-    private var content: some View {
-        if viewModel.isLoading && viewModel.templates.isEmpty {
-            loadingView
-        } else {
-            library
-        }
-    }
-
-    private var loadingView: some View {
-        VStack(spacing: VoidSpace.s3) {
-            ProgressView()
-                .tint(VoidColor.text2)
-            Text("Loading")
-                .voidEyebrowSm()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
+    /// The List is always there, so pull-to-refresh and search work even when it's empty;
+    /// loading and empty states sit over it.
     private var library: some View {
-        ScrollView {
-            VStack(spacing: VoidSpace.s3) {
-                VoidTextField(placeholder: "Search workouts", text: $viewModel.searchText, icon: .search)
-                    .padding(.horizontal, VoidSpace.insetCard)
-                    .padding(.top, VoidSpace.s2)
-
-                VoidListPanel {
-                    NewWorkoutRow {
-                        showCreateTemplate = true
-                    }
-
-                    if viewModel.templates.isEmpty {
-                        VoidHairline()
-                        VoidPlaceholder(eyebrow: "No workouts yet", caption: "Build one here, or let a plan add them.")
-                    } else if viewModel.filteredTemplates.isEmpty {
-                        VoidHairline()
-                        VoidPlaceholder(eyebrow: "No matches")
-                    } else {
-                        ForEach(viewModel.filteredTemplates) { template in
-                            VoidHairline()
-                            workoutRow(template)
-                        }
-                    }
-                }
-                .padding(.bottom, VoidSpace.s6)
+        List {
+            ForEach(viewModel.filteredTemplates) { template in
+                workoutRow(template)
             }
         }
+        .listStyle(.insetGrouped)
         .scrollDismissesKeyboard(.interactively)
+        .overlay {
+            emptyState
+        }
         .refreshable {
             await viewModel.refreshAsync()
+        }
+    }
+
+    @ViewBuilder
+    private var emptyState: some View {
+        if viewModel.templates.isEmpty {
+            if viewModel.isLoading {
+                ProgressView {
+                    Text("Loading")
+                        .voidEyebrowSm()
+                }
+                .tint(VoidColor.text2)
+            } else {
+                ContentUnavailableView {
+                    Label("No workouts yet", systemImage: VoidIcon.library.systemName)
+                } description: {
+                    Text("Build one, or let a plan add them.")
+                } actions: {
+                    Button {
+                        showCreateTemplate = true
+                    } label: {
+                        Text("New workout")
+                            .foregroundStyle(VoidColor.onPlasma)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(VoidColor.plasma)
+                }
+            }
+        } else if viewModel.filteredTemplates.isEmpty {
+            ContentUnavailableView.search(text: viewModel.searchText)
         }
     }
 
@@ -154,7 +159,25 @@ struct TemplateListView: View {
         } label: {
             WorkoutLibraryRow(template: template)
         }
-        .buttonStyle(VoidRowButtonStyle())
+        .listRowBackground(VoidColor.panel)
+        .listRowSeparatorTint(VoidColor.hairline)
+        .swipeActions(edge: .trailing) {
+            // No destructive role: Delete asks first, and the role would animate the row
+            // away before the answer.
+            Button {
+                requestDelete(template)
+            } label: {
+                Label("Delete", systemImage: VoidIcon.trash.systemName)
+            }
+            .tint(.red)
+
+            Button {
+                viewModel.duplicateTemplate(template)
+            } label: {
+                Label("Duplicate", systemImage: GapIcon.duplicate)
+            }
+            .tint(.gray)
+        }
         .contextMenu {
             Button {
                 viewModel.duplicateTemplate(template)
@@ -171,12 +194,16 @@ struct TemplateListView: View {
             Divider()
 
             Button(role: .destructive) {
-                templateToDelete = template
-                showDeleteConfirmation = true
+                requestDelete(template)
             } label: {
                 Label("Delete", systemImage: VoidIcon.trash.systemName)
             }
         }
+    }
+
+    private func requestDelete(_ template: Template) {
+        templateToDelete = template
+        showDeleteConfirmation = true
     }
 
     private func share(_ template: Template) {
@@ -190,7 +217,8 @@ struct TemplateListView: View {
 
 // MARK: - Rows
 
-/// 66pt library row: 52pt workout tile · name · "6 exercises · ~55 min · edited 2d ago" · chevron.
+/// Library row: 52pt workout tile · name · "6 exercises · ~55 min · edited 2d ago".
+/// The NavigationLink around it draws the disclosure chevron.
 private struct WorkoutLibraryRow: View {
     let template: Template
 
@@ -208,14 +236,8 @@ private struct WorkoutLibraryRow: View {
                     .foregroundStyle(VoidColor.text2)
                     .lineLimit(1)
             }
-
-            Spacer(minLength: VoidSpace.s2)
-
-            VoidChevron()
         }
-        .frame(height: VoidSize.listRow)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        .padding(.vertical, VoidSpace.s1)
     }
 
     private var caption: String {
@@ -239,46 +261,6 @@ private struct WorkoutLibraryRow: View {
         case 30..<365: return "edited \(days / 30)mo ago"
         default: return "edited \(days / 365)y ago"
         }
-    }
-}
-
-/// First row of the library: a plus tile and "New workout".
-private struct NewWorkoutRow: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: VoidSpace.s3) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous)
-                        .fill(VoidColor.panel2)
-                    Image(systemName: VoidIcon.plus.systemName)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(VoidColor.text)
-                }
-                .frame(width: VoidSize.tile, height: VoidSize.tile)
-                .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("New workout")
-                        .font(VoidFont.bodyStrong)
-                        .foregroundStyle(VoidColor.text)
-                        .lineLimit(1)
-                    Text("Pick exercises, sets and rest")
-                        .font(VoidFont.caption2)
-                        .foregroundStyle(VoidColor.text2)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: VoidSpace.s2)
-
-                VoidChevron()
-            }
-            .frame(height: VoidSize.listRow)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(VoidRowButtonStyle())
-        .accessibilityLabel("New workout")
     }
 }
 

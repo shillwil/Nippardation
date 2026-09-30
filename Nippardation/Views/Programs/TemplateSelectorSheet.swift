@@ -2,7 +2,8 @@
 //  TemplateSelectorSheet.swift
 //  Nippardation
 //
-//  Workout picker for the plan wizard.
+//  Workout picker for the plan wizard and the plan editor: a native list of the user's workouts,
+//  plus a link that builds a new one.
 //
 
 import SwiftUI
@@ -17,51 +18,53 @@ struct TemplateSelectorSheet: View {
         NavigationStack {
             Group {
                 if isLoading {
-                    VStack(spacing: VoidSpace.s3) {
-                        ProgressView().tint(VoidColor.plasma)
+                    ProgressView {
                         Text("Loading workouts")
                             .font(VoidFont.caption)
                             .foregroundStyle(VoidColor.text2)
                     }
+                    .tint(VoidColor.plasma)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if templates.isEmpty {
-                    VStack(spacing: VoidSpace.s4) {
-                        VoidPlaceholder(eyebrow: "No workouts yet", caption: "Create a workout to use in your plan.")
-                        VoidListPanel {
+                    ContentUnavailableView {
+                        Label("No workouts yet", systemImage: VoidIcon.barbell.systemName)
+                    } description: {
+                        Text("Create a workout to use in your plan.")
+                    } actions: {
+                        NavigationLink {
+                            newWorkoutEditor
+                        } label: {
+                            Text("Create new workout")
+                                .foregroundStyle(VoidColor.onPlasma)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(VoidColor.plasma)
+                    }
+                } else {
+                    List {
+                        Section {
                             createWorkoutLink
                         }
-                    }
-                    .padding(.top, VoidSpace.s6)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            VoidListPanel {
-                                createWorkoutLink
-                            }
 
-                            VoidSectionRow(title: "Your workouts", trailing: VoidFormat.pad2(templates.count))
-                                .padding(.top, VoidSpace.s3)
-
-                            VoidListPanel {
-                                ForEach(Array(templates.enumerated()), id: \.element.id) { index, template in
-                                    workoutRow(template)
-                                    if index < templates.count - 1 {
-                                        VoidHairline()
-                                    }
-                                }
+                        Section {
+                            ForEach(templates) { template in
+                                workoutRow(template)
                             }
+                        } header: {
+                            Text("Your workouts")
                         }
-                        .padding(.vertical, VoidSpace.s2)
                     }
+                    .listStyle(.insetGrouped)
                 }
             }
             .voidScreen()
             .navigationTitle("Choose workout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) {
+                        dismiss()
+                    }
                 }
             }
         }
@@ -69,6 +72,7 @@ struct TemplateSelectorSheet: View {
 
     // MARK: - Rows
 
+    /// Picks the workout and closes the sheet, so the row carries no disclosure chevron.
     private func workoutRow(_ template: Template) -> some View {
         Button {
             onSelect(template)
@@ -86,24 +90,16 @@ struct TemplateSelectorSheet: View {
                         .font(VoidFont.caption2)
                         .foregroundStyle(VoidColor.text2)
                 }
-
-                Spacer(minLength: VoidSpace.s2)
-
-                VoidChevron()
             }
-            .frame(height: VoidSize.listRow)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(VoidRowButtonStyle())
-        .accessibilityElement(children: .combine)
+        .listRowBackground(VoidColor.panel)
+        .listRowSeparatorTint(VoidColor.hairline)
     }
 
+    /// Pushes the workout editor; the list draws the disclosure chevron.
     private var createWorkoutLink: some View {
         NavigationLink {
-            TemplateEditorView(onSave: { template in
-                onSelect(template)
-                dismiss()
-            })
+            newWorkoutEditor
         } label: {
             HStack(spacing: VoidSpace.s3) {
                 WizardGlyphSquare(icon: .plus)
@@ -112,22 +108,32 @@ struct TemplateSelectorSheet: View {
                     .font(VoidFont.bodyStrong)
                     .foregroundStyle(VoidColor.text)
                     .lineLimit(1)
-
-                Spacer(minLength: VoidSpace.s2)
-
-                VoidChevron()
             }
-            .frame(height: VoidSize.listRow)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(VoidRowButtonStyle())
-        .accessibilityElement(children: .combine)
+        .listRowBackground(VoidColor.panel)
+    }
+
+    /// A saved new workout is picked straight away and the sheet closes.
+    private var newWorkoutEditor: some View {
+        TemplateEditorView(onSave: { template in
+            onSelect(template)
+            dismiss()
+        })
     }
 }
 
 #Preview {
     TemplateSelectorSheet(
         templates: MockTemplateRepository.sampleTemplates,
+        isLoading: false,
+        onSelect: { _ in }
+    )
+    .withDependencies(.preview)
+}
+
+#Preview("No workouts") {
+    TemplateSelectorSheet(
+        templates: [],
         isLoading: false,
         onSelect: { _ in }
     )

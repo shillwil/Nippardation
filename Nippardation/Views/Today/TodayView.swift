@@ -3,8 +3,10 @@
 //  Nippardation
 //
 //  Today tab: one glance, one tap. Reads icon → word → button.
-//  Eyebrow row (date · streak chip), the 76pt hero tile, ▮ UP NEXT, the one Michroma word,
-//  the DAY 02 / 05 readout, the giant Start, an exercises · minutes caption, and two pills.
+//  A standard navigation bar (Today over the date — its subtitle on iOS 26, a two-line title
+//  before that — and the streak as bar status), then the 76pt hero tile, ▮ UP NEXT, the one
+//  Michroma word, the DAY 02 / 05 readout, the giant Start, an exercises · minutes caption,
+//  and two pills.
 //
 
 import SwiftUI
@@ -37,10 +39,6 @@ struct TodayView: View {
         let hero = heroContent
 
         VStack(spacing: 0) {
-            VoidEyebrowRow(VoidFormat.dateEyebrow(Date())) {
-                VoidChip(icon: .flame, text: "\(VoidFormat.pad2(viewModel.streakWeeks)) WK")
-            }
-
             Spacer(minLength: VoidSpace.s3)
 
             heroBlock(hero)
@@ -70,10 +68,19 @@ struct TodayView: View {
                 onLeading: previewTapped,
                 onTrailing: { showSwapSheet = true }
             )
-            .padding(.bottom, VoidSpace.pillsBottom)
+            // The system tab bar insets the safe area; the pills only need the standard gap above it.
+            .padding(.bottom, VoidSpace.s4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .voidRootScreen()
+        .navigationTitle("Today")
+        // Inline, not large: this screen never scrolls, so a large title would never collapse, and
+        // its extra ~52pt (plus the iOS 26 subtitle) leaves this fixed layout ~20pt short on 375×667.
+        .navigationBarTitleDisplayMode(.inline)
+        .todayDateSubtitle(VoidFormat.dateEyebrow(Date()))
+        .toolbar { streakToolbarItem }
+        .voidScreen()
+        // Light impact when the plan advances (a checkpoint reached).
+        .sensoryFeedback(.impact(weight: .light), trigger: viewModel.planAdvanceCount)
         .onAppear {
             workoutManager.loadCompletedWorkouts()
             if !didCheckForActiveWorkout {
@@ -90,7 +97,6 @@ struct TodayView: View {
             viewModel.overrideDidChange(newValue)
         }
         .onChange(of: viewModel.planAdvanceCount) { _, _ in
-            VoidHaptics.light()
             navigation.planDidChange()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WorkoutDataUpdated"))) { _ in
@@ -127,6 +133,36 @@ struct TodayView: View {
         } message: {
             Text(viewModel.error ?? "")
         }
+    }
+
+    // MARK: - Navigation bar
+
+    /// The streak is status, not an action: a title-and-icon label in the bar. On iOS 26 it opts
+    /// out of the shared glass capsule, which would make it read as a tappable button.
+    @ToolbarContentBuilder
+    private var streakToolbarItem: some ToolbarContent {
+        if #available(iOS 26.0, *) {
+            ToolbarItem(placement: .topBarTrailing) {
+                streakLabel
+            }
+            .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(placement: .topBarTrailing) {
+                streakLabel
+            }
+        }
+    }
+
+    private var streakLabel: some View {
+        Label("\(VoidFormat.pad2(viewModel.streakWeeks)) WK", systemImage: VoidIcon.flame.systemName)
+            .labelStyle(.titleAndIcon)
+            .accessibilityLabel(streakAccessibilityLabel)
+    }
+
+    /// "Streak, 3 weeks" — the bar shows the console form "03 WK".
+    private var streakAccessibilityLabel: String {
+        let weeks = viewModel.streakWeeks
+        return "Streak, \(weeks) \(weeks == 1 ? "week" : "weeks")"
     }
 
     // MARK: - Hero block
@@ -323,6 +359,35 @@ private struct HeroContent {
 /// Spec gaps with no VoidSpace token (HANDOFF §1: eyebrow → 6 → word → 6 → readout).
 private enum TodayLayout {
     static let wordGap: CGFloat = 6
+}
+
+private extension View {
+    /// The date ("TUE · 09.08") under the Today title. iOS 26 shows it as the navigation subtitle;
+    /// earlier systems have no subtitle slot, so the bar's principal item stacks the title over the
+    /// date instead. `navigationTitle` still names the screen for the back button and VoiceOver.
+    @ViewBuilder
+    func todayDateSubtitle(_ text: String) -> some View {
+        if #available(iOS 26.0, *) {
+            navigationSubtitle(text)
+        } else {
+            toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 0) {
+                        // The face and size the bar's own title uses (see NippardationApp).
+                        Text("Today")
+                            .font(.custom(VoidFont.labelFontName, fixedSize: VoidFont.navTitleSize))
+                        Text(text)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    // Both lines share the 44pt bar, which doesn't grow with the text size.
+                    .dynamicTypeSize(...DynamicTypeSize.xLarge)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isHeader)
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Previews

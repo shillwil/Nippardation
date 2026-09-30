@@ -2,7 +2,8 @@
 //  AIWizardStep1GoalView.swift
 //  Nippardation
 //
-//  Step 1: training goal and split preference.
+//  Step 1: training goal (a checkmark list) and split preference (a menu, with Custom opening
+//  a free-text description).
 //
 
 import SwiftUI
@@ -10,122 +11,82 @@ import SwiftUI
 struct AIWizardStep1GoalView: View {
     @ObservedObject var viewModel: AIWizardViewModel
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: VoidSpace.s6) {
-                AISectionHeader("Your goal", subtitle: "Pick a training focus.")
-                    .padding(.horizontal, VoidSpace.s1)
-
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
-                ], spacing: 10) {
-                    ForEach(AITrainingGoal.allCases) { goal in
-                        goalCard(goal)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                    WizardSectionLabel(title: "Preferred split")
-                    WizardHelperText(text: "Pick a split or describe your own.")
-
-                    FlowLayout(spacing: VoidSpace.s2) {
-                        ForEach(AISplitSuggestion.allCases) { suggestion in
-                            WizardChip(
-                                title: suggestion.rawValue,
-                                isSelected: viewModel.selectedSplitSuggestion == suggestion
-                            ) {
-                                viewModel.selectSplitSuggestion(suggestion)
-                            }
-                        }
-                    }
-                    .padding(.top, VoidSpace.s1)
-
-                    VoidTextField(placeholder: "Or type your own, e.g. Arnold split", text: $viewModel.inspirationSource)
-                        .onChange(of: viewModel.inspirationSource) { _, newValue in
-                            // Clear the chip when the text no longer matches it.
-                            if let selected = viewModel.selectedSplitSuggestion,
-                               newValue != selected.rawValue {
-                                viewModel.selectedSplitSuggestion = nil
-                            }
-                        }
+    /// The split menu's selection: a suggestion, or nil for Custom. Choosing a suggestion writes its
+    /// name into the prompt; switching back to Custom clears it for the user's own words.
+    private var splitSelection: Binding<AISplitSuggestion?> {
+        Binding(
+            get: { viewModel.selectedSplitSuggestion },
+            set: { newValue in
+                if let newValue {
+                    viewModel.selectedSplitSuggestion = newValue
+                    viewModel.inspirationSource = newValue.rawValue
+                } else if viewModel.selectedSplitSuggestion != nil {
+                    viewModel.selectedSplitSuggestion = nil
+                    viewModel.inspirationSource = ""
                 }
             }
-            .padding(.horizontal, VoidSpace.insetCard)
-            .padding(.vertical, VoidSpace.s2)
+        )
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Goal", selection: $viewModel.selectedGoal) {
+                    ForEach(AITrainingGoal.allCases) { goal in
+                        goalLabel(goal)
+                            .tag(goal)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } header: {
+                Text("Goal")
+            } footer: {
+                Text("Pick a training focus.")
+            }
+            .wizardFormRows()
+
+            Section {
+                Picker("Split", selection: splitSelection) {
+                    ForEach(AISplitSuggestion.allCases) { suggestion in
+                        Text(suggestion.rawValue)
+                            .tag(Optional(suggestion))
+                    }
+                    Text("Custom")
+                        .tag(AISplitSuggestion?.none)
+                }
+                .pickerStyle(.menu)
+                // The menu shows its value as tinted text; plasma text is too faint on a light panel.
+                .tint(VoidColor.text2)
+
+                if viewModel.selectedSplitSuggestion == nil {
+                    TextField("Describe it, e.g. Arnold split", text: $viewModel.inspirationSource)
+                        .foregroundStyle(VoidColor.text)
+                }
+            } header: {
+                Text("Preferred split")
+            } footer: {
+                Text("Pick a split, or choose Custom and describe your own. Leave it blank to let the AI decide.")
+            }
+            .wizardFormRows()
         }
         .scrollDismissesKeyboard(.interactively)
     }
 
-    // MARK: - Subviews
+    // MARK: - Rows
 
-    private func goalCard(_ goal: AITrainingGoal) -> some View {
-        WizardOptionCard(isSelected: viewModel.selectedGoal == goal, action: {
-            viewModel.selectedGoal = goal
-        }) {
-            VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                Image(systemName: goal.icon)
-                    .font(.system(size: 22, weight: .medium))
+    private func goalLabel(_ goal: AITrainingGoal) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(goal.displayName)
                     .foregroundStyle(VoidColor.text)
-                    .frame(height: 26)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(goal.displayName)
-                        .font(VoidFont.bodyStrong)
-                        .foregroundStyle(VoidColor.text)
-                    Text(goal.subtitle)
-                        .font(VoidFont.caption2)
-                        .foregroundStyle(VoidColor.text2)
-                }
+                Text(goal.subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(VoidColor.text2)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+        } icon: {
+            Image(systemName: goal.icon)
         }
-        .accessibilityLabel("\(goal.displayName), \(goal.subtitle)")
-    }
-}
-
-// MARK: - Flow Layout
-
-/// Simple flow layout for wrapping chips horizontally
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y), proposal: .unspecified)
-        }
-    }
-
-    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint]) {
-        let maxWidth = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        var maxX: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > maxWidth && currentX > 0 {
-                currentX = 0
-                currentY += lineHeight + spacing
-                lineHeight = 0
-            }
-            positions.append(CGPoint(x: currentX, y: currentY))
-            lineHeight = max(lineHeight, size.height)
-            currentX += size.width + spacing
-            maxX = max(maxX, currentX)
-        }
-
-        return (CGSize(width: maxX, height: currentY + lineHeight), positions)
     }
 }
 
@@ -133,6 +94,8 @@ struct FlowLayout: Layout {
     NavigationStack {
         AIWizardStep1GoalView(viewModel: AIWizardViewModel())
             .voidScreen()
+            .navigationTitle("Goal")
+            .navigationBarTitleDisplayMode(.inline)
     }
     .withDependencies(.preview)
 }

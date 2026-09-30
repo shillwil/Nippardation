@@ -5,19 +5,20 @@
 //  The Plans hub (HANDOFF screen 4): the one place to get a plan — generate it, receive it,
 //  restore it, later browse the community's. Shown as the Plan tab root when there is no
 //  active plan (`isRoot`), and pushed from Plan → Other plans / Switch plan.
+//  A grouped list: the create buttons, Sent to you, Your plans, Community.
 //
 
 import SwiftUI
 
 struct PlansHubView: View {
-    /// Root of the Plan tab (eyebrow row + hidden nav bar) vs pushed (inline eyebrow title).
+    /// Root of the Plan tab (no active plan) vs pushed from Plan; decides where the active plan's row goes.
     var isRoot: Bool = true
 
     @StateObject private var viewModel: PlansHubViewModel
     @EnvironmentObject private var navigation: AppNavigation
     @Environment(\.dismiss) private var dismiss
 
-    @State private var route: PlansHubRoute?
+    @State private var showAccount = false
     @State private var showPaste = false
     @State private var showStarter = false
     @State private var showBuild = false
@@ -32,191 +33,167 @@ struct PlansHubView: View {
     // MARK: - Body
 
     var body: some View {
-        screen
-            .navigationDestination(item: $route) { route in
-                switch route {
-                case .account:
-                    AccountView()
-                case .preview(let program):
-                    PlanPreviewView(program: program)
+        List {
+            createSection
+
+            if !viewModel.receivedPlans.isEmpty {
+                sentSection
+            }
+
+            yourPlansSection
+
+            communitySection
+        }
+        .listStyle(.insetGrouped)
+        .voidScreen()
+        .navigationTitle("Plans")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button("Paste a link", systemImage: VoidIcon.link.systemName) {
+                    showPaste = true
+                }
+                Button("Account", systemImage: VoidIcon.person.systemName) {
+                    showAccount = true
                 }
             }
-            .onAppear { viewModel.load() }
-            .onChange(of: navigation.planRevision) { _, _ in viewModel.load() }
-            .onChange(of: viewModel.mutationCount) { _, _ in navigation.planDidChange() }
-            .sheet(isPresented: $showPaste, onDismiss: routePendingLink) {
-                PasteLinkSheet { url in pendingLinkURL = url }
+        }
+        .navigationDestination(isPresented: $showAccount) {
+            AccountView()
+        }
+        .onAppear { viewModel.load() }
+        .onChange(of: navigation.planRevision) { _, _ in viewModel.load() }
+        .onChange(of: viewModel.mutationCount) { _, _ in navigation.planDidChange() }
+        .sheet(isPresented: $showPaste, onDismiss: routePendingLink) {
+            PasteLinkSheet { url in pendingLinkURL = url }
+        }
+        .sheet(isPresented: $showStarter, onDismiss: { viewModel.load() }) {
+            StarterPlansSheet { _ in
+                navigation.planDidChange()
+                navigation.show(.today)
             }
-            .sheet(isPresented: $showStarter, onDismiss: { viewModel.load() }) {
-                StarterPlansSheet { _ in
-                    navigation.planDidChange()
-                    navigation.show(.today)
-                }
+            .environmentObject(navigation)
+        }
+        .sheet(isPresented: $showBuild, onDismiss: reloadAfterCreate) {
+            // The wizard brings its own NavigationStack.
+            ProgramWizardView()
                 .environmentObject(navigation)
-            }
-            .sheet(isPresented: $showBuild, onDismiss: reloadAfterCreate) {
-                NavigationStack {
-                    ProgramWizardView()
-                }
+        }
+        .fullScreenCover(isPresented: $showAI, onDismiss: reloadAfterCreate) {
+            AIWizardView()
                 .environmentObject(navigation)
+        }
+        .alert("Delete plan", isPresented: Binding(
+            get: { viewModel.programs.showSimpleDeleteAlert },
+            set: { viewModel.programs.showSimpleDeleteAlert = $0 }
+        )) {
+            Button("Cancel", role: .cancel) { viewModel.programs.clearDeleteState() }
+            Button("Delete", role: .destructive) {
+                if let program = viewModel.programs.programToDelete {
+                    viewModel.programs.deleteProgram(program)
+                }
+                viewModel.programs.clearDeleteState()
             }
-            .fullScreenCover(isPresented: $showAI, onDismiss: reloadAfterCreate) {
-                AIWizardView()
-                    .environmentObject(navigation)
-            }
-            .alert("Delete plan", isPresented: Binding(
-                get: { viewModel.programs.showSimpleDeleteAlert },
-                set: { viewModel.programs.showSimpleDeleteAlert = $0 }
-            )) {
-                Button("Cancel", role: .cancel) { viewModel.programs.clearDeleteState() }
-                Button("Delete", role: .destructive) {
-                    if let program = viewModel.programs.programToDelete {
-                        viewModel.programs.deleteProgram(program)
+        } message: {
+            Text("This removes the plan. Your workout history is never changed.")
+        }
+        .sheet(isPresented: Binding(
+            get: { viewModel.programs.showTemplateDeleteSheet },
+            set: { viewModel.programs.showTemplateDeleteSheet = $0 }
+        )) {
+            if let detail = viewModel.programs.programToDeleteDetail {
+                ProgramDeleteConfirmationView(
+                    program: detail,
+                    isDeletingProgram: viewModel.programs.isDeletingProgram,
+                    onConfirmDelete: { keepIds in
+                        viewModel.programs.deleteProgramWithTemplates(keepTemplateIds: keepIds)
+                    },
+                    onCancel: {
+                        viewModel.programs.clearDeleteState()
                     }
-                    viewModel.programs.clearDeleteState()
-                }
-            } message: {
-                Text("This removes the plan. Your workout history is never changed.")
+                )
             }
-            .sheet(isPresented: Binding(
-                get: { viewModel.programs.showTemplateDeleteSheet },
-                set: { viewModel.programs.showTemplateDeleteSheet = $0 }
-            )) {
-                if let detail = viewModel.programs.programToDeleteDetail {
-                    ProgramDeleteConfirmationView(
-                        program: detail,
-                        isDeletingProgram: viewModel.programs.isDeletingProgram,
-                        onConfirmDelete: { keepIds in
-                            viewModel.programs.deleteProgramWithTemplates(keepTemplateIds: keepIds)
-                        },
-                        onCancel: {
-                            viewModel.programs.clearDeleteState()
-                        }
-                    )
-                }
+        }
+    }
+
+    /// A native section header with an optional trailing note ("1 new", the plan count, "Coming soon").
+    private func sectionHeader(_ title: String, trailing: String? = nil) -> some View {
+        HStack {
+            Text(title)
+            Spacer(minLength: VoidSpace.s2)
+            if let trailing {
+                Text(trailing)
             }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Create
+
+    /// Three buttons on the hull, in a row or stacked: the AI plan is the screen's one plasma action.
+    private var createSection: some View {
+        Section {
+            // Side by side while all three titles fit; stacked at large text sizes instead of truncating.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { createButtons }
+                VStack(spacing: 10) { createButtons }
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+        }
     }
 
     @ViewBuilder
-    private var screen: some View {
-        if isRoot {
-            content
-                .voidRootScreen()
-        } else {
-            content
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        Text("Plans").voidEyebrow()
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        controls
-                    }
-                }
-                .voidScreen()
-        }
-    }
-
-    private var content: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if isRoot {
-                    VoidEyebrowRow("Plans") { controls }
-                }
-
-                createRow
-                    .padding(.top, 14)
-
-                if !viewModel.receivedPlans.isEmpty {
-                    sentSection
-                }
-
-                yourPlansSection
-
-                communitySection
-            }
-            .padding(.bottom, VoidSpace.pillsBottom)
-        }
-        .scrollIndicators(.hidden)
-    }
-
-    // MARK: - Eyebrow controls
-
-    private var controls: some View {
-        HStack(spacing: 12) {
-            VoidControlButton(icon: .link, accessibilityLabel: "Paste a link") {
-                showPaste = true
-            }
-            VoidControlButton(icon: .person, accessibilityLabel: "Account") {
-                route = .account
-            }
-        }
-    }
-
-    // MARK: - Create row
-
-    private var createRow: some View {
-        HStack(spacing: 10) {
-            createTile(icon: .sparkle, label: "AI plan", plasma: true) { showAI = true }
-            createTile(icon: .list, label: "Starter") { showStarter = true }
-            createTile(icon: .plus, label: "Build") { showBuild = true }
-        }
-        .padding(.horizontal, VoidSpace.insetCard)
+    private var createButtons: some View {
+        createButton("AI plan", icon: .sparkle, prominent: true) { showAI = true }
+        createButton("Starter", icon: .list) { showStarter = true }
+        createButton("Build", icon: .plus) { showBuild = true }
     }
 
     @ViewBuilder
-    private func createTile(icon: VoidIcon, label: String, plasma: Bool = false, action: @escaping () -> Void) -> some View {
-        if plasma {
-            Button(action: action) {
-                tileLabel(icon, label, color: VoidColor.onPlasma)
-                    .background(VoidColor.plasma)
-                    .clipShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: VoidRadius.tile, style: .continuous))
+    private func createButton(_ title: String, icon: VoidIcon, prominent: Bool = false, action: @escaping () -> Void) -> some View {
+        let button = Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon.systemName)
+                    .font(.title2.weight(.medium))
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .buttonStyle(VoidScaleButtonStyle())
-            .accessibilityLabel(label)
-        } else {
-            Button(action: action) {
-                tileLabel(icon, label, color: VoidColor.text)
-            }
-            .buttonStyle(VoidPanelButtonStyle(radius: VoidRadius.tile, line: VoidColor.hairline2))
-            .accessibilityLabel(label)
+            .foregroundStyle(prominent ? VoidColor.onPlasma : VoidColor.text)
+            .frame(maxWidth: .infinity)
         }
-    }
+        .controlSize(.large)
+        .buttonBorderShape(.roundedRectangle(radius: VoidRadius.tile))
 
-    private func tileLabel(_ icon: VoidIcon, _ label: String, color: Color) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon.systemName)
-                .font(.system(size: 22, weight: .medium))
-                .frame(width: 24, height: 24)
-            Text(label)
-                .font(.custom(VoidFont.labelFontName, size: 10))
-                .tracking(1.2)
-                .textCase(.uppercase)
+        if prominent {
+            button
+                .buttonStyle(.borderedProminent)
+                .tint(VoidColor.plasma)
+        } else {
+            button
+                .buttonStyle(.bordered)
+                .tint(VoidColor.text)
         }
-        .foregroundStyle(color)
-        .frame(maxWidth: .infinity)
-        .frame(height: VoidSize.createTile)
     }
 
     // MARK: - Sent to you
 
     private var sentSection: some View {
-        VStack(spacing: 10) {
-            VoidSectionRow(title: "Sent to you", trailing: viewModel.receivedTrailing, trailingColor: VoidColor.plasma)
-            VoidListPanel {
-                let plans = viewModel.receivedPlans
-                ForEach(Array(plans.enumerated()), id: \.element.id) { index, plan in
-                    receivedRow(plan)
-                    if index < plans.count - 1 {
-                        VoidHairline()
-                    }
-                }
+        Section {
+            ForEach(viewModel.receivedPlans) { plan in
+                receivedRow(plan)
             }
+        } header: {
+            let unread = viewModel.unreadCount
+            sectionHeader("Sent to you", trailing: unread > 0 ? "\(unread) new" : nil)
         }
-        .padding(.top, 22)
     }
 
+    /// Opens the Plan received sheet, so a button row without a chevron.
     private func receivedRow(_ plan: ReceivedPlan) -> some View {
         Button {
             DeepLinkRouter.shared.open(token: plan.token)
@@ -237,11 +214,18 @@ struct PlansHubView: View {
                 if !plan.isRead {
                     PlasmaDot()
                 }
-                VoidChevron()
             }
-            .frame(height: VoidSize.listRow)
         }
-        .buttonStyle(VoidRowButtonStyle())
+        .listRowBackground(VoidColor.panel)
+        .listRowSeparatorTint(VoidColor.hairline)
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) {
+                viewModel.removeReceived(plan)
+            } label: {
+                Label("Remove", systemImage: VoidIcon.trash.systemName)
+            }
+            .tint(.red) // the plasma tint would otherwise recolour it
+        }
         .contextMenu {
             Button(role: .destructive) {
                 viewModel.removeReceived(plan)
@@ -249,80 +233,77 @@ struct PlansHubView: View {
                 Label("Remove", systemImage: VoidIcon.trash.systemName)
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityHint(plan.isRead ? "" : "New")
+        .accessibilityValue(plan.isRead ? "" : "New")
     }
 
     // MARK: - Your plans
 
     private var yourPlansSection: some View {
         let rows = viewModel.planRows
-        return VStack(spacing: 10) {
-            VoidSectionRow(title: "Your plans", trailing: rows.isEmpty ? nil : "\(rows.count)")
-            VoidListPanel {
-                if rows.isEmpty {
+        return Section {
+            if rows.isEmpty {
+                Group {
                     if viewModel.isLoading {
                         ProgressView()
                             .tint(VoidColor.plasma)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, VoidSpace.s6)
+                            .padding(.vertical, VoidSpace.s4)
                     } else {
                         VoidPlaceholder(
                             eyebrow: "No plans yet",
                             caption: "Generate one, pick a starter, build your own, or paste a link."
                         )
                     }
-                } else {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                        planRow(row)
-                        if index < rows.count - 1 {
-                            VoidHairline()
-                        }
-                    }
+                }
+                .listRowBackground(VoidColor.panel)
+            } else {
+                ForEach(rows) { row in
+                    planRow(row)
                 }
             }
+        } header: {
+            sectionHeader("Your plans", trailing: rows.isEmpty ? nil : "\(rows.count)")
+        } footer: {
             if let error = viewModel.error, rows.isEmpty {
                 Text(error)
-                    .font(VoidFont.caption2)
-                    .foregroundStyle(VoidColor.text3)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, VoidSpace.insetText)
             }
         }
-        .padding(.top, 22)
     }
 
+    /// Inactive plans push their preview (system chevron); the active plan's row goes back to its rotation.
     private func planRow(_ row: PlansHubViewModel.PlanRow) -> some View {
-        Button {
+        Group {
             if row.isActive {
-                goToActivePlan()
-            } else {
-                route = .preview(row.program)
-            }
-        } label: {
-            HStack(spacing: 12) {
-                VoidAvatar(text: row.initials, plasma: row.isActive, dimmed: row.isPaused)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(row.program.name)
-                        .font(VoidFont.bodyStrong)
-                        .foregroundStyle(row.isPaused ? VoidColor.text3 : VoidColor.text)
-                        .lineLimit(1)
-                    Text(row.caption)
-                        .font(VoidFont.caption2)
-                        .foregroundStyle(row.isPaused ? VoidColor.text3 : VoidColor.text2)
-                        .lineLimit(1)
+                Button {
+                    goToActivePlan()
+                } label: {
+                    planRowLabel(row)
                 }
-                Spacer(minLength: 8)
-                VoidChevron(color: row.isActive ? VoidColor.plasma : VoidColor.text3)
+            } else {
+                NavigationLink {
+                    PlanPreviewView(program: row.program)
+                } label: {
+                    planRowLabel(row)
+                }
             }
-            .frame(height: VoidSize.listRow)
         }
-        .buttonStyle(VoidRowButtonStyle())
-        .overlay(alignment: .leading) {
-            if row.isActive {
-                UpNextMark().offset(x: -14)
+        .listRowBackground(planRowBackground(row))
+        .listRowSeparatorTint(VoidColor.hairline)
+        .swipeActions(edge: .trailing) {
+            // A confirmation follows, so a red button rather than the destructive role,
+            // which would animate the row away before the user confirms.
+            Button {
+                viewModel.prepareDelete(row.program)
+            } label: {
+                Label("Delete", systemImage: VoidIcon.trash.systemName)
             }
+            .tint(.red)
+            Button {
+                viewModel.duplicate(row.program)
+            } label: {
+                Label("Duplicate", systemImage: VoidIcon.plus.systemName)
+            }
+            .tint(.gray)
         }
         .contextMenu {
             if !row.isActive {
@@ -344,37 +325,60 @@ struct PlansHubView: View {
                 Label("Delete", systemImage: VoidIcon.trash.systemName)
             }
         }
-        .accessibilityElement(children: .combine)
+    }
+
+    private func planRowLabel(_ row: PlansHubViewModel.PlanRow) -> some View {
+        HStack(spacing: 12) {
+            VoidAvatar(text: row.initials, plasma: row.isActive, dimmed: row.isPaused)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.program.name)
+                    .font(VoidFont.bodyStrong)
+                    .foregroundStyle(row.isPaused ? VoidColor.text3 : VoidColor.text)
+                    .lineLimit(1)
+                Text(row.caption)
+                    .font(VoidFont.caption2)
+                    .foregroundStyle(row.isPaused ? VoidColor.text3 : VoidColor.text2)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+        }
+    }
+
+    /// The panel fill, plus the up-next mark flush to the panel's leading edge on the active plan.
+    private func planRowBackground(_ row: PlansHubViewModel.PlanRow) -> some View {
+        ZStack(alignment: .leading) {
+            VoidColor.panel
+            if row.isActive {
+                UpNextMark()
+            }
+        }
     }
 
     // MARK: - Community
 
     private var communitySection: some View {
-        VStack(spacing: 10) {
-            VoidSectionRow(title: "Community", trailing: "Coming soon", trailingColor: VoidColor.text3)
-            VoidListPanel {
-                HStack(spacing: 12) {
-                    VoidAvatar(text: "4D")
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Recommended for 4 days a week")
-                            .font(VoidFont.bodyStrong)
-                            .foregroundStyle(VoidColor.text)
-                            .lineLimit(1)
-                        Text("Upper / Lower · coming soon")
-                            .font(VoidFont.caption2)
-                            .foregroundStyle(VoidColor.text2)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 8)
-                    VoidChevron()
+        Section {
+            HStack(spacing: 12) {
+                VoidAvatar(text: "4D")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Recommended for 4 days a week")
+                        .font(VoidFont.bodyStrong)
+                        .foregroundStyle(VoidColor.text)
+                        .lineLimit(1)
+                    Text("Upper / Lower · coming soon")
+                        .font(VoidFont.caption2)
+                        .foregroundStyle(VoidColor.text2)
+                        .lineLimit(1)
                 }
-                .frame(height: VoidSize.listRow)
+                Spacer(minLength: 8)
             }
             .opacity(0.45)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Community plans, coming soon")
+            .listRowBackground(VoidColor.panel)
+        } header: {
+            sectionHeader("Community", trailing: "Coming soon")
         }
-        .padding(.top, 22)
     }
 
     // MARK: - Actions
@@ -398,13 +402,6 @@ struct PlansHubView: View {
         viewModel.load()
         navigation.planDidChange()
     }
-}
-
-// MARK: - Routes
-
-private enum PlansHubRoute: Hashable {
-    case account
-    case preview(Program)
 }
 
 // MARK: - Previews

@@ -2,8 +2,9 @@
 //  ExerciseFilterSheet.swift
 //  Nippardation
 //
-//  Filter sheet for exercise browsing. Void sheet: panel background, eyebrow sections,
-//  44pt rows with hairlines and a plasma check on the selected options.
+//  Filter sheet for exercise browsing: a system Form with a checkmark row per option.
+//  Muscle groups and equipment pick any number; difficulty and movement pattern pick one,
+//  and tapping the picked row again clears it.
 //
 
 import SwiftUI
@@ -25,45 +26,37 @@ struct ExerciseFilterSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: VoidSpace.s5) {
-                    muscleGroupsSection
-                    equipmentSection
-                    difficultySection
-                    movementPatternSection
-                }
-                .padding(.horizontal, VoidSpace.insetText)
-                .padding(.top, VoidSpace.s3)
-                .padding(.bottom, VoidSpace.s6)
+            Form {
+                muscleGroupsSection
+                equipmentSection
+                difficultySection
+                movementPatternSection
             }
-            .scrollContentBackground(.hidden)
-            .background(VoidColor.panel.ignoresSafeArea())
-            .toolbarBackground(VoidColor.panel, for: .navigationBar)
-            .tint(VoidColor.plasma)
+            .tint(VoidColor.plasmaInk)
             .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Reset clears the choices in place; it doesn't dismiss, so it isn't a cancel.
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Reset") {
                         filter.reset()
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Apply") {
                         onApply(filter)
                         dismiss()
                     }
-                    .fontWeight(.semibold)
                 }
             }
         }
-        .voidSheet()
+        .presentationDragIndicator(.visible)
     }
 
     // MARK: - Sections
 
     private var muscleGroupsSection: some View {
-        section("Muscle groups") {
+        Section("Muscle groups") {
             ForEach(MuscleGroup.allCases, id: \.self) { muscle in
                 FilterOptionRow(
                     label: muscle.rawValue.capitalized,
@@ -81,7 +74,7 @@ struct ExerciseFilterSheet: View {
     }
 
     private var equipmentSection: some View {
-        section("Equipment") {
+        Section("Equipment") {
             ForEach(Equipment.allCases, id: \.self) { equip in
                 FilterOptionRow(
                     label: equip.displayName,
@@ -99,7 +92,7 @@ struct ExerciseFilterSheet: View {
     }
 
     private var difficultySection: some View {
-        section("Difficulty") {
+        Section("Difficulty") {
             ForEach(Difficulty.allCases, id: \.self) { difficulty in
                 FilterOptionRow(
                     label: difficulty.displayName,
@@ -113,7 +106,7 @@ struct ExerciseFilterSheet: View {
     }
 
     private var movementPatternSection: some View {
-        section("Movement pattern") {
+        Section("Movement pattern") {
             ForEach(MovementPattern.allCases, id: \.self) { pattern in
                 FilterOptionRow(
                     label: pattern.displayName,
@@ -125,19 +118,11 @@ struct ExerciseFilterSheet: View {
             }
         }
     }
-
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .voidEyebrowSm()
-                .padding(.bottom, VoidSpace.s1)
-            content()
-        }
-    }
 }
 
 // MARK: - Option row
 
+/// A Form row that toggles one option, with the system checkmark in the tint colour when on.
 private struct FilterOptionRow: View {
     let label: String
     let isSelected: Bool
@@ -157,16 +142,11 @@ private struct FilterOptionRow: View {
 
                 if isSelected {
                     Image(systemName: VoidIcon.check.systemName)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(VoidColor.plasma)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.tint)
                 }
             }
-            .frame(height: VoidSize.pill)
             .contentShape(Rectangle())
-        }
-        .buttonStyle(VoidRowButtonStyle())
-        .overlay(alignment: .bottom) {
-            VoidHairline()
         }
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }

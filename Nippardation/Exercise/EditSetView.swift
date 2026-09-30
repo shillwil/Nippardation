@@ -4,7 +4,9 @@
 //
 //  Created by Alex Shillingford on 5/16/25.
 //
-//  "Edit set" sheet: panel chrome, eyebrow title, panel-2 stepper wells, one plasma CTA.
+//  "Edit set" sheet: the Add set form (rows in `SetEntryForm.swift`) under a navigation bar
+//  (Cancel / Save), filled with the set being edited. Weight is typed on the decimal pad or
+//  stepped in place, with no separate weight sheet; the typed weight is read on Save.
 //
 
 import SwiftUI
@@ -18,85 +20,69 @@ struct EditSetView: View {
     var onSave: (Int, Double, SetType) -> Void
     
     @State private var weightString: String = ""
-    @State private var showingWeightPicker = false
+    @FocusState private var isWeightFocused: Bool
     
     init(reps: Binding<Int>, weight: Binding<Double>, setType: Binding<SetType>, onSave: @escaping (Int, Double, SetType) -> Void) {
         self._reps = reps
         self._weight = weight
         self._setType = setType
         self.onSave = onSave
-        self._weightString = State(initialValue: String(format: "%.1f", weight.wrappedValue))
+        self._weightString = State(initialValue: SetEntry.weightText(weight.wrappedValue))
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            LoggerSheetHeader(title: "Edit set") {
-                LoggerCloseButton(accessibilityLabel: "Cancel") {
-                    dismiss()
+        NavigationStack {
+            Form {
+                Section {
+                    SetTypePicker(setType: $setType)
+                    SetRepsStepper(reps: $reps)
                 }
+
+                SetWeightSection(weight: $weight, text: $weightString, isFocused: $isWeightFocused)
             }
-
-            VStack(alignment: .leading, spacing: VoidSpace.s4) {
-                // Reps section
-                VStack(alignment: .leading, spacing: 6) {
-                    LoggerFieldLabel(title: "Reps")
-                    LoggerStepperWell(
-                        value: VoidFormat.pad2(reps),
-                        unit: "reps",
-                        decrementLabel: "One rep fewer",
-                        incrementLabel: "One rep more",
-                        onDecrement: {
-                            if reps > 1 {
-                                reps -= 1
-                            }
-                        },
-                        onIncrement: {
-                            reps += 1
-                        }
-                    )
+            .listSectionSpacing(.compact)
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("Edit set")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    // Dismissing drops the edit, so this is Cancel rather than Close.
+                    Button("Cancel", role: .cancel) {
+                        dismiss()
+                    }
                 }
-
-                // Set type
-                VStack(alignment: .leading, spacing: 6) {
-                    LoggerFieldLabel(title: "Set type")
-                    LoggerSegmentedControl(
-                        items: [SetType.warmup, SetType.working],
-                        label: { $0 == .warmup ? "Warm-up" : "Working" },
-                        selection: $setType
-                    )
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveSet()
+                    }
+                    .disabled(!canSave)
                 }
-
-                // Weight section
-                VStack(alignment: .leading, spacing: 6) {
-                    LoggerFieldLabel(title: "Weight · lbs")
-                    LoggerValueWell(
-                        value: String(format: "%.1f", weight),
-                        unit: "lbs",
-                        accessibilityLabel: "Weight, opens the weight entry"
-                    ) {
-                        showingWeightPicker = true
+                // The decimal pad has no return key.
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isWeightFocused = false
                     }
                 }
             }
-            .padding(.horizontal, VoidSpace.insetCard)
-            .padding(.top, VoidSpace.s2)
-
-            Spacer(minLength: VoidSpace.s4)
-
-            // Save button
-            VoidCTAButton(title: "Save set") {
-                onSave(reps, weight, setType)
-                dismiss()
-            }
-            .padding(.horizontal, VoidSpace.insetCard)
-            .padding(.bottom, VoidSpace.s3)
         }
-        .background(VoidColor.panel.ignoresSafeArea())
-        .sheet(isPresented: $showingWeightPicker) {
-            WeightInputView(weight: $weight, weightString: $weightString)
-                .presentationDetents([.fraction(0.667)])
-                .voidSheet()
-        }
+        .tint(VoidColor.plasmaInk)
+    }
+
+    /// Save stays off until there's a weight in range to save.
+    private var canSave: Bool {
+        SetEntry.weightToSave(text: weightString, weight: weight) != nil
+    }
+
+    /// The typed weight is read here, not on focus loss, so a number still being typed is kept.
+    /// A weight the text still shows (not typed over, or stepped) is saved as it is, so a Save
+    /// that only changes the reps or set type leaves the logged weight exactly as it was.
+    private func saveSet() {
+        guard let enteredWeight = SetEntry.weightToSave(text: weightString, weight: weight) else { return }
+        isWeightFocused = false
+        weight = enteredWeight
+        onSave(reps, enteredWeight, setType)
+        dismiss()
     }
 }
 

@@ -28,7 +28,8 @@ struct MainTabView: View {
                     PlanView()
                 }
             }
-            .badge(receivedPlans.hasUnread ? 1 : 0)
+            // The number of unread plans under Plan → Sent to you; a zero count hides the badge.
+            .badge(receivedPlans.unreadCount)
 
             Tab(AppTab.progress.label, systemImage: AppTab.progress.icon.systemName, value: .progress) {
                 NavigationStack {
@@ -37,7 +38,7 @@ struct MainTabView: View {
             }
         }
         .background(VoidColor.hull.ignoresSafeArea())
-        .tint(VoidColor.plasma)
+        .tint(VoidColor.plasmaInk)
         .preferredColorScheme(nil)
         .environmentObject(navigation)
         .environmentBanner()

@@ -2,8 +2,8 @@
 //  MuscleGroupFilterBar.swift
 //  Nippardation
 //
-//  Horizontal row of 28pt squared muscle chips. Selected = panel-2 + text;
-//  unselected = panel + hairline-2, text-2.
+//  Horizontal row of muscle filter chips: system button-style toggles, filled with plasma
+//  while on. "All" is on when no muscle is picked; tapping it clears the picks.
 //
 
 import SwiftUI
@@ -15,55 +15,48 @@ struct MuscleGroupFilterBar: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: VoidSpace.s2) {
-                VoidSquareChip(text: "All", isSelected: selectedMuscles.isEmpty) {
+                ChipToggle(title: "All", isOn: selectedMuscles.isEmpty) { _ in
                     onToggle(nil)
                 }
 
                 ForEach(MuscleGroup.allCases, id: \.self) { muscle in
-                    VoidSquareChip(text: muscle.rawValue, isSelected: selectedMuscles.contains(muscle)) {
+                    ChipToggle(
+                        title: muscle.rawValue.capitalized,
+                        isOn: selectedMuscles.contains(muscle)
+                    ) { _ in
                         onToggle(muscle)
                     }
                 }
             }
             .padding(.horizontal, VoidSpace.insetCard)
+            .padding(.vertical, VoidSpace.s1)
         }
     }
 }
 
 // MARK: - Chip
 
-/// 28pt squared chip (radius 8) with a Chakra label. Visual is 28pt; the hit area is padded to 44pt.
-struct VoidSquareChip: View {
-    let text: String
-    var isSelected: Bool = false
-    var trailingIcon: VoidIcon? = nil
-    let action: () -> Void
+/// A chip is the system button-style `Toggle`: it fills with plasma while on and reports its
+/// on/off state to VoiceOver. The label switches to on-plasma ink while on so it stays
+/// legible on the fill; the control keeps the system font.
+struct ChipToggle: View {
+    let title: String
+    let isOn: Bool
+    /// Called with the state the user asked for. The owner decides what it means (a filter
+    /// flips, a preset only ever turns on).
+    let onChange: (Bool) -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Text(text)
-                    .voidChipLabel(isSelected ? VoidColor.text : VoidColor.text2)
-                    .lineLimit(1)
-                if let trailingIcon {
-                    Image(systemName: trailingIcon.systemName)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(VoidColor.text2)
-                }
-            }
-            .padding(.horizontal, 10)
-            .frame(height: VoidSize.chip)
-            .background(isSelected ? VoidColor.panel2 : VoidColor.panel)
-            .clipShape(RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: VoidRadius.control, style: .continuous)
-                    .strokeBorder(isSelected ? Color.clear : VoidColor.hairline2, lineWidth: 1)
-            )
-            .padding(.vertical, (VoidSize.hitMin - VoidSize.chip) / 2)
-            .contentShape(Rectangle())
+        Toggle(isOn: Binding(
+            get: { isOn },
+            set: { onChange($0) }
+        )) {
+            Text(title)
+                .foregroundStyle(isOn ? VoidColor.onPlasma : VoidColor.text)
+                .lineLimit(1)
         }
-        .buttonStyle(VoidPlainButtonStyle())
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .toggleStyle(.button)
+        .tint(VoidColor.plasma)
     }
 }
 

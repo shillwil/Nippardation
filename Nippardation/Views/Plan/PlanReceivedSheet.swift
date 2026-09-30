@@ -33,26 +33,28 @@ struct PlanReceivedSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VoidSheetContainer {
-                    content
+            content
+                .navigationTitle("Shared with you")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        // Closing loses nothing: an opened share is already filed under Sent to you.
+                        SheetCloseButton { onDismiss() }
+                            .disabled(viewModel.state == .importing)
+                    }
                 }
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            .background(VoidColor.panel)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(item: $route) { route in
-                switch route {
-                case .plan(let program):
-                    PlanPreviewView(program: program, isShared: true)
-                case .workout(let template):
-                    WorkoutPreviewView(template: template)
+                .navigationDestination(item: $route) { route in
+                    switch route {
+                    case .plan(let program):
+                        PlanPreviewView(program: program, isShared: true)
+                    case .workout(let template):
+                        WorkoutPreviewView(template: template)
+                    }
                 }
-            }
         }
-        .tint(VoidColor.plasma)
-        .voidSheet()
+        .tint(VoidColor.plasmaInk)
         .presentationDetents([.fraction(0.62), .large])
+        .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(viewModel.state == .importing)
         .onAppear {
             guard !didLoad else { return }
@@ -64,7 +66,13 @@ struct PlanReceivedSheet: View {
     @ViewBuilder
     private var content: some View {
         if viewModel.item != nil {
-            loadedView
+            ScrollView {
+                loadedView
+                    .padding(.horizontal, VoidSpace.insetText)
+                    .padding(.top, VoidSpace.s2)
+                    .padding(.bottom, VoidSpace.s6)
+            }
+            .scrollBounceBehavior(.basedOnSize)
         } else if case .error(let message) = viewModel.state {
             errorView(message)
         } else {
@@ -181,34 +189,25 @@ struct PlanReceivedSheet: View {
     // MARK: - Loading / error
 
     private var loadingView: some View {
-        VStack(spacing: 8) {
-            Text("Sent to you").voidEyebrow(VoidColor.warning)
-            ProgressView()
-                .tint(VoidColor.plasma)
-                .padding(.top, 24)
-            Text("Loading plan…")
-                .font(VoidFont.caption2)
-                .foregroundStyle(VoidColor.text2)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, VoidSpace.s6)
+        ProgressView("Loading plan…")
+            .tint(VoidColor.plasma)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func errorView(_ message: String) -> some View {
-        VStack(spacing: 8) {
-            Text("Could not load").voidEyebrow(VoidColor.warning)
+        ContentUnavailableView {
+            Label("Couldn't load this plan", systemImage: "exclamationmark.triangle")
+        } description: {
             Text(message)
-                .font(VoidFont.caption2)
-                .foregroundStyle(VoidColor.text2)
-                .multilineTextAlignment(.center)
-            HStack(spacing: 10) {
-                VoidPillButton(title: "Try again") { viewModel.retry() }
-                VoidPillButton(title: "Close") { onDismiss() }
+        } actions: {
+            Button {
+                viewModel.retry()
+            } label: {
+                Text("Try again")
+                    .foregroundStyle(VoidColor.onPlasma)
             }
-            .padding(.top, 16)
+            .buttonStyle(.borderedProminent)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, VoidSpace.s4)
     }
 
     // MARK: - Actions

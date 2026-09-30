@@ -2,26 +2,25 @@
 //  StepIndicator.swift
 //  Nippardation
 //
-//  Squared 4pt step marks for the plan wizard (matches AIStepIndicator).
+//  Where a wizard is up to: a system progress bar in plasma, shared by the plan wizard and the
+//  AI plan wizard. VoiceOver reads it as "Step n of total".
 //
 
 import SwiftUI
 
 struct StepIndicator: View {
     let totalSteps: Int
+    /// 0-based.
     let currentStep: Int
 
+    private var total: Int { max(totalSteps, 1) }
+    private var position: Int { min(max(currentStep + 1, 1), total) }
+
     var body: some View {
-        HStack(spacing: VoidSpace.s2) {
-            ForEach(0..<totalSteps, id: \.self) { step in
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(step <= currentStep ? VoidColor.plasma : VoidColor.track)
-                    .frame(width: step == currentStep ? 24 : 8, height: 4)
-                    .animation(.easeOut(duration: 0.12), value: currentStep)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Step \(currentStep + 1) of \(totalSteps)")
+        ProgressView(value: Double(position), total: Double(total))
+            .tint(VoidColor.plasma)
+            .accessibilityLabel("Progress")
+            .accessibilityValue("Step \(position) of \(total)")
     }
 }
 
@@ -33,5 +32,6 @@ struct StepIndicator: View {
             StepIndicator(totalSteps: 3, currentStep: 1)
             StepIndicator(totalSteps: 3, currentStep: 2)
         }
+        .padding(VoidSpace.insetCard)
     }
 }

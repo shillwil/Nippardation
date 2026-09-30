@@ -18,7 +18,6 @@ struct PlanPreviewView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var detail: Program?
-    @State private var selectedTemplate: Template?
     @State private var isActivating = false
     @State private var errorMessage: String?
 
@@ -59,47 +58,40 @@ struct PlanPreviewView: View {
     private var showsActivate: Bool { !isShared && !displayProgram.isActive }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(readout)
-                    .voidReadout()
-                    .padding(.horizontal, VoidSpace.insetText)
-                    .padding(.top, 14)
-                    .padding(.bottom, 6)
-
-                if rows.isEmpty {
-                    VoidPlaceholder(eyebrow: "No workouts", caption: "This plan has no workout days yet.")
-                        .padding(.top, 24)
-                } else {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                        rotationRow(row)
-                        if index < rows.count - 1 {
-                            VoidHairline().padding(.horizontal, VoidSpace.insetText)
+        Group {
+            if rows.isEmpty {
+                ContentUnavailableView(
+                    "No workouts",
+                    systemImage: VoidIcon.barbell.systemName,
+                    description: Text("This plan has no workout days yet.")
+                )
+            } else {
+                List {
+                    Section {
+                        ForEach(rows) { row in
+                            rotationRow(row)
+                                // Flush leading edge for the up-next mark; the chevron keeps the card inset.
+                                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: VoidSpace.insetCard))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparatorTint(VoidColor.hairline)
                         }
+                    } header: {
+                        Text(readout)
                     }
                 }
+                .listStyle(.plain)
             }
-            .padding(.bottom, VoidSpace.pillsBottom)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .planBottomBar {
             if showsActivate {
                 VoidCTAButton(title: "Activate", isLoading: isActivating) { activate() }
                     .padding(.horizontal, VoidSpace.insetCard)
-                    .padding(.top, 10)
-                    .padding(.bottom, VoidSpace.pillsBottom)
-                    .background(VoidColor.hull)
+                    .padding(.vertical, VoidSpace.s3)
             }
         }
+        .navigationTitle(displayProgram.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(displayProgram.name).voidEyebrow().lineLimit(1)
-            }
-        }
         .voidScreen()
-        .navigationDestination(item: $selectedTemplate) { template in
-            WorkoutPreviewView(template: template)
-        }
         .task { await loadDetail() }
         .alert("Could not activate", isPresented: Binding(
             get: { errorMessage != nil },
@@ -113,32 +105,18 @@ struct PlanPreviewView: View {
 
     // MARK: - Rows
 
+    /// A day with exercises pushes its workout preview; one without has nothing to show.
     @ViewBuilder
     private func rotationRow(_ row: RotationRow) -> some View {
-        let template = row.template
-        Button {
-            if let template, !template.exercises.isEmpty {
-                selectedTemplate = template
+        if let template = row.template, !template.exercises.isEmpty {
+            NavigationLink {
+                WorkoutPreviewView(template: template)
+            } label: {
+                PlanRotationRow(row: row)
             }
-        } label: {
-            HStack(spacing: 14) {
-                WorkoutTile(glyph: row.glyph, state: .later)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(row.eyebrow).voidEyebrowSm()
-                    Text(row.word)
-                        .voidWordRow(VoidColor.textSoft)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
-                Spacer(minLength: 8)
-                VoidChevron()
-            }
-            .padding(.horizontal, VoidSpace.insetText)
-            .frame(height: VoidSize.row)
+        } else {
+            PlanRotationRow(row: row)
         }
-        .buttonStyle(VoidRowButtonStyle())
-        .disabled(template == nil || template?.exercises.isEmpty == true)
-        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Data

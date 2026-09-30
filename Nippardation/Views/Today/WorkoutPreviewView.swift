@@ -3,8 +3,9 @@
 //  Nippardation
 //
 //  Preview Exercises: the read-only exercise list for a workout, pushed from Today.
-//  Video carousel on top, then a list panel of exercises; tapping a row opens the
-//  existing read-only exercise detail sheet (as the old ExercisesListView did).
+//  A grouped list: the video carousel on top, then the exercises under a summary header;
+//  tapping a row opens the existing read-only exercise detail sheet (as the old
+//  ExercisesListView did). A workout with no exercises shows the standard empty state.
 //
 
 import SwiftUI
@@ -25,6 +26,12 @@ struct WorkoutPreviewView: View {
         template.exercises.sorted { $0.orderIndex < $1.orderIndex }
     }
 
+    /// Mirrors `ExerciseVideoCarousel`'s filter: it only draws cards for exercises with a
+    /// library item, and draws nothing otherwise, so skip its row rather than leave a gap.
+    private var hasVideoCards: Bool {
+        template.exercises.contains { $0.exerciseLibraryItem != nil }
+    }
+
     /// "06 EXERCISES · ~55 MIN · 18 SETS"
     private var summary: String {
         let sets = template.totalWorkingSets + template.totalWarmupSets
@@ -36,40 +43,40 @@ struct WorkoutPreviewView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: VoidSpace.s4) {
-                ExerciseVideoCarousel(template: template, title: nil)
-
-                Text(summary)
-                    .voidReadout()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .padding(.horizontal, VoidSpace.insetText)
-
-                if exercises.isEmpty {
-                    VoidListPanel {
-                        VoidPlaceholder(
-                            eyebrow: "No exercises yet",
-                            caption: "Add exercises to this workout from the Plan tab."
-                        )
-                    }
-                } else {
-                    VoidListPanel {
-                        ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
-                            exerciseRow(exercise, index: index)
-                            if index < exercises.count - 1 {
-                                VoidHairline()
-                            }
-                        }
+        List {
+            if !exercises.isEmpty {
+                if hasVideoCards {
+                    Section {
+                        ExerciseVideoCarousel(template: template, title: nil)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                     }
                 }
+
+                Section {
+                    ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
+                        exerciseRow(exercise, index: index)
+                            .listRowBackground(VoidColor.panel)
+                            .listRowSeparatorTint(VoidColor.hairline)
+                    }
+                } header: {
+                    Text(summary)
+                }
             }
-            .padding(.top, VoidSpace.s2)
-            .padding(.bottom, VoidSpace.s6)
+        }
+        .listStyle(.insetGrouped)
+        .overlay {
+            if exercises.isEmpty {
+                ContentUnavailableView(
+                    "No exercises yet",
+                    systemImage: VoidIcon.barbell.systemName,
+                    description: Text("Add exercises to this workout from the Plan tab.")
+                )
+            }
         }
         .navigationTitle(template.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
         .voidScreen()
         .sheet(item: $selectedExercise) { item in
             ActiveExerciseDetailView(
@@ -81,11 +88,13 @@ struct WorkoutPreviewView: View {
                 exerciseIndex: item.value,
                 isReadOnly: true
             )
+            .presentationDragIndicator(.visible)
         }
     }
 
     // MARK: - Rows
 
+    /// Opens a sheet, so no disclosure chevron: the list's own highlight is the press state.
     private func exerciseRow(_ exercise: TemplateExercise, index: Int) -> some View {
         Button {
             selectedExercise = IdentifiableIndex(id: index)
@@ -104,12 +113,8 @@ struct WorkoutPreviewView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: VoidSpace.s2)
-                VoidChevron()
             }
-            .frame(height: VoidSize.listRow)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(VoidRowButtonStyle())
     }
 
     /// "3 × 8–12 · 2 warm-up · 90 s rest" (the eyebrow style uppercases it).

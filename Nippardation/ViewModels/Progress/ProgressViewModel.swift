@@ -10,15 +10,16 @@
 import Foundation
 import Combine
 
-/// The Me / Crew switch on the Progress eyebrow row.
+/// The Me / Crew switch: a segmented control in the Progress navigation bar.
 enum ProgressScope: String, CaseIterable, Hashable {
     case me
     case crew
 
+    /// Segment title, title case like every system segmented control.
     var label: String {
         switch self {
-        case .me: return "ME"
-        case .crew: return "CREW"
+        case .me: return "Me"
+        case .crew: return "Crew"
         }
     }
 }

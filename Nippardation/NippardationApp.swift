@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import AVFoundation
 import FirebaseCore
 
 @main
@@ -15,8 +16,10 @@ struct NippardationApp: App {
     @StateObject private var workoutManager = WorkoutManager.shared
     @StateObject private var authManager = AuthManager.shared
     @StateObject private var deepLinkRouter = DeepLinkRouter.shared
-    
+
     init() {
+        // Before anything can create an AVPlayer: exercise demos must mix with the person's music.
+        AppAudioSession.configure()
         StringArrayTransformer.register()
         configureFirebase()
         Self.configureNavigationBarTypography()
@@ -37,13 +40,13 @@ struct NippardationApp: App {
         return authManager.isAuthenticated
     }
     
-    /// Puts pushed-screen navigation titles on Chakra Petch.
+    /// Puts navigation titles on Chakra Petch (the approved custom-font exception).
     ///
     /// `navigationTitle` has no SwiftUI font modifier, so the title is the one piece of
-    /// reading type that only UIKit can reach. Backgrounds stay as they are today —
-    /// `.voidScreen()` still owns them through `.toolbarBackground(VoidColor.hull, …)`;
-    /// this only writes the title text attributes. Bar button items are deliberately left
-    /// alone: they are buttons, and buttons keep SF.
+    /// reading type that only UIKit can reach. Only the title text attributes are set: the
+    /// bar's background and material stay the system's (Liquid Glass and the scroll-edge
+    /// effect on iOS 26), which replacement bar appearances would override. Bar button items
+    /// are deliberately left alone: they are buttons, and buttons keep SF.
     @MainActor
     private static func configureNavigationBarTypography() {
         let titleFont = UIFont(name: VoidFont.labelFontName, size: VoidFont.navTitleSize)
@@ -51,29 +54,9 @@ struct NippardationApp: App {
         let largeTitleFont = UIFont(name: VoidFont.labelFontName, size: VoidFont.navLargeTitleSize)
             ?? .systemFont(ofSize: VoidFont.navLargeTitleSize, weight: .bold)
 
-        func titled(_ appearance: UINavigationBarAppearance) -> UINavigationBarAppearance {
-            var title = appearance.titleTextAttributes
-            title[.font] = titleFont
-            appearance.titleTextAttributes = title
-
-            var largeTitle = appearance.largeTitleTextAttributes
-            largeTitle[.font] = largeTitleFont
-            appearance.largeTitleTextAttributes = largeTitle
-
-            return appearance
-        }
-
-        let opaque = UINavigationBarAppearance()
-        opaque.configureWithDefaultBackground()
-
-        let transparent = UINavigationBarAppearance()
-        transparent.configureWithTransparentBackground()
-
         let bar = UINavigationBar.appearance()
-        bar.standardAppearance = titled(opaque)
-        bar.compactAppearance = titled(opaque)
-        bar.scrollEdgeAppearance = titled(transparent)
-        bar.compactScrollEdgeAppearance = titled(transparent)
+        bar.titleTextAttributes = [.font: titleFont]
+        bar.largeTitleTextAttributes = [.font: largeTitleFont]
     }
 
     private func configureFirebase() {
@@ -111,11 +94,15 @@ struct NippardationApp: App {
                     // Save context on app termination
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
                         coreDataManager.saveContext()
-                        
+
                         // Force save active workout when app is terminating
                         if workoutManager.isWorkoutInProgress {
                             WorkoutCacheManager.shared.saveWorkoutCache()
                         }
+                    }
+                    // A media-services reset puts the session back on Solo Ambient; restore Ambient.
+                    .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)) { _ in
+                        AppAudioSession.configure()
                     }
             } else {
                 AuthenticationView()

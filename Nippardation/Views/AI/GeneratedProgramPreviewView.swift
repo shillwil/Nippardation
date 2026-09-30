@@ -2,7 +2,8 @@
 //  GeneratedProgramPreviewView.swift
 //  Nippardation
 //
-//  Review an AI-generated plan before saving: rename it, remove exercises, then Save or Discard.
+//  Review an AI-generated plan before saving: rename it, tune or swipe away exercises, then Save or
+//  Discard from the toolbar. While saving, Save turns into a spinner and the list stops taking edits.
 //
 
 import SwiftUI
@@ -50,8 +51,7 @@ struct GeneratedProgramPreviewView: View {
 
                     ForEach(workout.exercises) { exercise in
                         EditableExerciseRow(
-                            exercise: exerciseBinding(workoutIndex: workoutIndex, id: exercise.id, fallback: exercise),
-                            onDelete: { remove(workoutIndex: workoutIndex, id: exercise.id) }
+                            exercise: exerciseBinding(workoutIndex: workoutIndex, id: exercise.id, fallback: exercise)
                         )
                         .listRowBackground(Color.clear)
                         .listRowSeparatorTint(VoidColor.hairline)
@@ -68,34 +68,24 @@ struct GeneratedProgramPreviewView: View {
         }
         .listStyle(.plain)
         .scrollDismissesKeyboard(.interactively)
+        .disabled(viewModel.isSaving)
         .voidScreen()
         .navigationTitle("Review plan")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    onDiscard()
-                } label: {
-                    Text("Discard")
-                        .font(VoidFont.buttonPlain)
-                        .foregroundStyle(VoidColor.warning)
-                }
-                .disabled(viewModel.isSaving)
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Discard", role: .destructive, action: onDiscard)
+                    .disabled(viewModel.isSaving)
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    viewModel.save()
-                } label: {
-                    Text("Save")
-                        .font(VoidFont.button)
-                        .foregroundStyle(VoidColor.plasma)
+            ToolbarItem(placement: .confirmationAction) {
+                if viewModel.isSaving {
+                    ProgressView()
+                        .accessibilityLabel("Saving")
+                } else {
+                    Button("Save") {
+                        viewModel.save()
+                    }
                 }
-                .disabled(viewModel.isSaving)
-            }
-        }
-        .overlay {
-            if viewModel.isSaving {
-                WizardBusyOverlay(eyebrow: "Saving")
             }
         }
         .onChange(of: viewModel.savedSuccessfully) { _, saved in
@@ -214,53 +204,34 @@ struct GeneratedProgramPreviewView: View {
             }
         )
     }
-
-    private func remove(workoutIndex: Int, id: UUID) {
-        guard viewModel.workouts.indices.contains(workoutIndex),
-              let exerciseIndex = viewModel.workouts[workoutIndex].exercises.firstIndex(where: { $0.id == id })
-        else { return }
-        viewModel.removeExercise(workoutIndex: workoutIndex, exerciseIndex: exerciseIndex)
-    }
 }
 
 // MARK: - Editable Exercise Row
 
+/// Name plus sets / reps / rest wells. Removing an exercise is the list's own swipe-to-delete.
 struct EditableExerciseRow: View {
     @Binding var exercise: GeneratedProgramPreviewViewModel.EditableExercise
-    let onDelete: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: VoidSpace.s2) {
-            VStack(alignment: .leading, spacing: VoidSpace.s2) {
-                Text(exercise.name)
-                    .font(VoidFont.bodyStrong)
-                    .foregroundStyle(VoidColor.text)
-                    .lineLimit(2)
+        VStack(alignment: .leading, spacing: VoidSpace.s2) {
+            Text(exercise.name)
+                .font(VoidFont.bodyStrong)
+                .foregroundStyle(VoidColor.text)
+                .lineLimit(2)
 
-                HStack(spacing: VoidSpace.s2) {
-                    field("Sets") {
-                        WizardIntField(placeholder: "0", value: $exercise.workingSets, height: 36)
-                    }
-                    field("Reps") {
-                        repsWell
-                    }
-                    field("Rest s") {
-                        WizardIntField(placeholder: "0", value: $exercise.restSeconds, height: 36)
-                    }
+            HStack(spacing: VoidSpace.s2) {
+                field("Sets") {
+                    WizardIntField(placeholder: "0", value: $exercise.workingSets, height: 36)
+                }
+                field("Reps") {
+                    repsWell
+                }
+                field("Rest s") {
+                    WizardIntField(placeholder: "0", value: $exercise.restSeconds, height: 36)
                 }
             }
-
-            Spacer(minLength: 0)
-
-            Button(action: onDelete) {
-                Image(systemName: VoidIcon.close.systemName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(VoidColor.text2)
-                    .frame(width: VoidSize.hitMin, height: VoidSize.hitMin)
-            }
-            .buttonStyle(VoidPlainButtonStyle())
-            .accessibilityLabel("Remove \(exercise.name)")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func field<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -278,7 +249,7 @@ struct EditableExerciseRow: View {
             .foregroundStyle(VoidColor.text)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 8)
-            .frame(height: 36)
+            .frame(minHeight: 36)
             .voidPanel(radius: VoidRadius.tile, line: VoidColor.hairline2, fill: VoidColor.panel2)
     }
 }

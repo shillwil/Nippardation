@@ -2,17 +2,16 @@
 //  PlanRotationRow.swift
 //  Nippardation
 //
-//  One 94pt row of the Plan rotation: [52pt tile] 14 [eyebrow-sm over word] … [16pt chevron].
+//  One 94pt row of the Plan rotation: [52pt tile] 14 [eyebrow-sm over word].
 //  The tile carries the state (done / skipped / next / later); the up-next row also draws the 3×36 plasma
-//  mark flush to the left screen edge. Separators are drawn by the list, not the row.
+//  mark flush to the row's leading edge. The list owns the rest: separators, and the system disclosure
+//  chevron on rows that open their workout (a NavigationLink). Place the row with zero list-row insets.
 //
 
 import SwiftUI
 
 struct PlanRotationRow: View {
     let row: RotationRow
-    /// Hidden when the row has nothing to open (its workout could not be resolved).
-    var showsChevron: Bool = true
 
     private var eyebrowColor: Color {
         switch row.state {
@@ -46,10 +45,6 @@ struct PlanRotationRow: View {
                 }
 
                 Spacer(minLength: VoidSpace.s2)
-
-                if !row.isSettled && showsChevron {
-                    VoidChevron(color: row.isUpNext ? VoidColor.plasma : VoidColor.text3)
-                }
             }
             .padding(.horizontal, VoidSpace.insetText)
             .frame(maxWidth: .infinity)
@@ -94,15 +89,14 @@ extension RotationRow {
         skippedWorkouts: skipped
     )
 
-    return ZStack {
-        VoidColor.hull.ignoresSafeArea()
-        VStack(spacing: 0) {
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                PlanRotationRow(row: row)
-                if index < rows.count - 1 {
-                    VoidHairline()
-                }
-            }
+    return List {
+        ForEach(rows) { row in
+            PlanRotationRow(row: row)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparatorTint(VoidColor.hairline)
         }
     }
+    .listStyle(.plain)
+    .voidScreen()
 }
