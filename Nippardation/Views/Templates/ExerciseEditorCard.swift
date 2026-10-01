@@ -24,14 +24,14 @@ struct ExerciseEditorCard: View {
                 VoidAvatar(text: VoidFormat.pad2(index + 1))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(exercise.displayName)
+                    // Shrinks toward 70% to stay on one line, then wraps onto a second. Only a
+                    // note too long for two lines at 70% still ends in "…".
+                    ShrinkThenWrapText(exercise.displayName)
                         .font(VoidFont.bodyStrong)
                         .foregroundStyle(VoidColor.text)
-                        .lineLimit(1)
-                    Text(summary)
+                    ShrinkThenWrapText(summary)
                         .font(VoidFont.caption2)
                         .foregroundStyle(VoidColor.text2)
-                        .lineLimit(1)
                 }
 
                 Spacer(minLength: 0)

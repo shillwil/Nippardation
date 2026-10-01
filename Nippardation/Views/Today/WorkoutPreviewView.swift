@@ -104,13 +104,12 @@ struct WorkoutPreviewView: View {
                     .voidEyebrowSm(VoidColor.text3)
                     .frame(width: 22, alignment: .leading)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(exercise.displayName)
+                    // Shrinks toward 70% to stay on one line, then wraps onto a second.
+                    ShrinkThenWrapText(exercise.displayName)
                         .font(VoidFont.bodyStrong)
                         .foregroundStyle(VoidColor.text)
-                        .lineLimit(1)
-                    Text(Self.prescription(for: exercise))
+                    ShrinkThenWrapText(Self.prescription(for: exercise))
                         .voidEyebrowSm()
-                        .lineLimit(1)
                 }
                 Spacer(minLength: VoidSpace.s2)
             }

@@ -144,7 +144,7 @@ struct PlanView: View {
             .padding(.vertical, VoidSpace.s3)
             .disabled(isWorking)
         }
-        .navigationTitle(program.name)
+        .wrappingNavigationTitle(program.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

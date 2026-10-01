@@ -2,7 +2,8 @@
 //  PlanRotationRow.swift
 //  Nippardation
 //
-//  One 94pt row of the Plan rotation: [52pt tile] 14 [eyebrow-sm over word].
+//  One row of the Plan rotation, at least 94pt: [52pt tile] 14 [eyebrow-sm over word]. A long
+//  workout name wraps onto a second line (shrinking as needed) rather than truncating.
 //  The tile carries the state (done / skipped / next / later); the up-next row also draws the 3×36 plasma
 //  mark flush to the row's leading edge. The list owns the rest: separators, and the system disclosure
 //  chevron on rows that open their workout (a NavigationLink). Place the row with zero list-row insets.
@@ -38,17 +39,21 @@ struct PlanRotationRow: View {
                     Text(row.eyebrow)
                         .voidEyebrowSm(eyebrowColor)
                         .lineLimit(1)
+                    // Two lines, and a 0.5 floor: Michroma is wide, and at 0.7 a name like
+                    // CHEST/TRICEPS FOCUS still overruns a 6.1-inch row by a few points.
                     Text(row.word)
                         .voidWordRow(wordColor)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.5)
                 }
 
                 Spacer(minLength: VoidSpace.s2)
             }
             .padding(.horizontal, VoidSpace.insetText)
+            // Room above and below once the word wraps; a one-line row still comes out at 94pt.
+            .padding(.vertical, VoidSpace.s3)
             .frame(maxWidth: .infinity)
-            .frame(height: VoidSize.row)
+            .frame(minHeight: VoidSize.row)
 
             if row.isUpNext {
                 UpNextMark()
