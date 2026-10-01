@@ -15,7 +15,10 @@ final class TodayViewModel: ObservableObject {
     /// What Today shows. A workout in progress is layered on top of this by the view.
     enum Mode: Equatable {
         case loading
+        /// No active plan, but saved plans to pick from.
         case empty
+        /// No plans at all — a new account. Today offers the AI wizard in place of Start.
+        case newUser
         case scheduled
         case swapped
         case rest
@@ -41,6 +44,9 @@ final class TodayViewModel: ObservableObject {
     @Published private(set) var planTemplates: [String: Template] = [:]
     @Published private(set) var streakWeeks: Int = 0
     @Published private(set) var hasLoaded = false
+    /// Whether the user has any plan, active or not. Starts true so a returning user never sees
+    /// the new-user state flash by while their plans load.
+    @Published private(set) var hasSavedPlans = true
     /// Bumps each time the plan auto-advances; the view answers with a haptic and `planDidChange()`.
     @Published private(set) var planAdvanceCount = 0
     @Published var error: String?
@@ -83,7 +89,9 @@ final class TodayViewModel: ObservableObject {
 
     var mode: Mode {
         guard hasLoaded || activeProgram != nil else { return .loading }
-        guard let program = activeProgram, !program.workouts.isEmpty else { return .empty }
+        guard let program = activeProgram, !program.workouts.isEmpty else {
+            return activeProgram == nil && !hasSavedPlans ? .newUser : .empty
+        }
         switch override {
         case .some(.rest):
             return .rest
@@ -115,7 +123,7 @@ final class TodayViewModel: ObservableObject {
         switch mode {
         case .swapped: return overrideTemplate
         case .scheduled, .rest: return scheduledTemplate
-        case .loading, .empty: return nil
+        case .loading, .empty, .newUser: return nil
         }
     }
 
@@ -152,6 +160,7 @@ final class TodayViewModel: ObservableObject {
             if Task.isCancelled { return }
             applyProgram(program)
             await resolvePlanTemplates()
+            await refreshHasSavedPlans()
             error = nil
         } catch is CancellationError {
             return
@@ -160,11 +169,28 @@ final class TodayViewModel: ObservableObject {
                 applyProgram(cached)
                 await resolvePlanTemplates()
             }
+            // hasSavedPlans stays as it was: a failed load is no proof of a new account.
             self.error = error.localizedDescription
         }
         hasLoaded = true
         refreshStreak()
         await advanceIfPendingWorkoutCompleted()
+    }
+
+    /// With no active plan, asks whether the user has any plan at all (a new account has none).
+    private func refreshHasSavedPlans() async {
+        guard activeProgram == nil else {
+            hasSavedPlans = true
+            return
+        }
+        if !programRepository.getCachedPrograms().isEmpty {
+            hasSavedPlans = true
+            return
+        }
+        // A failed fetch keeps the returning-user state rather than guess "new".
+        if let programs = try? await programRepository.fetchPrograms(forceRefresh: false) {
+            hasSavedPlans = !programs.isEmpty
+        }
     }
 
     /// Sets the plan and the scheduled workout from what is already in memory (no fetching).
@@ -253,7 +279,7 @@ final class TodayViewModel: ObservableObject {
     /// Resolves what Start should run. Starting on a rest day clears the rest override first.
     func prepareStart() async -> StartPlan? {
         switch mode {
-        case .loading, .empty:
+        case .loading, .empty, .newUser:
             return nil
         case .rest:
             overrideStore.clear()
@@ -317,7 +343,7 @@ final class TodayViewModel: ObservableObject {
             let template = await resolveTemplate(serverId: workout.templateServerId, embedded: scheduledTemplate ?? workout.template)
             if let template { scheduledTemplate = template }
             return template
-        case .loading, .empty:
+        case .loading, .empty, .newUser:
             return nil
         }
     }
@@ -479,7 +505,8 @@ extension TodayViewModel {
         program: Program?,
         store: TodayOverrideStore,
         skippedStore: SkippedWorkoutStore? = nil,
-        streakWeeks: Int = 3
+        streakWeeks: Int = 3,
+        hasSavedPlans: Bool = true
     ) -> TodayViewModel {
         let viewModel = TodayViewModel(
             programRepository: MockProgramRepository(),
@@ -493,6 +520,7 @@ extension TodayViewModel {
         viewModel.isFrozenForPreview = true
         viewModel.applyProgram(program)
         viewModel.hasLoaded = true
+        viewModel.hasSavedPlans = hasSavedPlans
         viewModel.streakWeeks = streakWeeks
         return viewModel
     }

@@ -80,8 +80,12 @@ struct PlansHubView: View {
                 .environmentObject(navigation)
         }
         .fullScreenCover(isPresented: $showAI, onDismiss: reloadAfterCreate) {
-            AIWizardView()
-                .environmentObject(navigation)
+            // With no plan running, the new plan becomes the active one and Today is where it starts.
+            AIWizardView(activatesPlanOnSave: isRoot) {
+                navigation.planDidChange()
+                navigation.show(.today)
+            }
+            .environmentObject(navigation)
         }
         .alert("Delete plan", isPresented: Binding(
             get: { viewModel.programs.showSimpleDeleteAlert },

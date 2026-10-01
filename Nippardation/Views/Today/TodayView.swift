@@ -19,6 +19,7 @@ struct TodayView: View {
 
     @State private var showActiveWorkout = false
     @State private var showSwapSheet = false
+    @State private var showAIWizard = false
     @State private var previewTemplate: Template?
     @State private var didCheckForActiveWorkout = false
 
@@ -46,7 +47,7 @@ struct TodayView: View {
             Spacer(minLength: VoidSpace.s3)
 
             // The button's glow rings overflow this 200pt footprint, as the kit's box-shadow does.
-            VoidStartButton(title: hero.startTitle, isEnabled: hero.startEnabled) {
+            VoidStartButton(title: hero.startTitle, icon: hero.startIcon, isEnabled: hero.startEnabled) {
                 startTapped()
             }
             .frame(width: VoidSize.start, height: VoidSize.start)
@@ -113,6 +114,13 @@ struct TodayView: View {
                 // Race guard: nothing to resume, close the cover.
                 Color.clear.onAppear { showActiveWorkout = false }
             }
+        }
+        // A new account's first plan: saving it activates it, so Today comes back ready to Start.
+        .fullScreenCover(isPresented: $showAIWizard, onDismiss: { viewModel.load() }) {
+            AIWizardView(activatesPlanOnSave: true) {
+                navigation.planDidChange()
+            }
+            .environmentObject(navigation)
         }
         .sheet(isPresented: $showSwapSheet) {
             if let program = viewModel.activeProgram {
@@ -229,6 +237,21 @@ struct TodayView: View {
                 swapEnabled: false
             )
 
+        case .newUser:
+            return HeroContent(
+                glyph: .sparkle,
+                eyebrow: "Welcome",
+                eyebrowColor: VoidColor.text2,
+                word: "Day One",
+                readout: "Let AI build your first plan",
+                caption: VoidFormat.readout(["Goal", "Schedule", "Setup", "Fine-tune"]),
+                startTitle: "Create Workout",
+                startIcon: .sparkle,
+                startEnabled: true,
+                previewEnabled: false,
+                swapEnabled: false
+            )
+
         case .scheduled:
             let name = viewModel.scheduledName
             return HeroContent(
@@ -290,7 +313,7 @@ struct TodayView: View {
             caption: VoidFormat.readout([started, viewModel.activeProgram?.name]),
             startTitle: "Resume",
             startEnabled: true,
-            previewEnabled: viewModel.mode != .loading && viewModel.mode != .empty,
+            previewEnabled: ![.loading, .empty, .newUser].contains(viewModel.mode),
             swapEnabled: false
         )
     }
@@ -308,6 +331,8 @@ struct TodayView: View {
             return
         case .empty:
             navigation.show(.plan)
+        case .newUser:
+            showAIWizard = true
         case .scheduled, .swapped, .rest:
             Task { @MainActor in
                 guard let plan = await viewModel.prepareStart() else { return }
@@ -351,6 +376,7 @@ private struct HeroContent {
     var readout: String
     var caption: String
     var startTitle: String
+    var startIcon: VoidIcon = .play
     var startEnabled: Bool
     var previewEnabled: Bool
     var swapEnabled: Bool
@@ -420,6 +446,18 @@ private func previewOverrideStore(_ name: String, override: TodayOverride?) -> T
     let store = previewOverrideStore("empty", override: nil)
     NavigationStack {
         TodayView(viewModel: .preview(program: nil, store: store, streakWeeks: 0), overrideStore: store)
+    }
+    .environmentObject(AppNavigation())
+    .withDependencies(.preview)
+}
+
+#Preview("New user") {
+    let store = previewOverrideStore("new", override: nil)
+    NavigationStack {
+        TodayView(
+            viewModel: .preview(program: nil, store: store, streakWeeks: 0, hasSavedPlans: false),
+            overrideStore: store
+        )
     }
     .environmentObject(AppNavigation())
     .withDependencies(.preview)

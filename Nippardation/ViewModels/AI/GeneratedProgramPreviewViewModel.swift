@@ -46,6 +46,8 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
     let originalProgram: Program
     let metadata: GenerationMetadataDTO?
     let reusedTemplateIds: Set<String>
+    /// Save also makes this the active plan (a first plan: nothing is running yet).
+    let activatesOnSave: Bool
 
     // MARK: - Dependencies
 
@@ -59,6 +61,7 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
         program: Program,
         metadata: GenerationMetadataDTO?,
         reusedTemplateIds: Set<String> = [],
+        activatesOnSave: Bool = false,
         programRepository: (any ProgramRepositoryProtocol)? = nil,
         templateRepository: (any TemplateRepositoryProtocol)? = nil,
         exerciseLibraryResolver: ExerciseLibraryResolver? = nil
@@ -66,6 +69,7 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
         self.originalProgram = program
         self.metadata = metadata
         self.reusedTemplateIds = reusedTemplateIds
+        self.activatesOnSave = activatesOnSave
         self.programRepository = programRepository ?? DependencyContainer.shared.programRepository
         self.templateRepository = templateRepository ?? DependencyContainer.shared.templateRepository
         self.exerciseLibraryResolver = exerciseLibraryResolver ?? DependencyContainer.shared.exerciseLibraryResolver
@@ -162,6 +166,12 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
                     if let template = workout.template {
                         try? await self.templateRepository.cacheTemplate(template)
                     }
+                }
+
+                // After caching, so the activation finds the plan locally. A failure here leaves
+                // the plan saved; Save again retries (every step above is idempotent).
+                if self.activatesOnSave {
+                    _ = try await self.programRepository.setActiveProgram(serverId: resolvedProgram.serverId)
                 }
 
                 await MainActor.run {

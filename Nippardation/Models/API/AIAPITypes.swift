@@ -229,14 +229,46 @@ enum AIEquipment: String, CaseIterable, Identifiable {
     }
 }
 
-/// Predefined split type suggestions
+/// Predefined split type suggestions. `rawValue` is what the AI receives as the inspiration source.
 enum AISplitSuggestion: String, CaseIterable, Identifiable {
     case pushPullLegs = "Push Pull Legs"
-    case upperLower = "Upper Lower"
+    case upperLower = "Upper/Lower"
     case fullBody = "Full Body"
     case broSplit = "Bro Split"
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .pushPullLegs: return "Push / Pull / Legs"
+        case .upperLower: return "Upper / Lower"
+        case .fullBody: return "Full Body"
+        case .broSplit: return "Bro Split"
+        }
+    }
+
+    /// One line on what the split is, for someone who has never trained on one.
+    var subtitle: String {
+        switch self {
+        case .pushPullLegs:
+            return "Chest, shoulders and triceps; then back and biceps; then legs. Each gets its own day."
+        case .upperLower:
+            return "Alternate upper-body and lower-body days. A good fit for 4 days a week."
+        case .fullBody:
+            return "Every workout trains your whole body. A good fit for 2–3 days a week."
+        case .broSplit:
+            return "One muscle group a day: chest, back, shoulders, arms, then legs. Usually 5 days a week."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .pushPullLegs: return "arrow.left.arrow.right"
+        case .upperLower: return "arrow.up.arrow.down"
+        case .fullBody: return "figure.strengthtraining.traditional"
+        case .broSplit: return "calendar"
+        }
+    }
 }
 
 // MARK: - AI Response → Domain Model Mapping

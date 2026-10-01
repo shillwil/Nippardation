@@ -2,8 +2,8 @@
 //  AIWizardStep1GoalView.swift
 //  Nippardation
 //
-//  Step 1: training goal (a checkmark list) and split preference (a menu, with Custom opening
-//  a free-text description).
+//  Step 1: training goal and split preference, both checkmark lists with a line on each option
+//  (Custom opens a free-text description).
 //
 
 import SwiftUI
@@ -11,7 +11,7 @@ import SwiftUI
 struct AIWizardStep1GoalView: View {
     @ObservedObject var viewModel: AIWizardViewModel
 
-    /// The split menu's selection: a suggestion, or nil for Custom. Choosing a suggestion writes its
+    /// The split list's selection: a suggestion, or nil for Custom. Choosing a suggestion writes its
     /// name into the prompt; switching back to Custom clears it for the user's own words.
     private var splitSelection: Binding<AISplitSuggestion?> {
         Binding(
@@ -47,17 +47,17 @@ struct AIWizardStep1GoalView: View {
             .wizardFormRows()
 
             Section {
+                // A checkmark list, like Goal, so every split carries its one-line explanation.
                 Picker("Split", selection: splitSelection) {
                     ForEach(AISplitSuggestion.allCases) { suggestion in
-                        Text(suggestion.rawValue)
+                        splitLabel(suggestion.displayName, subtitle: suggestion.subtitle, icon: suggestion.icon)
                             .tag(Optional(suggestion))
                     }
-                    Text("Custom")
+                    splitLabel("Custom", subtitle: "Describe your own, or leave it blank to let the AI decide.", icon: "pencil")
                         .tag(AISplitSuggestion?.none)
                 }
-                .pickerStyle(.menu)
-                // The menu shows its value as tinted text; plasma text is too faint on a light panel.
-                .tint(VoidColor.text2)
+                .pickerStyle(.inline)
+                .labelsHidden()
 
                 if viewModel.selectedSplitSuggestion == nil {
                     TextField("Describe it, e.g. Arnold split", text: $viewModel.inspirationSource)
@@ -66,7 +66,7 @@ struct AIWizardStep1GoalView: View {
             } header: {
                 Text("Preferred split")
             } footer: {
-                Text("Pick a split, or choose Custom and describe your own. Leave it blank to let the AI decide.")
+                Text("A split is how your week's training is divided across days.")
             }
             .wizardFormRows()
         }
@@ -86,6 +86,20 @@ struct AIWizardStep1GoalView: View {
             }
         } icon: {
             Image(systemName: goal.icon)
+        }
+    }
+
+    private func splitLabel(_ title: String, subtitle: String, icon: String) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .foregroundStyle(VoidColor.text)
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(VoidColor.text2)
+            }
+        } icon: {
+            Image(systemName: icon)
         }
     }
 }

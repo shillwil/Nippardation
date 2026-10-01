@@ -19,13 +19,15 @@ struct GeneratedProgramPreviewView: View {
         program: Program,
         metadata: GenerationMetadataDTO?,
         reusedTemplateIds: Set<String> = [],
+        activatesOnSave: Bool = false,
         onSave: @escaping () -> Void,
         onDiscard: @escaping () -> Void
     ) {
         _viewModel = StateObject(wrappedValue: GeneratedProgramPreviewViewModel(
             program: program,
             metadata: metadata,
-            reusedTemplateIds: reusedTemplateIds
+            reusedTemplateIds: reusedTemplateIds,
+            activatesOnSave: activatesOnSave
         ))
         self.onSave = onSave
         self.onDiscard = onDiscard

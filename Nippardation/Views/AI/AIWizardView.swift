@@ -28,6 +28,11 @@ struct AIWizardView: View {
         var next: Step? { Step(rawValue: rawValue + 1) }
     }
 
+    /// Saving also makes the plan active (the user's first plan), then calls `onPlanActivated`
+    /// so the presenter can send them to Today to start it.
+    var activatesPlanOnSave = false
+    var onPlanActivated: (() -> Void)?
+
     @StateObject private var viewModel = AIWizardViewModel()
     @Environment(\.dismiss) private var dismiss
 
@@ -70,7 +75,11 @@ struct AIWizardView: View {
                         program: program,
                         metadata: viewModel.generationMetadata,
                         reusedTemplateIds: viewModel.reusedTemplateIds,
+                        activatesOnSave: activatesPlanOnSave,
                         onSave: {
+                            if activatesPlanOnSave {
+                                onPlanActivated?()
+                            }
                             dismiss()
                         },
                         onDiscard: {

@@ -287,6 +287,7 @@ private struct VoidCTALabel: View {
 /// plus one faster, brighter ring thrown out of the press. Plays a light impact (`sensoryFeedback`).
 struct VoidStartButton: View {
     var title: String = "Start"
+    var icon: VoidIcon = .play
     var isEnabled: Bool = true
     let action: () -> Void
 
@@ -325,7 +326,7 @@ struct VoidStartButton: View {
                     .frame(width: VoidSize.start, height: VoidSize.start)
                     .shadow(color: VoidColor.plasma.opacity(glow), radius: 25, x: 0, y: 18)
                 VStack(spacing: 2) {
-                    Image(systemName: VoidIcon.play.systemName)
+                    Image(systemName: icon.systemName)
                         .font(.system(size: 30, weight: .bold))
                         .frame(width: 34, height: 34)
                     Text(title)
