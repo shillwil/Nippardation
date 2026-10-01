@@ -56,7 +56,8 @@ struct NippardationApp: App {
 
         let bar = UINavigationBar.appearance()
         bar.titleTextAttributes = [.font: titleFont]
-        bar.largeTitleTextAttributes = [.font: largeTitleFont]
+        // Large titles grow with the text size, as the system's own do (34pt at the default).
+        bar.largeTitleTextAttributes = [.font: UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: largeTitleFont)]
     }
 
     private func configureFirebase() {

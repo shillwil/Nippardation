@@ -500,17 +500,63 @@ struct VoidPillPair: View {
 
     var body: some View {
         // Side by side while both titles fit; stacked at large text sizes instead of truncating.
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) { pills }
-            VStack(spacing: 10) { pills }
+        PillPairLayout(spacing: 10) {
+            VoidPillButton(title: leading, isEnabled: leadingEnabled, action: onLeading)
+            VoidPillButton(title: trailing, isEnabled: trailingEnabled, action: onTrailing)
         }
         .padding(.horizontal, VoidSpace.insetCard)
     }
+}
 
-    @ViewBuilder
-    private var pills: some View {
-        VoidPillButton(title: leading, isEnabled: leadingEnabled, action: onLeading)
-        VoidPillButton(title: trailing, isEnabled: trailingEnabled, action: onTrailing)
+/// Equal halves side by side while the wider pill's title fits in half the width, otherwise one
+/// pill per row. A Layout rather than ViewThatFits: in the Plan tab's bottom bar, under its
+/// wrapping large title (iOS 26's `.largeTitle` toolbar slot), a ViewThatFits re-measured
+/// without end when the text size changed, and the app froze.
+private struct PillPairLayout: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? rowWidth(subviews)
+        guard rowWidth(subviews) <= width else {
+            let heights = subviews.map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
+            return CGSize(width: width, height: heights.reduce(0, +) + totalSpacing(subviews))
+        }
+        let share = shareWidth(width, subviews)
+        let height = subviews.map { $0.sizeThatFits(ProposedViewSize(width: share, height: nil)).height }.max() ?? 0
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        if rowWidth(subviews) <= bounds.width {
+            let share = shareWidth(bounds.width, subviews)
+            for (index, subview) in subviews.enumerated() {
+                subview.place(
+                    at: CGPoint(x: bounds.minX + CGFloat(index) * (share + spacing), y: bounds.minY),
+                    proposal: ProposedViewSize(width: share, height: bounds.height)
+                )
+            }
+        } else {
+            var y = bounds.minY
+            for subview in subviews {
+                let height = subview.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil)).height
+                subview.place(at: CGPoint(x: bounds.minX, y: y), proposal: ProposedViewSize(width: bounds.width, height: height))
+                y += height + spacing
+            }
+        }
+    }
+
+    /// The width a row needs: every pill as wide as the widest title asks for.
+    private func rowWidth(_ subviews: Subviews) -> CGFloat {
+        let widest = subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        return widest * CGFloat(subviews.count) + totalSpacing(subviews)
+    }
+
+    private func shareWidth(_ width: CGFloat, _ subviews: Subviews) -> CGFloat {
+        (width - totalSpacing(subviews)) / CGFloat(max(subviews.count, 1))
+    }
+
+    private func totalSpacing(_ subviews: Subviews) -> CGFloat {
+        spacing * CGFloat(max(subviews.count - 1, 0))
     }
 }
 

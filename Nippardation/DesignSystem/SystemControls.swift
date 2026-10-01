@@ -52,15 +52,17 @@ extension View {
 
 private struct WrappingLargeTitle: ViewModifier {
     let title: String
+    /// Read here, outside the bar: inside it, SwiftUI stops toolbar content growing at xxLarge,
+    /// while the bar's own large titles keep growing with the text size.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content.toolbar {
                 ToolbarItem(placement: .largeTitle) {
                     Text(title)
-                        // The face and size the bar's own large titles use (see NippardationApp),
-                        // fixed like theirs so this one doesn't grow with the text size alone.
-                        .font(.custom(VoidFont.labelFontName, fixedSize: VoidFont.navLargeTitleSize))
+                        // The face and size the bar's own large titles use (see NippardationApp).
+                        .font(.custom(VoidFont.labelFontName, fixedSize: VoidFont.navLargeTitleSize(at: dynamicTypeSize)))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
@@ -75,5 +77,17 @@ private struct WrappingLargeTitle: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+extension VoidFont {
+    /// The navigation bar's large-title size at a text size: `navLargeTitleSize` at the default,
+    /// growing and shrinking the way the system's own large titles do. NippardationApp gives the
+    /// bar's large titles the same curve.
+    static func navLargeTitleSize(at dynamicTypeSize: DynamicTypeSize) -> CGFloat {
+        UIFontMetrics(forTextStyle: .largeTitle).scaledValue(
+            for: navLargeTitleSize,
+            compatibleWith: UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
+        )
     }
 }

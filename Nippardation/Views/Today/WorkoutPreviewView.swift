@@ -15,6 +15,8 @@ struct WorkoutPreviewView: View {
 
     @State private var readOnlyWorkout: TrackedWorkout
     @State private var selectedExercise: IdentifiableIndex?
+    /// The row number's column grows with the text size, so "03" never breaks onto two lines.
+    @ScaledMetric private var numberColumnWidth: CGFloat = 22
 
     init(template: Template) {
         self.template = template
@@ -102,7 +104,8 @@ struct WorkoutPreviewView: View {
             HStack(spacing: VoidSpace.s3) {
                 Text(VoidFormat.pad2(index + 1))
                     .voidEyebrowSm(VoidColor.text3)
-                    .frame(width: 22, alignment: .leading)
+                    .fixedSize()
+                    .frame(minWidth: numberColumnWidth, alignment: .leading)
                 VStack(alignment: .leading, spacing: 3) {
                     // Shrinks toward 70% to stay on one line, then wraps onto a second.
                     ShrinkThenWrapText(exercise.displayName)
