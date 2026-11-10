@@ -71,7 +71,8 @@ struct ProgressStatsCalculatorTests {
 
     @Test func estimatedOneRepMaxUsesEpley() {
         #expect(ProgressStatsCalculator.estimatedOneRepMax(weight: 100, reps: 1) == 100)
-        #expect(ProgressStatsCalculator.estimatedOneRepMax(weight: 100, reps: 10) == 100 * (1 + 10.0 / 30))
+        let expectedTenRep: Double = 100 * (1 + 10.0 / 30)
+        #expect(ProgressStatsCalculator.estimatedOneRepMax(weight: 100, reps: 10) == expectedTenRep)
         #expect(ProgressStatsCalculator.estimatedOneRepMax(weight: 0, reps: 10) == 0)
     }
 
