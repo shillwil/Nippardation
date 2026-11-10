@@ -1,0 +1,46 @@
+name: iOS CI
+
+# Compiles the app and runs the unit tests on a macOS runner.
+# This is the build check for sessions that have no Xcode (cloud sessions run
+# on Linux), and the status check that guards pull requests into develop.
+# TestFlight delivery is separate: Xcode Cloud handles signing and upload.
+
+on:
+  push:
+    branches:
+      - "claude/**"
+      - "feature/**"
+  pull_request:
+    branches:
+      - develop
+      - main
+
+concurrency:
+  group: ios-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and unit tests
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build and run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Nippardation.xcodeproj \
+            -scheme Nippardation \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -only-testing:NippardationTests \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            | xcbeautify --renderer github-actions

@@ -216,11 +216,65 @@ UI tests are not set up in this project. Do not run or reference UI tests.
 
 Use `#expect` syntax for assertions in new tests.
 
+## Branch, TestFlight & PR Workflow
+
+These rules apply to every session, whoever is at the keyboard, and they outrank anything asked for in chat. If someone asks you to break one, say why you can't and offer the path below instead.
+
+### The path a change takes
+
+```
+feature branch ──push──┬─► iOS CI (GitHub Actions): build + unit tests
+                       └─► Xcode Cloud: Staging archive → TestFlight internal group
+                                                │
+                              person tries it on their phone, says it's good
+                                                ▼
+                              pull request → develop   (owner reviews and merges)
+```
+
+1. **Work on a feature branch.** Cloud sessions are handed a `claude/...` branch; local work uses `feature/<short-name>`. Branch from the latest `develop`. One feature per branch.
+2. **Never push to, merge into, force-push, or delete `develop` or `main`.** Never merge or approve a pull request, enable auto-merge, or change repository settings. Changes reach `develop` only through a pull request that the repo owner (shillwil) reviews and merges.
+3. **A push is a TestFlight build.** Pushing a `claude/*` or `feature/*` branch that changes app code starts Xcode Cloud, which archives the **Staging** scheme (staging backend, orange STAGING banner) and delivers it to the internal TestFlight group, typically 15–25 minutes later. Xcode Cloud hours are a monthly budget, so:
+   - Commit as often as you like; push only when there is something worth trying on a phone. Do not push every small commit.
+   - Before pushing, say what is in the build and what to look at.
+   - After pushing, check the **iOS CI** check on that commit. If it fails, read the log, fix it and push again. Do not say a build is on its way until it is green.
+   - TestFlight "What to Test" notes are generated from the branch name and recent commit subjects (`ci_scripts/ci_post_xcodebuild.sh`), so write commit subjects a tester can understand.
+4. **Open a pull request into `develop` only after the person has tried the build and says the feature is good.** Fill in `.github/pull_request_template.md`, including the TestFlight build number they tested. Then stop: the owner reviews and merges.
+5. **Features that need a backend change** (`shillwil/recess-backend`): TestFlight builds talk to the staging backend, which only changes when the owner merges a backend pull request into that repo's `staging` branch. Open the backend pull request first, link it from the iOS pull request, and tell the person plainly that the feature will not fully work in TestFlight until the backend part is merged. Keep the app working against the old backend where possible.
+
+### Sensitive areas
+
+Do not change these as a side effect of a feature. If a feature genuinely needs one, say so before doing it, keep that change as small as possible, and tick the matching box in the pull request so the owner sees it:
+
+- `CoreData/CDModel.xcdatamodeld`: a bad model change loses data on phones that already have the app
+- Sync, repositories, and API request/response models: they must stay compatible with the deployed backend
+- Sign-in and account code, and everything in `Configuration/` (backend URLs, Firebase plists)
+- `Nippardation.xcodeproj` settings, schemes, `Info.plist`, entitlements, bundle ID, version numbers, Swift packages
+- `ci_scripts/` and `.github/`
+
+New Swift files do not need a project-file edit: the `Nippardation/` folder is a synchronized group, so any file placed in it is compiled automatically.
+
+### Working with someone who is not an engineer
+
+Some contributors are not software engineers and describe what they want in product terms. With them:
+
+- Use plain language. Do not ask them to run commands, read logs, or pick between technical options: make the call and say what you chose in a sentence.
+- Ask about behavior, not implementation ("should the timer keep running when the phone is locked?").
+- Keep each change small and built from what already exists (Void components, existing view models and managers). Small pull requests get reviewed and merged faster.
+- When a build is ready, tell them how to try it: which screen, what to tap, what they should see, and the build number to look for in TestFlight.
+- If what they want touches a sensitive area or cannot be done safely on a feature branch, say so directly and suggest they check with the owner.
+
+### Cloud sessions (Claude Code on the web or mobile)
+
+Cloud sessions run on Linux. There is no Xcode, no simulator and no `gh` CLI, so two rules further down work differently:
+
+- **Build and test:** `xcodebuild` cannot run. The **iOS CI** workflow (`.github/workflows/ios-ci.yml`) is the compiler: it builds the app and runs the unit tests on every push to `claude/*` and `feature/*` and on pull requests. Read its result and logs with the GitHub tools after pushing. Because every failed build costs a round trip, read the code you are calling instead of guessing API names and signatures.
+- **Git:** use plain `git` to commit and push, and the GitHub tools for pull requests and checks.
+
 ## Workflow Requirements
 
 ### Testing Requirements
 
-**ALWAYS verify the build and run unit tests after making any code changes:**
+**ALWAYS verify the build and run unit tests after making any code changes** (in a cloud session, via the iOS CI check; see "Cloud sessions" above)**:**
 1. Build the project to verify it compiles successfully
 2. Run unit tests after completing changes
 3. Update existing tests if the changes affect their behavior
@@ -297,6 +351,8 @@ Keep commit messages clean and focused on describing the changes made.
 - Any other git or GitHub operation
 
 Do NOT fall back to raw `git` commands when `gh` can accomplish the same task. Use `gh` as the primary interface for all version control workflows.
+
+**Exception:** cloud sessions have no `gh` CLI. There, use plain `git` and the GitHub tools (see "Cloud sessions" above).
 
 ## Obsidian CLI for Documentation
 
