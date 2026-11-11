@@ -42,18 +42,21 @@ protocol ProgramAPIServiceProtocol: Sendable {
     /// - Returns: The created program DTO
     func createProgram(_ request: CreateProgramRequest) async throws -> ProgramDTO
 
-    /// Update program metadata
+    /// Update a program: its metadata and, when the request carries `workouts`, its whole
+    /// rotation, applied together on the server
     /// - Parameters:
     ///   - id: The program's server ID
     ///   - request: Update request with fields to change
     /// - Returns: Updated program DTO
     func updateProgram(id: String, _ request: UpdateProgramRequest) async throws -> ProgramDTO
 
-    /// Replace all workouts in a program
+    /// Replace all workouts in a program without touching its metadata
     /// - Parameters:
     ///   - id: The program's server ID
     ///   - workouts: New workout list (replaces all existing)
     /// - Returns: Updated program DTO
+    /// - Note: The rotation must fit the program's stored `daysPerWeek`. To change the
+    ///   number of days, send `workouts` in `updateProgram` instead.
     func updateProgramWorkouts(
         id: String,
         _ workouts: [ProgramWorkoutInput]

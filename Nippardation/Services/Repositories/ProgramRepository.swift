@@ -200,16 +200,6 @@ final class ProgramRepository: ProgramRepositoryProtocol {
     }
 
     func updateProgram(_ program: Program) async throws -> Program {
-        let request = UpdateProgramRequest(
-            name: program.name,
-            description: program.description,
-            daysPerWeek: program.daysPerWeek,
-            durationWeeks: program.durationWeeks
-        )
-
-        var dto = try await apiService.updateProgram(id: program.serverId, request)
-
-        // Also update workouts if they changed
         let workoutInputs = program.workouts.map { workout in
             ProgramWorkoutInput(
                 dayNumber: workout.dayNumber,
@@ -217,11 +207,24 @@ final class ProgramRepository: ProgramRepositoryProtocol {
                 templateId: workout.templateServerId
             )
         }
+        let sendsRotation = !workoutInputs.isEmpty
 
-        dto = try await apiService.updateProgramWorkouts(
-            id: program.serverId,
-            workoutInputs
+        // One request for the whole save. The server validates every day number against
+        // the day count, so the two have to change together: sent as separate requests,
+        // removing a day was rejected (the old rotation no longer fit the new, smaller
+        // count) and the save could also be left half-applied.
+        //
+        // A program whose rotation is not loaded sends neither field, so a save that only
+        // knows the metadata can never shorten the rotation on the server.
+        let request = UpdateProgramRequest(
+            name: program.name,
+            description: program.description,
+            daysPerWeek: sendsRotation ? program.daysPerWeek : nil,
+            durationWeeks: program.durationWeeks,
+            workouts: sendsRotation ? workoutInputs : nil
         )
+
+        let dto = try await apiService.updateProgram(id: program.serverId, request)
 
         let updatedProgram = await hydrate(ProgramMapper.toDomain(dto))
 

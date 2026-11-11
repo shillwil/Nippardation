@@ -111,23 +111,32 @@ struct CreateProgramRequest: Codable {
 
 }
 
-/// Request body for updating program metadata
+/// Request body for updating a program.
+///
+/// A nil field is left out of the JSON and the server keeps its current value.
+/// `workouts`, when sent, replaces the whole rotation in the same server transaction as
+/// the metadata. Send it together with `daysPerWeek` whenever the number of days changes:
+/// the server checks each day number against the day count, so the two only fit together
+/// when they arrive in the same request.
 struct UpdateProgramRequest: Codable {
     let name: String?
     let description: String?
     let daysPerWeek: Int?
     let durationWeeks: Int?
+    let workouts: [ProgramWorkoutInput]?
 
     init(
         name: String? = nil,
         description: String? = nil,
         daysPerWeek: Int? = nil,
-        durationWeeks: Int? = nil
+        durationWeeks: Int? = nil,
+        workouts: [ProgramWorkoutInput]? = nil
     ) {
         self.name = name
         self.description = description
         self.daysPerWeek = daysPerWeek
         self.durationWeeks = durationWeeks
+        self.workouts = workouts
     }
 
 }

@@ -169,15 +169,41 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
 
         let existing = programDTOs[index]
         let now = ISO8601DateFormatter().string(from: Date())
+        let daysPerWeek = request.daysPerWeek ?? existing.daysPerWeek
+
+        // Like the server: a rotation in the request replaces the stored one.
+        let workouts: [ProgramWorkoutDTO]?
+        if let inputs = request.workouts {
+            workouts = inputs.map { input in
+                ProgramWorkoutDTO(
+                    id: UUID().uuidString,
+                    dayNumber: input.dayNumber,
+                    dayLabel: input.dayLabel,
+                    templateId: input.templateId,
+                    template: nil
+                )
+            }
+        } else {
+            workouts = existing.workouts
+        }
+
+        // Like the server: progress restarts when it would point past the end of the rotation.
+        let currentDayIndex: Int?
+        if let current = existing.currentDayIndex, current >= daysPerWeek {
+            currentDayIndex = 0
+        } else {
+            currentDayIndex = existing.currentDayIndex
+        }
+
         let updated = ProgramDTO(
             id: existing.id,
             name: request.name ?? existing.name,
             description: request.description ?? existing.description,
-            daysPerWeek: request.daysPerWeek ?? existing.daysPerWeek,
+            daysPerWeek: daysPerWeek,
             durationWeeks: request.durationWeeks ?? existing.durationWeeks,
-            workouts: existing.workouts,
+            workouts: workouts,
             isActive: existing.isActive,
-            currentDayIndex: existing.currentDayIndex,
+            currentDayIndex: currentDayIndex,
             timesCompleted: existing.timesCompleted,
             isPublic: existing.isPublic,
             isAiGenerated: existing.isAiGenerated,
