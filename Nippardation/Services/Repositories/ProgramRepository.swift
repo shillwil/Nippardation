@@ -209,10 +209,8 @@ final class ProgramRepository: ProgramRepositoryProtocol {
         }
         let sendsRotation = !workoutInputs.isEmpty
 
-        // One request for the whole save. The server validates every day number against
-        // the day count, so the two have to change together: sent as separate requests,
-        // removing a day was rejected (the old rotation no longer fit the new, smaller
-        // count) and the save could also be left half-applied.
+        // One request for the whole save, so it applies completely or not at all: the
+        // server checks every day number against the day count carried in the same request.
         //
         // A program whose rotation is not loaded sends neither field, so a save that only
         // knows the metadata can never shorten the rotation on the server.

@@ -171,9 +171,19 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         let now = ISO8601DateFormatter().string(from: Date())
         let daysPerWeek = request.daysPerWeek ?? existing.daysPerWeek
 
-        // Like the server: a rotation in the request replaces the stored one.
+        // Like the server: a rotation in the request replaces the stored one and has to fit
+        // the day count (not empty, every day number unique and below the count). Without a
+        // rotation, lowering the day count drops the stored days that no longer fit.
         let workouts: [ProgramWorkoutDTO]?
         if let inputs = request.workouts {
+            var seenDays = Set<Int>()
+            let fits = !inputs.isEmpty && inputs.allSatisfy { input in
+                input.dayNumber >= 0 && input.dayNumber < daysPerWeek && seenDays.insert(input.dayNumber).inserted
+            }
+            guard fits else {
+                throw RepositoryError.validationError("Workouts do not fit a program with \(daysPerWeek) days per week")
+            }
+
             workouts = inputs.map { input in
                 ProgramWorkoutDTO(
                     id: UUID().uuidString,
@@ -184,7 +194,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
                 )
             }
         } else {
-            workouts = existing.workouts
+            workouts = existing.workouts?.filter { $0.dayNumber < daysPerWeek }
         }
 
         // Like the server: progress restarts when it would point past the end of the rotation.
@@ -212,6 +222,7 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         )
 
         programDTOs[index] = updated
+        refreshActiveProgram(with: updated)
         return updated
     }
 
@@ -259,7 +270,22 @@ final class MockProgramAPIService: ProgramAPIServiceProtocol, @unchecked Sendabl
         )
 
         programDTOs[index] = updated
+        refreshActiveProgram(with: updated)
         return updated
+    }
+
+    /// Keeps the active-program response in step with a program that was just updated,
+    /// so the next `fetchActiveProgram()` returns what was saved.
+    private func refreshActiveProgram(with program: ProgramDTO) {
+        guard activeProgramDTO?.program.id == program.id else { return }
+
+        activeProgramDTO = ActiveProgramDTO(
+            program: program,
+            nextWorkout: program.workouts?
+                .first { $0.dayNumber == (program.currentDayIndex ?? 0) }
+                .map { NextWorkoutDTO(from: $0) },
+            isCompleted: false
+        )
     }
 
     func deleteProgram(id: String) async throws {

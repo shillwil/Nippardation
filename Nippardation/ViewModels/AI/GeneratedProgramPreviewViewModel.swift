@@ -144,7 +144,8 @@ final class GeneratedProgramPreviewViewModel: ObservableObject {
                     lastFetchedAt: self.originalProgram.lastFetchedAt
                 )
 
-                // Update program metadata on server if name/description changed
+                // Save the program on the server if name/description changed (one request
+                // that carries the metadata and the unchanged rotation)
                 if updatedProgram.name != self.originalProgram.name ||
                    updatedProgram.description != self.originalProgram.description {
                     _ = try await self.programRepository.updateProgram(updatedProgram)

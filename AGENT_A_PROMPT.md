@@ -144,7 +144,7 @@ Authorization: Bearer <firebase_id_token>
 | GET | `/api/programs/:id` | Get program with workouts |
 | GET | `/api/programs/active` | Get active program |
 | POST | `/api/programs` | Create program |
-| PUT | `/api/programs/:id` | Update program metadata |
+| PUT | `/api/programs/:id` | Update program metadata and, optionally, its whole rotation |
 | PUT | `/api/programs/:id/workouts` | Replace program workouts |
 | DELETE | `/api/programs/:id` | Delete program |
 | POST | `/api/programs/:id/activate` | Set as active program |

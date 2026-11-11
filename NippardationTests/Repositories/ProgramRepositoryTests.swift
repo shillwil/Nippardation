@@ -142,6 +142,62 @@ struct ProgramRepositoryTests {
         #expect(updated.workouts.count == 4)
     }
 
+    @Test("A saved active plan is what the next active-plan fetch returns")
+    func testUpdateProgramOfTheActivePlanSurvivesAReload() async throws {
+        let api = makeAPI()
+        let manager = CoreDataTestHelper.createInMemoryManager()
+        let repository = ProgramRepository(apiService: api, coreDataManager: manager)
+
+        // "prog_001" is the mock server's active plan, six days long. Save it with two.
+        var program = CoreDataTestHelper.createSampleProgram(
+            serverId: "prog_001",
+            name: "Push Pull",
+            daysPerWeek: 2
+        )
+        program.workouts = [day(0, "tmpl_001"), day(1, "tmpl_002")]
+        _ = try await repository.updateProgram(program)
+
+        // What the Plan screen does after a save: reload the active plan.
+        guard let active = try await repository.getActiveProgram() else {
+            Issue.record("No active program after the save")
+            return
+        }
+
+        #expect(active.serverId == "prog_001")
+        #expect(active.name == "Push Pull")
+        #expect(active.daysPerWeek == 2)
+        #expect(active.workouts.map(\.templateServerId) == ["tmpl_001", "tmpl_002"])
+
+        // The reload must not put the old six days back in the cache.
+        #expect(repository.getCachedProgram(serverId: "prog_001")?.workouts.count == 2)
+    }
+
+    @Test("A rotation the server refuses throws and leaves the cache alone")
+    func testUpdateProgramThrowsWithoutCachingWhenTheRotationDoesNotFit() async throws {
+        let api = makeAPI()
+        let manager = CoreDataTestHelper.createInMemoryManager()
+        let repository = ProgramRepository(apiService: api, coreDataManager: manager)
+
+        // Three days, but the last one is numbered 3: outside a three-day rotation (0...2).
+        let misnumbered = plan(days: [day(0, "tmpl_001"), day(1, "tmpl_003"), day(3, "tmpl_002")])
+
+        do {
+            _ = try await repository.updateProgram(misnumbered)
+            Issue.record("Expected updateProgram to throw")
+        } catch {
+            // Expected
+        }
+
+        #expect(api.updateProgramCallCount == 1)
+        #expect(api.updateProgramWorkoutsCallCount == 0)
+        #expect(manager.fetchCachedPrograms().isEmpty)
+
+        // The server still holds its four days.
+        let stored = try await api.fetchProgram(id: "prog_002")
+        #expect(stored.daysPerWeek == 4)
+        #expect(stored.workouts?.count == 4)
+    }
+
     @Test("A failed update throws and leaves the cache alone")
     func testUpdateProgramThrowsWithoutCachingWhenTheRequestFails() async throws {
         let api = makeAPI()
