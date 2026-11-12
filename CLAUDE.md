@@ -136,7 +136,7 @@ MainTabView (Today · Plan · Progress, custom floating VoidTabBar)
 - **Real-time Updates**: Views subscribe to WorkoutManager for live data
 - **State Persistence**: Active workout state survives app lifecycle events
 - **WebView Integration**: YouTube video demonstrations for exercises
-- **Debug preview mode**: `xcrun simctl launch booted com.shillwil.recess-fitness --void-preview [--void-tab plan] [--void-empty] [--void-share]` shows the app with mock data and no sign-in (DEBUG only, see `Configuration/VoidPreviewMode.swift`)
+- **Debug preview mode**: `xcrun simctl launch booted com.shillwil.recess-fitness.staging --void-preview [--void-tab plan] [--void-empty] [--void-share]` shows the app with mock data and no sign-in (DEBUG only, see `Configuration/VoidPreviewMode.swift`)
 
 ### Workout Template System
 

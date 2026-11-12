@@ -8,13 +8,16 @@
 //    recess://plan/<token>             (Void spec)
 //    recess://share/<token>
 //    https://recess.fit/p/<token>      (universal link; needs the associated-domains entitlement to open the app)
+//  A staging build also accepts its own registered schemes: nippardation-staging:// and recess-staging://.
 //
 
 import Foundation
 import Combine
 
-private let legacyScheme = "nippardation"
-private let recessScheme = "recess"
+private let baseSchemes = ["nippardation", "recess"]
+/// The plain schemes (what the backend issues and what people paste) plus the ones this build
+/// registers, which carry a suffix in staging.
+private let customSchemes = Set(baseSchemes + baseSchemes.map { $0 + AppConfiguration.shared.urlSchemeSuffix })
 private let shareHosts: Set<String> = ["share", "plan"]
 private let universalHost = "recess.fit"
 private let universalPathPrefix = "p"
@@ -59,6 +62,22 @@ final class DeepLinkRouter: ObservableObject {
         return extractShareToken(from: url) != nil
     }
 
+    /// The link to put in the share sheet for a share URL the backend issued.
+    ///
+    /// The backend always issues `nippardation://…`, which belongs to the production app. A staging
+    /// build re-points the link at its own scheme so tapping it opens the staging app instead.
+    nonisolated static func shareableURL(from backendURL: String) -> URL? {
+        let suffix = AppConfiguration.shared.urlSchemeSuffix
+        guard !suffix.isEmpty,
+              var components = URLComponents(string: backendURL),
+              let scheme = components.scheme?.lowercased(),
+              baseSchemes.contains(scheme) else {
+            return URL(string: backendURL)
+        }
+        components.scheme = scheme + suffix
+        return components.url
+    }
+
     /// Extracts a share token from any supported link form.
     /// - Parameter url: The URL to parse
     /// - Returns: The token string, or nil if the URL is invalid
@@ -68,7 +87,7 @@ final class DeepLinkRouter: ObservableObject {
         let pathComponents = url.pathComponents.filter { $0 != "/" }
 
         switch scheme {
-        case legacyScheme, recessScheme:
+        case let scheme? where customSchemes.contains(scheme):
             // scheme://share/TOKEN or scheme://plan/TOKEN (host = "share"/"plan", path = "/TOKEN")
             if let host, shareHosts.contains(host) {
                 guard let token = pathComponents.first, !token.isEmpty else { return nil }
