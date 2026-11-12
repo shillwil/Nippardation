@@ -90,6 +90,32 @@ import Foundation
         #expect(DeepLinkRouter.extractShareToken(from: URL(string: "recess://plan/")!) == nil)
     }
 
+    // MARK: - This build's own schemes (suffixed in staging, plain in production)
+
+    @Test func extractsTokenFromThisBuildsRegisteredSchemes() {
+        let suffix = AppConfiguration.shared.urlSchemeSuffix
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "nippardation\(suffix)://share/abc123")!) == "abc123")
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "recess\(suffix)://plan/abc123")!) == "abc123")
+    }
+
+    @Test func rejectsLookalikeSchemes() {
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "nippardation-other://share/abc123")!) == nil)
+        #expect(DeepLinkRouter.extractShareToken(from: URL(string: "recessx://plan/abc123")!) == nil)
+    }
+
+    @Test func shareableURLPointsBackendLinksAtThisBuild() {
+        let suffix = AppConfiguration.shared.urlSchemeSuffix
+        let url = DeepLinkRouter.shareableURL(from: "nippardation://share/a3Bf9kLm2xQz")
+
+        #expect(url?.absoluteString == "nippardation\(suffix)://share/a3Bf9kLm2xQz")
+        #expect(url.flatMap { DeepLinkRouter.extractShareToken(from: $0) } == "a3Bf9kLm2xQz")
+    }
+
+    @Test func shareableURLLeavesWebLinksAlone() {
+        let url = DeepLinkRouter.shareableURL(from: "https://recess.fit/p/abc123")
+        #expect(url?.absoluteString == "https://recess.fit/p/abc123")
+    }
+
     @Test func isShareLinkAcceptsAllForms() {
         #expect(DeepLinkRouter.isShareLink("nippardation://share/abc"))
         #expect(DeepLinkRouter.isShareLink("  recess://plan/abc \n"))

@@ -6,12 +6,28 @@ The app environment (staging vs production) is determined **at compile time** vi
 
 ### Build Configuration Matrix
 
-| Config     | Compiler Flags    | URL        | Used By                          |
-|------------|-------------------|------------|----------------------------------|
-| Debug      | `DEBUG STAGING`   | staging    | Staging scheme Run               |
-| Staging    | `STAGING`         | staging    | Staging scheme Archive           |
-| Release    | `PRODUCTION`      | production | Nippardation scheme Run/Archive  |
-| Production | `PRODUCTION`      | production | Production scheme Run/Archive    |
+| Config     | Compiler Flags    | URL        | Bundle ID                             | Used By                          |
+|------------|-------------------|------------|---------------------------------------|----------------------------------|
+| Debug      | `DEBUG STAGING`   | staging    | `com.shillwil.recess-fitness.staging` | Staging scheme Run, unit tests   |
+| Staging    | `STAGING`         | staging    | `com.shillwil.recess-fitness.staging` | Staging scheme Archive           |
+| Release    | `PRODUCTION`      | production | `com.shillwil.recess-fitness`         | Nippardation scheme Run/Archive  |
+| Production | `PRODUCTION`      | production | `com.shillwil.recess-fitness`         | Production scheme Run/Archive    |
+
+### Staging Is a Separate App
+
+Staging builds have their own bundle ID, so they are a different app from production everywhere
+that matters:
+
+- **On the phone:** "Recess Staging" installs beside "Recess Fitness" with its own local database,
+  sign-in and settings. Nothing made in one can sync to the other's backend.
+- **App Store Connect / TestFlight:** staging builds upload to the "Recess Staging" app record,
+  production builds to "Recess Fitness".
+- **Firebase:** `GoogleService-Info-Staging.plist` is the `.staging` app entry in the staging
+  Firebase project; `GoogleService-Info-Prod.plist` is the production project.
+- **Links:** staging registers `nippardation-staging://` and `recess-staging://`
+  (`URL_SCHEME_SUFFIX` build setting, used by `Info.plist`) and leaves the plain schemes to
+  production. `DeepLinkRouter.shareableURL(from:)` re-points backend share links at the staging
+  scheme in staging builds.
 
 ### Switching Environments
 

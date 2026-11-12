@@ -73,7 +73,8 @@ struct VoidFontsTests {
     @Test func recessURLSchemeIsRegistered() {
         let types = Bundle(for: WorkoutManager.self).object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]] ?? []
         let schemes = types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }
-        #expect(schemes.contains("recess"))
-        #expect(schemes.contains("nippardation"))
+        // Staging registers suffixed schemes so it never claims the production app's links.
+        let suffix = AppConfiguration.shared.urlSchemeSuffix
+        #expect(Set(schemes) == ["recess" + suffix, "nippardation" + suffix])
     }
 }
