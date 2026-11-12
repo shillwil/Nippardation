@@ -33,7 +33,7 @@ final class ShareViewModel: ObservableObject {
         Task {
             do {
                 let response = try await shareAPIService.createShare(type: type, itemId: itemId)
-                self.shareURL = URL(string: response.shareUrl)
+                self.shareURL = DeepLinkRouter.shareableURL(from: response.shareUrl)
                 self.isLoading = false
             } catch let repoError as RepositoryError {
                 self.error = repoError.errorDescription ?? "Failed to create share link"

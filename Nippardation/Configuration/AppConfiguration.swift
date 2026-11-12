@@ -58,14 +58,28 @@ struct AppConfiguration {
     var bundleIdentifier: String {
         switch environment {
         case .staging:
-            return "com.shillwil.recess-fitness"
+            return "com.shillwil.recess-fitness.staging"
         case .production:
             return "com.shillwil.recess-fitness"
         }
     }
 
+    /// The scheme the backend puts on share links (`nippardation://share/<token>`).
     var shareURLScheme: String {
         "nippardation"
+    }
+
+    /// Suffix on the custom URL schemes this build registers (`URL_SCHEME_SUFFIX` in the build
+    /// settings feeds Info.plist). Staging is its own app and installs beside production, so it
+    /// claims `nippardation-staging://` and `recess-staging://` and leaves the plain schemes to
+    /// the production app.
+    var urlSchemeSuffix: String {
+        switch environment {
+        case .staging:
+            return "-staging"
+        case .production:
+            return ""
+        }
     }
 
     // When false, the AI program wizard hides the equipment selector and sends

@@ -6,11 +6,11 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.shillwil.recess-fitness</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>nippardation</string>
-				<string>recess</string>
+				<string>nippardation$(URL_SCHEME_SUFFIX)</string>
+				<string>recess$(URL_SCHEME_SUFFIX)</string>
 			</array>
 		</dict>
 	</array>

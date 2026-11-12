@@ -3,7 +3,7 @@
 //  Nippardation
 //
 //  DEBUG-only launch mode for looking at the app with mock data and no sign-in:
-//    xcrun simctl launch booted com.shillwil.recess-fitness --void-preview [--void-tab plan] [--void-empty] [--void-share]
+//    xcrun simctl launch booted com.shillwil.recess-fitness.staging --void-preview [--void-tab plan] [--void-empty] [--void-share]
 //  Never compiled into Release builds.
 //
 
