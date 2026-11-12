@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import AVFoundation
 import FirebaseCore
 
 @main
@@ -20,6 +21,7 @@ struct NippardationApp: App {
         StringArrayTransformer.register()
         configureFirebase()
         Self.configureNavigationBarTypography()
+        Self.configureAudioSession()
 
         // Configure dependency container with real implementations
         DependencyContainer.shared.configureForProduction()
@@ -74,6 +76,19 @@ struct NippardationApp: App {
         bar.compactAppearance = titled(opaque)
         bar.scrollEdgeAppearance = titled(transparent)
         bar.compactScrollEdgeAppearance = titled(transparent)
+    }
+
+    /// Lets exercise demo videos play without stopping the user's music.
+    ///
+    /// With no category set, iOS treats the app's audio as primary (`.soloAmbient`), so the
+    /// moment a demo video starts playing — even muted — Spotify and other music apps pause.
+    /// `.ambient` mixes the app's audio with whatever else is playing instead.
+    static func configureAudioSession(_ session: AVAudioSession = .sharedInstance()) {
+        do {
+            try session.setCategory(.ambient, mode: .default)
+        } catch {
+            print("Audio session: could not set the ambient category — \(error)")
+        }
     }
 
     private func configureFirebase() {
