@@ -21,5 +21,7 @@
 		<string>ChakraPetch-Medium.ttf</string>
 		<string>ChakraPetch-Regular.ttf</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
